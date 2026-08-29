@@ -1,0 +1,28 @@
+# Normalize everything to LF in the repository AND in the working tree.
+# Required: .editorconfig enforces LF and CI runs `dotnet format --verify-no-changes`
+# on Linux. Without this, Windows checkouts produce CRLF and the format check fails.
+* text=auto eol=lf
+
+# Binary — never touch
+*.png    binary
+*.jpg    binary
+*.jpeg   binary
+*.gif    binary
+*.ico    binary
+*.pdf    binary
+*.zip    binary
+*.dll    binary
+*.exe    binary
+*.pfx    binary
+*.snk    binary
+*.woff   binary
+*.woff2  binary
+
+# Windows-only files that genuinely need CRLF
+*.bat    text eol=crlf
+*.cmd    text eol=crlf
+*.ps1    text eol=crlf
+
+# Keep diffs readable
+*.sln    text eol=crlf merge=union
+package-lock.json  -diff

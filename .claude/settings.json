@@ -1,0 +1,55 @@
+{
+  "statusLine": {
+    "type": "command",
+    "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);const w=j.context_window_size||0;const u=j.context_tokens_used||0;if(w)process.stdout.write('ctx '+Math.round(u/w*100)+'%')}catch(e){}})\""
+  },
+  "permissions": {
+    "allow": [
+      "Bash(dotnet build*)",
+      "Bash(dotnet test*)",
+      "Bash(dotnet format*)",
+      "Bash(dotnet restore*)",
+      "Bash(dotnet run*)",
+      "Bash(dotnet ef*)",
+      "Bash(dotnet new*)",
+      "Bash(dotnet sln*)",
+      "Bash(dotnet add*)",
+      "Bash(docker compose*)",
+      "Bash(git status)",
+      "Bash(git log*)",
+      "Bash(git diff*)",
+      "Bash(git add*)",
+      "Bash(git commit*)",
+      "Bash(git switch*)",
+      "Bash(git checkout -b*)",
+      "Bash(git push*)",
+      "Bash(git pull*)",
+      "Bash(gh pr*)",
+      "Bash(gh run*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);const p=(j.tool_input&&(j.tool_input.file_path||j.tool_input.path))||'';if(/(^|\\/)(bin|obj|packages|\\.vs|\\.git)(\\/|$)|\\.user$|\\.pfx$|\\.env($|\\.)|Local\\.json$/.test(p)){process.stderr.write('Blocked: protected path -> '+p+' (build output, IDE state and secret files are off-limits)');process.exit(2)}}catch(e){}})\""
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);const p=(j.tool_input&&(j.tool_input.file_path||j.tool_input.path))||'';if(!/\\.(cs|csproj)$/.test(p))return;require('child_process').execSync('dotnet format --no-restore --include \\\"'+p+'\\\" 2>&1 | tail -5',{stdio:'inherit'})}catch(e){}})\""
+          }
+        ]
+      }
+    ]
+  }
+}
