@@ -20,7 +20,7 @@ dotnet test                                   # all tests
 dotnet format --verify-no-changes             # style check
 dotnet ef migrations add <Name> -p src/Envanta.Infrastructure -s src/Envanta.Web
 dotnet ef database update -p src/Envanta.Infrastructure -s src/Envanta.Web
-dotnet run --project src/Envanta.Web          # Blazor UI + REST API + Swagger + SOAP
+dotnet run --project src/Envanta.Web          # Blazor UI + REST API + Scalar + SOAP
 dotnet run --project src/Envanta.Worker       # background worker (console mode)
 ```
 
@@ -33,7 +33,7 @@ src/
   Envanta.Infrastructure  EF Core, SQL Server, repositories, outbox. References Domain + Application.
   Envanta.SoapApi         class library: SOAP contracts + implementations. Mounted by Web.
   Envanta.Web             THE deployable host — Blazor components, REST controllers,
-                          Swagger, and the SoapCore middleware mount.
+                          OpenAPI/Scalar, and the SoapCore middleware mount.
   Envanta.Worker          BackgroundService, hosted as a Windows Service via UseWindowsService().
 tests/
   Envanta.Domain.Tests  Envanta.Application.Tests  Envanta.IntegrationTests (Testcontainers)
@@ -71,6 +71,7 @@ folders, not by extra processes.
   transaction as the state change; `Envanta.Worker` dispatches them.
 - **All code is English** — identifiers, comments, ADRs, commit messages, test names. User-facing
   strings (UI labels, validation messages) are Turkish with correct characters (ş, ğ, ı, ö, ü, ç).
+  One exception: `docs/journal/` is the human's study material and is written in Turkish.
 
 ## Orchestration (human-in-the-loop)
 
@@ -86,6 +87,9 @@ folders, not by extra processes.
   Never edits files. Skipping it on a schema-touching phase is a defect.
 - **tester**: verdict only — `READY_TO_PUSH` / `NEEDS_FIXES` with file:line. Runs format, build
   and tests. NEVER edits or writes files — not via Edit/Write, not via shell redirection.
+- **explainer**: runs after tester returns `READY_TO_PUSH`, before the ADR and `/pr`. Writes
+  `docs/journal/NNNN-<slug>.md` — the only agent permitted to write files, and only there.
+  It never writes ADRs and never writes answers to its own questions.
 - **Verdicts are terminal for the turn.** When any reviewer returns a verdict, the main agent
   MUST NOT edit or create any file (including plans and docs) and MUST NOT spawn any agent.
   `NEEDS_REVISION` -> human routes to planner. `NEEDS_FIXES` / `DB_NEEDS_REVISION` -> human
