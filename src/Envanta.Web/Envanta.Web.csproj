@@ -5,6 +5,13 @@
     <ProjectReference Include="..\Envanta.SoapApi\Envanta.SoapApi.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="DevExtreme.AspNet.Data" />
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" />
+    <PackageReference Include="Radzen.Blazor" />
+    <PackageReference Include="Scalar.AspNetCore" />
+  </ItemGroup>
+
   <PropertyGroup>
     <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
   </PropertyGroup>
