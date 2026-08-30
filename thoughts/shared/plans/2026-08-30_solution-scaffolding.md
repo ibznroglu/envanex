@@ -48,19 +48,19 @@ yazma modunda çalıştırılarak normalizasyon sağlanır; aksi halde `--verify
 Önce XML tabanlı slnx formatını dene (.NET 10, merge conflict üretmez):
 
 ```bash
-dotnet new sln -n Envanta -o . --format slnx
+dotnet new sln -n Envanex -o . --format slnx
 ```
 
 Eğer `--format slnx` desteklenmiyorsa klasik formata düş:
 
 ```bash
-dotnet new sln -n Envanta -o .
+dotnet new sln -n Envanex -o .
 ```
 
 Sonraki adımlara etkisi:
 
-- **slnx seçildiyse:** Dosya adı `Envanta.slnx`. `.gitattributes`'teki `*.sln text eol=crlf` satırı slnx'i kapsamaz — slnx varsayılan LF kuralına tabi olacak, ek bir `.gitattributes` değişikliği gerekmez.
-- **Klasik .sln seçildiyse:** Dosya adı `Envanta.sln`. `.gitattributes`'teki `*.sln text eol=crlf` satırı zaten mevcut.
+- **slnx seçildiyse:** Dosya adı `Envanex.slnx`. `.gitattributes`'teki `*.sln text eol=crlf` satırı slnx'i kapsamaz — slnx varsayılan LF kuralına tabi olacak, ek bir `.gitattributes` değişikliği gerekmez.
+- **Klasik .sln seçildiyse:** Dosya adı `Envanex.sln`. `.gitattributes`'teki `*.sln text eol=crlf` satırı zaten mevcut.
 
 Hangi format seçildiği Phase 4.1'deki ArchitectureTests kodunu belirler — coder bunu Phase 1'de karar verip not edecek.
 
@@ -83,12 +83,12 @@ Repo köküne `Directory.Packages.props` oluştur:
 
 | Proje | Şablon | Konum |
 |---|---|---|
-| Envanta.Domain | `classlib` | `src/Envanta.Domain` |
-| Envanta.Application | `classlib` | `src/Envanta.Application` |
-| Envanta.Infrastructure | `classlib` | `src/Envanta.Infrastructure` |
-| Envanta.SoapApi | `classlib` | `src/Envanta.SoapApi` |
-| Envanta.Web | `blazor --interactivity Server` | `src/Envanta.Web` |
-| Envanta.Worker | `worker` | `src/Envanta.Worker` |
+| Envanex.Domain | `classlib` | `src/Envanex.Domain` |
+| Envanex.Application | `classlib` | `src/Envanex.Application` |
+| Envanex.Infrastructure | `classlib` | `src/Envanex.Infrastructure` |
+| Envanex.SoapApi | `classlib` | `src/Envanex.SoapApi` |
+| Envanex.Web | `blazor --interactivity Server` | `src/Envanex.Web` |
+| Envanex.Worker | `worker` | `src/Envanex.Worker` |
 
 > `dotnet new blazor` .NET 9+ şablon adı. Eğer .NET 10'da değiştiyse `dotnet new list` ile kontrol et.
 > `--interactivity Server` InteractiveServer render mode'u ayarlar. HTTPS açık kalacak (`--no-https` YOK).
@@ -97,9 +97,9 @@ Repo köküne `Directory.Packages.props` oluştur:
 
 | Proje | Şablon | Konum |
 |---|---|---|
-| Envanta.Domain.Tests | `xunit` | `tests/Envanta.Domain.Tests` |
-| Envanta.Application.Tests | `xunit` | `tests/Envanta.Application.Tests` |
-| Envanta.IntegrationTests | `xunit` | `tests/Envanta.IntegrationTests` |
+| Envanex.Domain.Tests | `xunit` | `tests/Envanex.Domain.Tests` |
+| Envanex.Application.Tests | `xunit` | `tests/Envanex.Application.Tests` |
+| Envanex.IntegrationTests | `xunit` | `tests/Envanex.IntegrationTests` |
 
 ### 1.5 xUnit sürüm tespiti
 
@@ -120,17 +120,17 @@ Yapılacak:
 
 ```bash
 # src
-dotnet sln add src/Envanta.Domain/Envanta.Domain.csproj --solution-folder src
-dotnet sln add src/Envanta.Application/Envanta.Application.csproj --solution-folder src
-dotnet sln add src/Envanta.Infrastructure/Envanta.Infrastructure.csproj --solution-folder src
-dotnet sln add src/Envanta.SoapApi/Envanta.SoapApi.csproj --solution-folder src
-dotnet sln add src/Envanta.Web/Envanta.Web.csproj --solution-folder src
-dotnet sln add src/Envanta.Worker/Envanta.Worker.csproj --solution-folder src
+dotnet sln add src/Envanex.Domain/Envanex.Domain.csproj --solution-folder src
+dotnet sln add src/Envanex.Application/Envanex.Application.csproj --solution-folder src
+dotnet sln add src/Envanex.Infrastructure/Envanex.Infrastructure.csproj --solution-folder src
+dotnet sln add src/Envanex.SoapApi/Envanex.SoapApi.csproj --solution-folder src
+dotnet sln add src/Envanex.Web/Envanex.Web.csproj --solution-folder src
+dotnet sln add src/Envanex.Worker/Envanex.Worker.csproj --solution-folder src
 
 # tests
-dotnet sln add tests/Envanta.Domain.Tests/Envanta.Domain.Tests.csproj --solution-folder tests
-dotnet sln add tests/Envanta.Application.Tests/Envanta.Application.Tests.csproj --solution-folder tests
-dotnet sln add tests/Envanta.IntegrationTests/Envanta.IntegrationTests.csproj --solution-folder tests
+dotnet sln add tests/Envanex.Domain.Tests/Envanex.Domain.Tests.csproj --solution-folder tests
+dotnet sln add tests/Envanex.Application.Tests/Envanex.Application.Tests.csproj --solution-folder tests
+dotnet sln add tests/Envanex.IntegrationTests/Envanex.IntegrationTests.csproj --solution-folder tests
 ```
 
 > slnx formatında `--solution-folder` desteği olmayabilir — coder `dotnet sln add --help` ile
@@ -163,29 +163,29 @@ Genel kurala göre. Bu noktada `dotnet test` şablonların ürettiği `UnitTest1
 
 | Proje | Referans |
 |---|---|
-| Envanta.Application | → Domain |
-| Envanta.Infrastructure | → Domain, Application |
-| Envanta.SoapApi | → Application |
-| Envanta.Web | → Infrastructure, SoapApi |
-| Envanta.Worker | → Infrastructure |
-| Envanta.Domain.Tests | → Domain |
-| Envanta.Application.Tests | → Application |
-| Envanta.IntegrationTests | → Web |
+| Envanex.Application | → Domain |
+| Envanex.Infrastructure | → Domain, Application |
+| Envanex.SoapApi | → Application |
+| Envanex.Web | → Infrastructure, SoapApi |
+| Envanex.Worker | → Infrastructure |
+| Envanex.Domain.Tests | → Domain |
+| Envanex.Application.Tests | → Application |
+| Envanex.IntegrationTests | → Web |
 
 ```bash
-dotnet add src/Envanta.Application reference src/Envanta.Domain
-dotnet add src/Envanta.Infrastructure reference src/Envanta.Domain
-dotnet add src/Envanta.Infrastructure reference src/Envanta.Application
-dotnet add src/Envanta.SoapApi reference src/Envanta.Application
-dotnet add src/Envanta.Web reference src/Envanta.Infrastructure
-dotnet add src/Envanta.Web reference src/Envanta.SoapApi
-dotnet add src/Envanta.Worker reference src/Envanta.Infrastructure
-dotnet add tests/Envanta.Domain.Tests reference src/Envanta.Domain
-dotnet add tests/Envanta.Application.Tests reference src/Envanta.Application
-dotnet add tests/Envanta.IntegrationTests reference src/Envanta.Web
+dotnet add src/Envanex.Application reference src/Envanex.Domain
+dotnet add src/Envanex.Infrastructure reference src/Envanex.Domain
+dotnet add src/Envanex.Infrastructure reference src/Envanex.Application
+dotnet add src/Envanex.SoapApi reference src/Envanex.Application
+dotnet add src/Envanex.Web reference src/Envanex.Infrastructure
+dotnet add src/Envanex.Web reference src/Envanex.SoapApi
+dotnet add src/Envanex.Worker reference src/Envanex.Infrastructure
+dotnet add tests/Envanex.Domain.Tests reference src/Envanex.Domain
+dotnet add tests/Envanex.Application.Tests reference src/Envanex.Application
+dotnet add tests/Envanex.IntegrationTests reference src/Envanex.Web
 ```
 
-**KRİTİK:** `Envanta.Domain` hiçbir Envanta projesine referans VERMEZ. Bu kural Phase 4'teki
+**KRİTİK:** `Envanex.Domain` hiçbir Envanex projesine referans VERMEZ. Bu kural Phase 4'teki
 architecture test ile kalıcı olarak korunacak.
 
 ### 2.2 Phase 2 doğrulaması
@@ -206,30 +206,30 @@ sürümsüz bırakılması YASAKTIR.
 
 ```bash
 # Web
-dotnet add src/Envanta.Web package Radzen.Blazor
-dotnet add src/Envanta.Web package DevExtreme.AspNet.Data
-dotnet add src/Envanta.Web package Microsoft.AspNetCore.OpenApi
-dotnet add src/Envanta.Web package Scalar.AspNetCore
+dotnet add src/Envanex.Web package Radzen.Blazor
+dotnet add src/Envanex.Web package DevExtreme.AspNet.Data
+dotnet add src/Envanex.Web package Microsoft.AspNetCore.OpenApi
+dotnet add src/Envanex.Web package Scalar.AspNetCore
 
 # Infrastructure
-dotnet add src/Envanta.Infrastructure package Microsoft.EntityFrameworkCore.SqlServer
-dotnet add src/Envanta.Infrastructure package Microsoft.EntityFrameworkCore.Design
+dotnet add src/Envanex.Infrastructure package Microsoft.EntityFrameworkCore.SqlServer
+dotnet add src/Envanex.Infrastructure package Microsoft.EntityFrameworkCore.Design
 
 # Application
-dotnet add src/Envanta.Application package FluentValidation
+dotnet add src/Envanex.Application package FluentValidation
 
 # SoapApi
-dotnet add src/Envanta.SoapApi package SoapCore
+dotnet add src/Envanex.SoapApi package SoapCore
 
 # Worker
-dotnet add src/Envanta.Worker package Microsoft.Extensions.Hosting.WindowsServices
+dotnet add src/Envanex.Worker package Microsoft.Extensions.Hosting.WindowsServices
 
 # Test projeleri
-dotnet add tests/Envanta.Domain.Tests package Shouldly
-dotnet add tests/Envanta.Application.Tests package Shouldly
-dotnet add tests/Envanta.IntegrationTests package Shouldly
-dotnet add tests/Envanta.IntegrationTests package Testcontainers.MsSql
-dotnet add tests/Envanta.IntegrationTests package Microsoft.AspNetCore.Mvc.Testing
+dotnet add tests/Envanex.Domain.Tests package Shouldly
+dotnet add tests/Envanex.Application.Tests package Shouldly
+dotnet add tests/Envanex.IntegrationTests package Shouldly
+dotnet add tests/Envanex.IntegrationTests package Testcontainers.MsSql
+dotnet add tests/Envanex.IntegrationTests package Microsoft.AspNetCore.Mvc.Testing
 ```
 
 ### 3.3 CPM'e taşı
@@ -292,7 +292,7 @@ Genel kurala göre.
 
 ### 4.1 Architecture tests ekle (ÖNCE)
 
-Şablon dosyaları silinmeden ÖNCE `tests/Envanta.Domain.Tests/ArchitectureTests.cs` dosyasını
+Şablon dosyaları silinmeden ÖNCE `tests/Envanex.Domain.Tests/ArchitectureTests.cs` dosyasını
 oluştur. Böylece hiçbir commit'te `dotnet test` sıfır testle karşılaşmaz.
 
 Dört ayrı `[Fact]` — her biri `.csproj` dosyasını diskten okuyarak bağımlılık kuralını doğrular.
@@ -301,14 +301,14 @@ Ortak mantık tek bir private helper'da toplanır.
 ```csharp
 using Shouldly;
 
-namespace Envanta.Domain.Tests;
+namespace Envanex.Domain.Tests;
 
 public class ArchitectureTests
 {
     [Fact]
     public void Domain_ShouldNotReference_AnyProject()
     {
-        var references = GetProjectReferences("Envanta.Domain");
+        var references = GetProjectReferences("Envanex.Domain");
 
         references.ShouldBeEmpty();
     }
@@ -316,25 +316,25 @@ public class ArchitectureTests
     [Fact]
     public void Application_ShouldOnlyReference_Domain()
     {
-        var references = GetProjectReferences("Envanta.Application");
+        var references = GetProjectReferences("Envanex.Application");
 
-        references.ShouldBe(new[] { "Envanta.Domain" });
+        references.ShouldBe(new[] { "Envanex.Domain" });
     }
 
     [Fact]
     public void Infrastructure_ShouldOnlyReference_DomainAndApplication()
     {
-        var references = GetProjectReferences("Envanta.Infrastructure");
+        var references = GetProjectReferences("Envanex.Infrastructure");
 
-        references.ShouldBe(new[] { "Envanta.Application", "Envanta.Domain" });
+        references.ShouldBe(new[] { "Envanex.Application", "Envanex.Domain" });
     }
 
     [Fact]
     public void SoapApi_ShouldOnlyReference_Application()
     {
-        var references = GetProjectReferences("Envanta.SoapApi");
+        var references = GetProjectReferences("Envanex.SoapApi");
 
-        references.ShouldBe(new[] { "Envanta.Application" });
+        references.ShouldBe(new[] { "Envanex.Application" });
     }
 
     /// <summary>
@@ -361,8 +361,8 @@ public class ArchitectureTests
 
         while (dir is not null)
         {
-            if (dir.GetFiles("Envanta.slnx").Length > 0
-                || dir.GetFiles("Envanta.sln").Length > 0)
+            if (dir.GetFiles("Envanex.slnx").Length > 0
+                || dir.GetFiles("Envanex.sln").Length > 0)
             {
                 return dir.FullName;
             }
@@ -371,7 +371,7 @@ public class ArchitectureTests
         }
 
         throw new InvalidOperationException(
-            "Envanta.sln or Envanta.slnx not found. The test must run from within the solution directory.");
+            "Envanex.sln or Envanex.slnx not found. The test must run from within the solution directory.");
     }
 }
 ```
@@ -382,7 +382,7 @@ yanlış yeşil verir. `.csproj` dosyasını doğrudan okumak, derleme optimizas
 olarak bağımlılık kuralını korur.
 
 **Yol bulma stratejisi:** `AppContext.BaseDirectory` test binary'sinin çalıştığı dizini verir
-(örn. `tests/Envanta.Domain.Tests/bin/Debug/net10.0/`). Buradan yukarı doğru solution dosyası
+(örn. `tests/Envanex.Domain.Tests/bin/Debug/net10.0/`). Buradan yukarı doğru solution dosyası
 aranarak repo köküne ulaşılır. Hem slnx hem sln aranır. Bu, hem `dotnet test` hem de IDE'den
 çalıştırma senaryolarını kapsar.
 
@@ -391,23 +391,23 @@ aranarak repo köküne ulaşılır. Hem slnx hem sln aranır. Bu, hem `dotnet te
 
 ### 4.2 Şablon dosyalarını sil
 
-- `src/Envanta.Domain/Class1.cs`
-- `src/Envanta.Application/Class1.cs`
-- `src/Envanta.Infrastructure/Class1.cs`
-- `src/Envanta.SoapApi/Class1.cs`
-- `src/Envanta.Web/Components/Pages/Counter.razor`
-- `src/Envanta.Web/Components/Pages/Weather.razor`
-- `src/Envanta.Worker/Worker.cs`
-- `tests/Envanta.Domain.Tests/UnitTest1.cs`
-- `tests/Envanta.Application.Tests/UnitTest1.cs`
-- `tests/Envanta.IntegrationTests/UnitTest1.cs`
+- `src/Envanex.Domain/Class1.cs`
+- `src/Envanex.Application/Class1.cs`
+- `src/Envanex.Infrastructure/Class1.cs`
+- `src/Envanex.SoapApi/Class1.cs`
+- `src/Envanex.Web/Components/Pages/Counter.razor`
+- `src/Envanex.Web/Components/Pages/Weather.razor`
+- `src/Envanex.Worker/Worker.cs`
+- `tests/Envanex.Domain.Tests/UnitTest1.cs`
+- `tests/Envanex.Application.Tests/UnitTest1.cs`
+- `tests/Envanex.IntegrationTests/UnitTest1.cs`
 
 > Silme sırasında `dotnet build` kırmızı kalabilir — beklenen davranış. 4.3'teki güncellemeler
 > tamamlandığında build tekrar yeşile döner.
 
 ### 4.3 Şablon kodunu güncelle
 
-**`src/Envanta.Web/Program.cs`:** Şablon sample servislerini kaldır, minimal çalışır hale getir.
+**`src/Envanex.Web/Program.cs`:** Şablon sample servislerini kaldır, minimal çalışır hale getir.
 Blazor InteractiveServer render mode aktif kalsın. OpenAPI ve Scalar kaydını ekle (sadece
 Development ortamında):
 
@@ -435,11 +435,11 @@ Dosyanın sonuna `WebApplicationFactory<Program>` erişimi için ekle:
 public partial class Program { }
 ```
 
-**`src/Envanta.Web/Components/Pages/Home.razor`:** Sadece basit bir "Envanta ERP" başlığı.
+**`src/Envanex.Web/Components/Pages/Home.razor`:** Sadece basit bir "Envanex ERP" başlığı.
 
-**`src/Envanta.Web/Components/Layout/NavMenu.razor`:** Counter ve Weather nav link'lerini kaldır.
+**`src/Envanex.Web/Components/Layout/NavMenu.razor`:** Counter ve Weather nav link'lerini kaldır.
 
-**`src/Envanta.Worker/Program.cs`:** Şablonun ürettiği builder kalıbını koru (değiştirme, dayatma).
+**`src/Envanex.Worker/Program.cs`:** Şablonun ürettiği builder kalıbını koru (değiştirme, dayatma).
 Sadece örnek Worker servis kaydını kaldır ve `UseWindowsService()` ekle.
 
 > Blazor şablonu `wwwroot/`, `Components/Layout/`, `Components/Routes.razor`,
@@ -511,19 +511,19 @@ Genel kurala göre. `dotnet test` en az 4 test geçirir (ArchitectureTests'teki 
 > listesi bağlayıcıdır, bu liste değildir.
 
 ```
-Envanta.slnx (veya Envanta.sln)
+Envanex.slnx (veya Envanex.sln)
 Directory.Packages.props
 src/
-  Envanta.Domain/
-    Envanta.Domain.csproj
-  Envanta.Application/
-    Envanta.Application.csproj
-  Envanta.Infrastructure/
-    Envanta.Infrastructure.csproj
-  Envanta.SoapApi/
-    Envanta.SoapApi.csproj
-  Envanta.Web/
-    Envanta.Web.csproj
+  Envanex.Domain/
+    Envanex.Domain.csproj
+  Envanex.Application/
+    Envanex.Application.csproj
+  Envanex.Infrastructure/
+    Envanex.Infrastructure.csproj
+  Envanex.SoapApi/
+    Envanex.SoapApi.csproj
+  Envanex.Web/
+    Envanex.Web.csproj
     Program.cs
     Components/
       App.razor
@@ -541,21 +541,21 @@ src/
       launchSettings.json
     wwwroot/
       ...
-  Envanta.Worker/
-    Envanta.Worker.csproj
+  Envanex.Worker/
+    Envanex.Worker.csproj
     Program.cs
     appsettings.json
     appsettings.Development.json
     Properties/
       launchSettings.json
 tests/
-  Envanta.Domain.Tests/
-    Envanta.Domain.Tests.csproj
+  Envanex.Domain.Tests/
+    Envanex.Domain.Tests.csproj
     ArchitectureTests.cs
-  Envanta.Application.Tests/
-    Envanta.Application.Tests.csproj
-  Envanta.IntegrationTests/
-    Envanta.IntegrationTests.csproj
+  Envanex.Application.Tests/
+    Envanex.Application.Tests.csproj
+  Envanex.IntegrationTests/
+    Envanex.IntegrationTests.csproj
 docs/
   adr/
     0001-layered-architecture-and-dependency-rule.md
