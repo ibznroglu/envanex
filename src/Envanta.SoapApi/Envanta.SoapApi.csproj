@@ -1,0 +1,5 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Envanta.Application\Envanta.Application.csproj" />
+  </ItemGroup>
+</Project>

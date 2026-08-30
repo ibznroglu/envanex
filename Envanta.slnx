@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Envanta.Application/Envanta.Application.csproj" />
+    <Project Path="src/Envanta.Domain/Envanta.Domain.csproj" />
+    <Project Path="src/Envanta.Infrastructure/Envanta.Infrastructure.csproj" />
+    <Project Path="src/Envanta.SoapApi/Envanta.SoapApi.csproj" />
+    <Project Path="src/Envanta.Web/Envanta.Web.csproj" />
+    <Project Path="src/Envanta.Worker/Envanta.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Envanta.Application.Tests/Envanta.Application.Tests.csproj" />
+    <Project Path="tests/Envanta.Domain.Tests/Envanta.Domain.Tests.csproj" />
+    <Project Path="tests/Envanta.IntegrationTests/Envanta.IntegrationTests.csproj" />
+  </Folder>
+</Solution>
