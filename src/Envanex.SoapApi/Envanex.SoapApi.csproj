@@ -1,0 +1,10 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <ItemGroup>
+    <ProjectReference Include="..\Envanex.Application\Envanex.Application.csproj" />
+  </ItemGroup>
+  <ItemGroup>
+    <PackageReference Include="SoapCore" />
+    <!-- Override vulnerable transitive dependency from SoapCore (System.Security.Cryptography.Xml 8.0.2) -->
+    <PackageReference Include="System.Security.Cryptography.Xml" />
+  </ItemGroup>
+</Project>

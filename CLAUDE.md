@@ -4,7 +4,7 @@ Guidance for Claude Code when working in this repository.
 
 ## Project Overview
 
-**Envanta** — a production-quality ERP core: inventory, purchasing, and sales/invoicing.
+**Envanex** — a production-quality ERP core: inventory, purchasing, and sales/invoicing.
 Append-only stock ledger, moving-average costing, order state machines, a SOAP integration
 surface, and a Windows Service worker.
 
@@ -18,34 +18,34 @@ docker compose up -d                          # SQL Server 2022 on localhost:143
 dotnet build -warnaserror                     # build (warnings are errors)
 dotnet test                                   # all tests
 dotnet format --verify-no-changes             # style check
-dotnet ef migrations add <Name> -p src/Envanta.Infrastructure -s src/Envanta.Web
-dotnet ef database update -p src/Envanta.Infrastructure -s src/Envanta.Web
-dotnet run --project src/Envanta.Web          # Blazor UI + REST API + Swagger + SOAP
-dotnet run --project src/Envanta.Worker       # background worker (console mode)
+dotnet ef migrations add <Name> -p src/Envanex.Infrastructure -s src/Envanex.Web
+dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web
+dotnet run --project src/Envanex.Web          # Blazor UI + REST API + Scalar + SOAP
+dotnet run --project src/Envanex.Worker       # background worker (console mode)
 ```
 
 ## Architecture
 
 ```
 src/
-  Envanta.Domain          entities, value objects, domain events. ZERO project references.
-  Envanta.Application     use cases, DTOs, validators, Result<T>. References Domain only.
-  Envanta.Infrastructure  EF Core, SQL Server, repositories, outbox. References Domain + Application.
-  Envanta.SoapApi         class library: SOAP contracts + implementations. Mounted by Web.
-  Envanta.Web             THE deployable host — Blazor components, REST controllers,
-                          Swagger, and the SoapCore middleware mount.
-  Envanta.Worker          BackgroundService, hosted as a Windows Service via UseWindowsService().
+  Envanex.Domain          entities, value objects, domain events. ZERO project references.
+  Envanex.Application     use cases, DTOs, validators, Result<T>. References Domain only.
+  Envanex.Infrastructure  EF Core, SQL Server, repositories, outbox. References Domain + Application.
+  Envanex.SoapApi         class library: SOAP contracts + implementations. Mounted by Web.
+  Envanex.Web             THE deployable host — Blazor components, REST controllers,
+                          OpenAPI/Scalar, and the SoapCore middleware mount.
+  Envanex.Worker          BackgroundService, hosted as a Windows Service via UseWindowsService().
 tests/
-  Envanta.Domain.Tests  Envanta.Application.Tests  Envanta.IntegrationTests (Testcontainers)
+  Envanex.Domain.Tests  Envanex.Application.Tests  Envanex.IntegrationTests (Testcontainers)
 db/
   scripts/  views/  procs/          raw T-SQL not expressible in EF
 docs/adr/                           one file per architectural decision
 ```
 
-**Dependency rule:** dependencies point inward only. `Envanta.Domain` never references anything.
+**Dependency rule:** dependencies point inward only. `Envanex.Domain` never references anything.
 A build error caused by adding a reference to Domain is the correct outcome, not a problem to fix.
 
-**One host on purpose.** Blazor UI, REST API and SOAP all live in `Envanta.Web` so the whole app
+**One host on purpose.** Blazor UI, REST API and SOAP all live in `Envanex.Web` so the whole app
 is a single deployment on the Azure free tier. Separation is enforced by project boundaries and
 folders, not by extra processes.
 
@@ -62,15 +62,16 @@ folders, not by extra processes.
 - **EF Core conventions:** money is `decimal(18,4)`, quantity is `decimal(18,6)`, every aggregate
   root has a `RowVersion` concurrency token, every FK is explicitly configured, no lazy loading.
 - **Blazor components never touch EF or `DbContext`.** They call Application use cases. A
-  component that injects `EnvantaDbContext` is a defect.
+  component that injects `EnvanexDbContext` is a defect.
 - **Radzen `RadzenDataGrid` is the standard grid.** Server-side paging via `LoadData`. Never load
   a full table and page client-side.
 - **Grid data endpoints** under `/api/*/datasource` use `DataSourceLoader.Load` from
   `DevExtreme.AspNet.Data`. They exist so the same data protocol works for a DevExpress client.
 - **Outbox pattern** for anything leaving the system. Use cases write outbox rows in the same
-  transaction as the state change; `Envanta.Worker` dispatches them.
+  transaction as the state change; `Envanex.Worker` dispatches them.
 - **All code is English** — identifiers, comments, ADRs, commit messages, test names. User-facing
   strings (UI labels, validation messages) are Turkish with correct characters (ş, ğ, ı, ö, ü, ç).
+  One exception: `docs/journal/` is the human's study material and is written in Turkish.
 
 ## Orchestration (human-in-the-loop)
 
@@ -86,6 +87,9 @@ folders, not by extra processes.
   Never edits files. Skipping it on a schema-touching phase is a defect.
 - **tester**: verdict only — `READY_TO_PUSH` / `NEEDS_FIXES` with file:line. Runs format, build
   and tests. NEVER edits or writes files — not via Edit/Write, not via shell redirection.
+- **explainer**: runs after tester returns `READY_TO_PUSH`, before the ADR and `/pr`. Writes
+  `docs/journal/NNNN-<slug>.md` — the only agent permitted to write files, and only there.
+  It never writes ADRs and never writes answers to its own questions.
 - **Verdicts are terminal for the turn.** When any reviewer returns a verdict, the main agent
   MUST NOT edit or create any file (including plans and docs) and MUST NOT spawn any agent.
   `NEEDS_REVISION` -> human routes to planner. `NEEDS_FIXES` / `DB_NEEDS_REVISION` -> human
@@ -125,7 +129,7 @@ folders, not by extra processes.
 - Never edit `bin/`, `obj/`, `.vs/`, `.idea/`, `packages/`, `*.user`, `*.pfx`, or `*.Local.json`.
 - Never put secrets in `appsettings.json`. Local secrets go in user-secrets.
 - Never hand-edit a generated migration to change its intent — create a new migration.
-- Never reference `Envanta.Infrastructure` from `Envanta.Domain` or `Envanta.Application`.
+- Never reference `Envanex.Infrastructure` from `Envanex.Domain` or `Envanex.Application`.
 - No raw SQL in components, controllers or use cases. Raw T-SQL lives in `db/` and is called
   through a repository method.
 - Every new endpoint, use case and component behavior gets a test. "It builds" is not validation.

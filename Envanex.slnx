@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/Envanex.Application/Envanex.Application.csproj" />
+    <Project Path="src/Envanex.Domain/Envanex.Domain.csproj" />
+    <Project Path="src/Envanex.Infrastructure/Envanex.Infrastructure.csproj" />
+    <Project Path="src/Envanex.SoapApi/Envanex.SoapApi.csproj" />
+    <Project Path="src/Envanex.Web/Envanex.Web.csproj" />
+    <Project Path="src/Envanex.Worker/Envanex.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/Envanex.Application.Tests/Envanex.Application.Tests.csproj" />
+    <Project Path="tests/Envanex.Domain.Tests/Envanex.Domain.Tests.csproj" />
+    <Project Path="tests/Envanex.IntegrationTests/Envanex.IntegrationTests.csproj" />
+  </Folder>
+</Solution>

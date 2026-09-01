@@ -1,10 +1,10 @@
-# Envanta
+# Envanex
 
 > Modular ERP core — inventory, purchasing and sales. Built with .NET 10.
 
 **Status:** in development. Live demo and screenshots land with PR 6.
 
-Envanta implements the parts of an ERP where correctness actually matters: an append-only stock
+Envanex implements the parts of an ERP where correctness actually matters: an append-only stock
 ledger, moving-average inventory costing, purchase and sales order state machines, and an
 integration surface for legacy clients.
 
@@ -24,8 +24,8 @@ integration surface for legacy clients.
 
 ```bash
 docker compose up -d
-dotnet ef database update -p src/Envanta.Infrastructure -s src/Envanta.Web
-dotnet run --project src/Envanta.Web
+dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web
+dotnet run --project src/Envanex.Web
 ```
 
 ## Documentation

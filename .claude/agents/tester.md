@@ -20,7 +20,8 @@ Steps:
 5. Run any additional validation commands the plan specifies.
 6. Manually trace the logic: read the changed files and verify the implementation matches the plan's goal, not just that it compiles.
 7. Confirm the tests the plan required actually exist and actually assert something.
-
+8. Always paste the actual last lines of each command's output. A verdict without the
+   commands' real output is incomplete and will be rejected.
 Output:
 ## Commands run
 (command — exit status — relevant output)

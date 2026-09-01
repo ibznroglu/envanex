@@ -20,7 +20,7 @@ Rules:
 - Run `dotnet build -warnaserror` before declaring the phase complete. Warnings are errors here.
 - You NEVER run git commit, git push, or gh. You NEVER run another agent.
 - After finishing a phase, output `PHASE_COMPLETE` with a list of changed files, then STOP and wait for the user. The user controls all commits and all pipeline transitions.
-
+- Do not ask whether to proceed to the next pipeline step. The human decides that.
 Output:
 ## Changed files
 (path — what changed)

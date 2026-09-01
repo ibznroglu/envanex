@@ -6,6 +6,8 @@
   "permissions": {
     "allow": [
       "Bash(dotnet build*)",
+      "Bash(dotnet list*)",
+      "Bash(dotnet package*)",
       "Bash(dotnet test*)",
       "Bash(dotnet format*)",
       "Bash(dotnet restore*)",
