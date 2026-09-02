@@ -1,0 +1,55 @@
+namespace Envanex.Domain.Common;
+
+public class Result
+{
+    public bool IsSuccess { get; }
+    public bool IsFailure => !IsSuccess;
+    public Error Error { get; }
+
+    protected Result(bool isSuccess, Error error)
+    {
+        if (isSuccess && error != Error.None)
+        {
+            throw new ArgumentException("Successful result cannot have an error.", nameof(error));
+        }
+
+        if (!isSuccess && error == Error.None)
+        {
+            throw new ArgumentException("Failed result must have an error.", nameof(error));
+        }
+
+        IsSuccess = isSuccess;
+        Error = error;
+    }
+
+    public static Result Success() => new(true, Error.None);
+
+    public static Result Failure(Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return new(false, error);
+    }
+
+    public static Result<T> Success<T>(T value) => new(value, true, Error.None);
+
+    public static Result<T> Failure<T>(Error error)
+    {
+        ArgumentNullException.ThrowIfNull(error);
+        return new(default!, false, error); // Value is inaccessible on failure; default is safe.
+    }
+}
+
+public class Result<T> : Result
+{
+    private readonly T _value;
+
+    public T Value => IsSuccess
+        ? _value
+        : throw new InvalidOperationException("Cannot access the value of a failed result.");
+
+    internal Result(T value, bool isSuccess, Error error)
+        : base(isSuccess, error)
+    {
+        _value = value;
+    }
+}
