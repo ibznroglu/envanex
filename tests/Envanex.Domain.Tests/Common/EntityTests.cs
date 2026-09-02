@@ -12,6 +12,13 @@ public class EntityTests
         }
     }
 
+    private sealed class OtherTestEntity : Entity<Guid>
+    {
+        public OtherTestEntity(Guid id) : base(id)
+        {
+        }
+    }
+
     [Fact]
     public void Entities_WithSameId_ShouldBeEqual()
     {
@@ -66,5 +73,15 @@ public class EntityTests
         var entity2 = new TestEntity(Guid.NewGuid());
 
         (entity1 != entity2).ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Entities_OfDifferentTypes_WithSameId_ShouldNotBeEqual()
+    {
+        Guid id = Guid.NewGuid();
+        var entity1 = new TestEntity(id);
+        var entity2 = new OtherTestEntity(id);
+
+        entity1.Equals(entity2).ShouldBeFalse();
     }
 }

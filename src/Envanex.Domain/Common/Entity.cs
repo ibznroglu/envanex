@@ -30,6 +30,11 @@ public abstract class Entity<TId> : IEquatable<Entity<TId>>
             return true;
         }
 
+        if (GetType() != other.GetType())
+        {
+            return false;
+        }
+
         return EqualityComparer<TId>.Default.Equals(Id, other.Id);
     }
 

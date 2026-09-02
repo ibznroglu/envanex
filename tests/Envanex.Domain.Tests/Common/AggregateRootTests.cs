@@ -48,6 +48,7 @@ public class AggregateRootTests
         var aggregate = new TestAggregate(Guid.NewGuid());
 
         aggregate.DomainEvents.ShouldBeAssignableTo<IReadOnlyCollection<IDomainEvent>>();
+        (aggregate.DomainEvents as List<IDomainEvent>).ShouldBeNull();
     }
 
     [Fact]
