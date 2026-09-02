@@ -29,7 +29,7 @@ dotnet run --project src/Envanex.Worker       # background worker (console mode)
 ```
 src/
   Envanex.Domain          entities, value objects, domain events. ZERO project references.
-  Envanex.Application     use cases, DTOs, validators, Result<T>. References Domain only.
+  Envanex.Application     use cases, DTOs, validators. References Domain only.
   Envanex.Infrastructure  EF Core, SQL Server, repositories, outbox. References Domain + Application.
   Envanex.SoapApi         class library: SOAP contracts + implementations. Mounted by Web.
   Envanex.Web             THE deployable host — Blazor components, REST controllers,
@@ -52,7 +52,8 @@ folders, not by extra processes.
 ## Key Patterns
 
 - **Result<T>, not exceptions**, for expected failures (validation, business rule violations).
-  Exceptions are for bugs and infrastructure faults only.
+  `Result<T>` and `Error` live in `Envanex.Domain.Common` so that aggregates can return
+  domain errors directly. Exceptions are for bugs and infrastructure faults only.
 - **Aggregates own their invariants.** State changes go through methods on the aggregate root.
   All setters are `private set`.
 - **Stock ledger is append-only.** `StockMovement` rows are never updated or deleted.
@@ -60,7 +61,8 @@ folders, not by extra processes.
 - **Costing is a strategy** (`ICostingStrategy`): moving average is the default, FIFO is the
   second implementation. Never inline a costing formula into a use case.
 - **EF Core conventions:** money is `decimal(18,4)`, quantity is `decimal(18,6)`, every aggregate
-  root has a `RowVersion` concurrency token, every FK is explicitly configured, no lazy loading.
+  root has a `RowVersion` concurrency token (EF shadow property configured in Infrastructure),
+  every FK is explicitly configured, no lazy loading.
 - **Blazor components never touch EF or `DbContext`.** They call Application use cases. A
   component that injects `EnvanexDbContext` is a defect.
 - **Radzen `RadzenDataGrid` is the standard grid.** Server-side paging via `LoadData`. Never load
