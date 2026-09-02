@@ -35,7 +35,7 @@ public class Result
     public static Result<T> Failure<T>(Error error)
     {
         ArgumentNullException.ThrowIfNull(error);
-        return new(default!, false, error);
+        return new(default!, false, error); // Value is inaccessible on failure; default is safe.
     }
 }
 

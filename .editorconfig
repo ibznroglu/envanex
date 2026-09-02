@@ -28,6 +28,10 @@ indent_size = 2
 [*.sql]
 indent_size = 4
 
+# 'Error' is the standard DDD name for this type; the keyword conflict is accepted.
+[src/Envanex.Domain/Common/Error.cs]
+dotnet_diagnostic.CA1716.severity = none
+
 # Test projects: allow underscores in method names (standard test naming convention)
 [tests/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none
