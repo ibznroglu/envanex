@@ -122,6 +122,8 @@ folders, not by extra processes.
 - For manual debugging above 60% context: save a snapshot to
   `thoughts/shared/debug/YYYY-MM-DD_topic.md` (status, repro, expected vs actual, hypothesis,
   file paths), then `/clear` and reload only the plan phase + debug note + 1–2 files.
+- Research and plan files are named `thoughts/shared/<kind>/YYYY-MM-DD_<slug>.md`. No numeric
+    prefixes — the date is the ordering.
 
 ## Constraints
 
