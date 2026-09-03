@@ -11,7 +11,7 @@ public sealed class EnvanexDbContextFactory : IDesignTimeDbContextFactory<Envane
 
         var connectionString = Environment.GetEnvironmentVariable("ENVANEX_CONNECTION_STRING");
 
-        if (string.IsNullOrEmpty(connectionString))
+        if (string.IsNullOrWhiteSpace(connectionString))
         {
             throw new InvalidOperationException(
                 "ENVANEX_CONNECTION_STRING environment variable is not set. " +
