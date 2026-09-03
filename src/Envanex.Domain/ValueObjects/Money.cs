@@ -9,14 +9,6 @@ public sealed record Money
     public decimal Amount { get; private init; }
     public Currency Currency { get; private init; }
 
-    /// <summary>
-    /// Parameterless constructor for EF Core materialization.
-    /// </summary>
-    private Money()
-    {
-        Currency = Currency.TRY;
-    }
-
     private Money(decimal amount, Currency currency)
     {
         Amount = amount;

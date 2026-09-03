@@ -29,7 +29,7 @@ public sealed class SchemaPrecisionTests : IAsyncLifetime
                 """)
             .SingleAsync();
 
-        ((int)result.Precision).ShouldBe(18);
+        result.Precision.ShouldBe((byte)18);
         result.Scale.ShouldBe(4);
     }
 
@@ -48,7 +48,7 @@ public sealed class SchemaPrecisionTests : IAsyncLifetime
                 """)
             .SingleAsync();
 
-        ((int)result.Precision).ShouldBe(18);
+        result.Precision.ShouldBe((byte)18);
         result.Scale.ShouldBe(6);
     }
 

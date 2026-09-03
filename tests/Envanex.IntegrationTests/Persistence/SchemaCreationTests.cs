@@ -15,7 +15,7 @@ public sealed class SchemaCreationTests : IAsyncLifetime
     public Task DisposeAsync() => Task.CompletedTask;
 
     [Fact]
-    public async Task EnsureCreated_OnCleanDatabase_ShouldCreateSchema()
+    public async Task Database_ShouldBeConnectableAndTableShouldExist()
     {
         await using var context = _fixture.CreateDbContext();
 
