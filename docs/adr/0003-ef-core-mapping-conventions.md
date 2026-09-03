@@ -1,4 +1,4 @@
-# 0003 -- EF Core mapping conventions
+# 0003 — EF Core mapping conventions
 
 ## Context
 
