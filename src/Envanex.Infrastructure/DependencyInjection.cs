@@ -16,6 +16,15 @@ public static class DependencyInjection
 
         var connectionString = configuration.GetConnectionString("EnvanexDb");
 
+        if (string.IsNullOrWhiteSpace(connectionString))
+        {
+            throw new InvalidOperationException(
+                "ConnectionStrings:EnvanexDb is not configured. " +
+                "Set it via user-secrets: " +
+                "dotnet user-secrets set \"ConnectionStrings:EnvanexDb\" \"<connection string>\" " +
+                "--project src/Envanex.Web");
+        }
+
         services.AddDbContext<EnvanexDbContext>(options =>
             options.UseSqlServer(connectionString));
 
