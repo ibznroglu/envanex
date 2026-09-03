@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Envanex.IntegrationTests.Persistence;
 
-internal sealed class TestDbContext : EnvanexDbContext
+public sealed class TestDbContext : EnvanexDbContext
 {
     public TestDbContext(DbContextOptions<TestDbContext> options) : base(options) { }
 
@@ -12,6 +12,7 @@ internal sealed class TestDbContext : EnvanexDbContext
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
+        ArgumentNullException.ThrowIfNull(modelBuilder);
         base.OnModelCreating(modelBuilder);
         modelBuilder.ApplyConfiguration(new TestProductConfiguration());
     }

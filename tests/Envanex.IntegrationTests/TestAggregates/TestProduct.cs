@@ -3,7 +3,7 @@ using Envanex.Domain.ValueObjects;
 
 namespace Envanex.IntegrationTests.TestAggregates;
 
-internal sealed class TestProduct : AggregateRoot<Guid>
+public sealed class TestProduct : AggregateRoot<Guid>
 {
     public string Name { get; private set; }
     public Money UnitPrice { get; private set; }
