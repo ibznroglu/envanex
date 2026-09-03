@@ -39,6 +39,11 @@ Check, in this order:
 - State change and outbox insert happen in the same transaction.
 - No transaction spanning an external call.
 
+You have no Bash tool, so you cannot compile, run, or query anything. Any claim about whether
+code compiles, what a library's API accepts, what git history contains, or how a tool behaves at
+runtime is a guess. Mark such findings as UNVERIFIED and say what command would settle it. Never
+state one as fact.
+
 Output:
 ## Verdict
 DB_APPROVED | DB_NEEDS_REVISION

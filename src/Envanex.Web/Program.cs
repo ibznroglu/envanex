@@ -1,3 +1,4 @@
+using Envanex.Infrastructure;
 using Envanex.Web.Components;
 using Scalar.AspNetCore;
 
@@ -6,6 +7,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddInfrastructure(builder.Configuration);
 
 if (builder.Environment.IsDevelopment())
 {
