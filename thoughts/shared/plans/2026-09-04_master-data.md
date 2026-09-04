@@ -10,6 +10,10 @@ Ilk gercek domain aggregate'lerini (UnitOfMeasure, Warehouse, Product) olusturma
 - Blazor UI, REST endpoint, SOAP contract yok.
 - Envanex.Application.Tests bos kalacak — bilinen bosluk.
 - Domain event tanimlanmayacak (aggregate'ler event raise etmiyor henuz).
+- UnitOfMeasure, Warehouse ve Product'ta Rename/Update gibi genel durum degistirme metotlari yok —
+  sadece Activate/Deactivate ve Product.UpdatePrice var. Degisiklik senaryolari use case'lerle
+  birlikte PR 5'te gelecek. UpdatePrice istisnadir cunku Money complex type eslemesinin guncelleme
+  yolunu ve concurrency token'i test etmek icin gerekiyor. Coder baska Update/Rename metodu eklemesin.
 
 ## Touches schema? Yes — db-reviewer required
 
@@ -49,8 +53,22 @@ public sealed class UnitOfMeasure : AggregateRoot<Guid>
     public decimal ConversionFactor { get; private set; }
     public bool IsActive { get; private set; }
 
-    private UnitOfMeasure() : base() { /* EF Core */ }
-    private UnitOfMeasure(Guid id, string code, string name, Guid? baseUnitId, decimal conversionFactor) : base(id) { }
+    private UnitOfMeasure() : base()
+    {
+        // EF Core
+        Code = default!;
+        Name = default!;
+    }
+
+    private UnitOfMeasure(Guid id, string code, string name, Guid? baseUnitId, decimal conversionFactor)
+        : base(id)
+    {
+        Code = code;
+        Name = name;
+        BaseUnitId = baseUnitId;
+        ConversionFactor = conversionFactor;
+        IsActive = true;
+    }
 
     public static Result<UnitOfMeasure> Create(string code, string name, Guid? baseUnitId, decimal conversionFactor);
     public void Deactivate();
@@ -142,8 +160,19 @@ public sealed class Warehouse : AggregateRoot<Guid>
     public string Name { get; private set; }
     public bool IsActive { get; private set; }
 
-    private Warehouse() : base() { /* EF Core */ }
-    private Warehouse(Guid id, string code, string name) : base(id) { }
+    private Warehouse() : base()
+    {
+        // EF Core
+        Code = default!;
+        Name = default!;
+    }
+
+    private Warehouse(Guid id, string code, string name) : base(id)
+    {
+        Code = code;
+        Name = name;
+        IsActive = true;
+    }
 
     public static Result<Warehouse> Create(string code, string name);
     public void Deactivate();
@@ -175,8 +204,24 @@ public sealed class Product : AggregateRoot<Guid>
     public Quantity ReorderPoint { get; private set; }
     public bool IsActive { get; private set; }
 
-    private Product() : base() { /* EF Core */ }
-    private Product(Guid id, string code, string name, Guid unitOfMeasureId, Money listPrice, Quantity reorderPoint) : base(id) { }
+    private Product() : base()
+    {
+        // EF Core
+        Code = default!;
+        Name = default!;
+        ListPrice = default!;
+    }
+
+    private Product(Guid id, string code, string name, Guid unitOfMeasureId, Money listPrice, Quantity reorderPoint)
+        : base(id)
+    {
+        Code = code;
+        Name = name;
+        UnitOfMeasureId = unitOfMeasureId;
+        ListPrice = listPrice;
+        ReorderPoint = reorderPoint;
+        IsActive = true;
+    }
 
     public static Result<Product> Create(string code, string name, Guid unitOfMeasureId, Money listPrice, Quantity reorderPoint);
     public void UpdatePrice(Money newPrice);
