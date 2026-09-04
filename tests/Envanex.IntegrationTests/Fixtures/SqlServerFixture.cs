@@ -22,8 +22,12 @@ public sealed class SqlServerFixture : IAsyncLifetime
     public async Task ResetAsync()
     {
         await using var context = CreateDbContext();
+
+        // Deletes follow FK dependency order: children before parents.
+        // Update this list when new tables are added.
         await context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM UnitOfMeasures");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM UnitOfMeasures WHERE BaseUnitId IS NOT NULL");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM UnitOfMeasures WHERE BaseUnitId IS NULL");
         await context.Database.ExecuteSqlRawAsync("DELETE FROM Warehouses");
     }
 
