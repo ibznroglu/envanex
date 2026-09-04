@@ -1,4 +1,4 @@
-using Envanex.IntegrationTests.Persistence;
+using Envanex.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
 
@@ -10,19 +10,21 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public string ConnectionString => _container.GetConnectionString();
 
-    public TestDbContext CreateDbContext()
+    public EnvanexDbContext CreateDbContext()
     {
-        var options = new DbContextOptionsBuilder<TestDbContext>()
+        var options = new DbContextOptionsBuilder<EnvanexDbContext>()
             .UseSqlServer(ConnectionString)
             .Options;
 
-        return new TestDbContext(options);
+        return new EnvanexDbContext(options);
     }
 
     public async Task ResetAsync()
     {
         await using var context = CreateDbContext();
-        await context.Database.ExecuteSqlRawAsync("DELETE FROM TestProducts");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM Products");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM UnitOfMeasures");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM Warehouses");
     }
 
     public async Task InitializeAsync()
@@ -30,7 +32,7 @@ public sealed class SqlServerFixture : IAsyncLifetime
         await _container.StartAsync();
 
         await using var context = CreateDbContext();
-        await context.Database.EnsureCreatedAsync();
+        await context.Database.MigrateAsync();
     }
 
     public async Task DisposeAsync()

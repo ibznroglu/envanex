@@ -22,8 +22,8 @@ public sealed class SchemaCreationTests : IAsyncLifetime
         var canConnect = await context.Database.CanConnectAsync();
         canConnect.ShouldBeTrue();
 
-        // Verify TestProducts table exists by querying it
-        var count = await context.TestProducts.CountAsync();
+        // Verify Products table exists by querying it
+        var count = await context.Products.CountAsync();
         count.ShouldBe(0);
     }
 }
