@@ -1,6 +1,7 @@
+using Envanex.Domain.Aggregates.Products;
+using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.Domain.ValueObjects;
 using Envanex.IntegrationTests.Fixtures;
-using Envanex.IntegrationTests.TestAggregates;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
@@ -19,12 +20,20 @@ public sealed class ConcurrencyTests : IAsyncLifetime
     [Fact]
     public async Task ConcurrentUpdate_ShouldThrowDbUpdateConcurrencyException()
     {
-        var unitPrice = Money.Of(100m, Currency.TRY).Value;
-        var product = TestProduct.Create("Concurrency Test", unitPrice, Quantity.Of(1m).Value);
+        var uom = UnitOfMeasure.Create("ADET", "Adet", null, 1m).Value;
 
         await using (var context = _fixture.CreateDbContext())
         {
-            context.TestProducts.Add(product);
+            context.UnitOfMeasures.Add(uom);
+            await context.SaveChangesAsync();
+        }
+
+        var unitPrice = Money.Of(100m, Currency.TRY).Value;
+        var product = Product.Create("CONC-TEST", "Concurrency Test", uom.Id, unitPrice, Quantity.Of(1m).Value).Value;
+
+        await using (var context = _fixture.CreateDbContext())
+        {
+            context.Products.Add(product);
             await context.SaveChangesAsync();
         }
 
@@ -32,8 +41,8 @@ public sealed class ConcurrencyTests : IAsyncLifetime
         await using var context1 = _fixture.CreateDbContext();
         await using var context2 = _fixture.CreateDbContext();
 
-        var product1 = await context1.TestProducts.SingleAsync(p => p.Id == product.Id);
-        var product2 = await context2.TestProducts.SingleAsync(p => p.Id == product.Id);
+        var product1 = await context1.Products.SingleAsync(p => p.Id == product.Id);
+        var product2 = await context2.Products.SingleAsync(p => p.Id == product.Id);
 
         // Update and save in context1
         product1.UpdatePrice(Money.Of(200m, Currency.TRY).Value);

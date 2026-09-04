@@ -54,6 +54,10 @@ folders, not by extra processes.
 - **Result<T>, not exceptions**, for expected failures (validation, business rule violations).
   `Result<T>` and `Error` live in `Envanex.Domain.Common` so that aggregates can return
   domain errors directly. Exceptions are for bugs and infrastructure faults only.
+-   A `null` reference passed where a value object is required is a caller bug, not a business
+    rule violation: guard it with `ArgumentNullException.ThrowIfNull` even in a method that
+    returns `Result`. An invalid *value* (an empty code, `Guid.Empty`, a negative factor) is a
+    business rule violation and returns `Result.Failure`.
 - **Aggregates own their invariants.** State changes go through methods on the aggregate root.
   All setters are `private set`.
 - **Stock ledger is append-only.** `StockMovement` rows are never updated or deleted.

@@ -24,8 +24,8 @@ public sealed class SchemaPrecisionTests : IAsyncLifetime
                 """
                 SELECT NUMERIC_PRECISION AS Precision, NUMERIC_SCALE AS Scale
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = 'TestProducts'
-                  AND COLUMN_NAME = 'UnitPrice_Amount'
+                WHERE TABLE_NAME = 'Products'
+                  AND COLUMN_NAME = 'ListPrice_Amount'
                 """)
             .SingleAsync();
 
@@ -43,8 +43,8 @@ public sealed class SchemaPrecisionTests : IAsyncLifetime
                 """
                 SELECT NUMERIC_PRECISION AS Precision, NUMERIC_SCALE AS Scale
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = 'TestProducts'
-                  AND COLUMN_NAME = 'StockQuantity'
+                WHERE TABLE_NAME = 'Products'
+                  AND COLUMN_NAME = 'ReorderPoint'
                 """)
             .SingleAsync();
 
@@ -62,7 +62,7 @@ public sealed class SchemaPrecisionTests : IAsyncLifetime
                 """
                 SELECT DATA_TYPE AS DataType
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = 'TestProducts'
+                WHERE TABLE_NAME = 'Products'
                   AND COLUMN_NAME = 'RowVersion'
                 """)
             .SingleAsync();
@@ -80,8 +80,8 @@ public sealed class SchemaPrecisionTests : IAsyncLifetime
                 """
                 SELECT DATA_TYPE AS DataType, CHARACTER_MAXIMUM_LENGTH AS MaxLength
                 FROM INFORMATION_SCHEMA.COLUMNS
-                WHERE TABLE_NAME = 'TestProducts'
-                  AND COLUMN_NAME = 'UnitPrice_Currency'
+                WHERE TABLE_NAME = 'Products'
+                  AND COLUMN_NAME = 'ListPrice_Currency'
                 """)
             .SingleAsync();
 
