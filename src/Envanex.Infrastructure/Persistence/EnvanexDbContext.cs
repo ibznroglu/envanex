@@ -1,3 +1,6 @@
+using Envanex.Domain.Aggregates.Products;
+using Envanex.Domain.Aggregates.UnitOfMeasures;
+using Envanex.Domain.Aggregates.Warehouses;
 using Microsoft.EntityFrameworkCore;
 
 namespace Envanex.Infrastructure.Persistence;
@@ -7,6 +10,10 @@ public class EnvanexDbContext : DbContext
     public EnvanexDbContext(DbContextOptions<EnvanexDbContext> options) : base(options) { }
 
     protected EnvanexDbContext(DbContextOptions options) : base(options) { }
+
+    public DbSet<UnitOfMeasure> UnitOfMeasures => Set<UnitOfMeasure>();
+    public DbSet<Warehouse> Warehouses => Set<Warehouse>();
+    public DbSet<Product> Products => Set<Product>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

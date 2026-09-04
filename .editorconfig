@@ -32,6 +32,10 @@ indent_size = 4
 [src/Envanex.Domain/Common/Error.cs]
 dotnet_diagnostic.CA1716.severity = none
 
+# EF Core migrations: generated code, suppress null-check warnings
+[src/Envanex.Infrastructure/Migrations/*.cs]
+dotnet_diagnostic.CA1062.severity = none
+
 # Test projects: allow underscores in method names (standard test naming convention)
 [tests/**/*.cs]
 dotnet_diagnostic.CA1707.severity = none
