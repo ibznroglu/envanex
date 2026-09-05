@@ -44,8 +44,8 @@ in the README. That branch is never merged.
 | # | Title | Status |
 |---|---|---|
 | 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done |
-| 5 | `feat(api)` — application layer, repositories, REST endpoints, hardened grid datasource
-| 6 | feat(auth) — authentication, authorization, read-only demo account |
+| 5 | `feat(api)` — application layer, repositories, REST endpoints, hardened grid datasource | |
+| 6 | `feat(auth)` — authentication and authorization: cookie for Blazor, token for REST and SOAP; read-only demo account | |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
 PR 7 is the point where the project becomes publicly visible: Azure SQL free tier, App Service,
@@ -101,10 +101,18 @@ ADR.
   be expressed as `Money.Zero` or split into separate columns. See ADR 0003.
 - **Every `Money` property needs an explicit `ComplexProperty` line** in its entity configuration.
   Forgetting it fails silently. See ADR 0003.
-- Grid datasource is a hardened surface. Max page size, sort/group field allowlist, and a default Take ship with the endpoint in PR 5, not later. The read DTO is flat, which makes the DTO itself the field allowlis.
-- Auth precedes the public demo. Authentication and authorization land in PR 6, before the first deploy in PR 7. The scheme mix — cookie for Blazor, token for the REST and SOAP surfaces — is decided in that PR's ADR.
-##
-Known gaps
+- **Grid datasource is a hardened surface.** Max page size, sort/group field allowlist, and a
+  default `Take` ship with the endpoint in PR 5, not later. The read DTO is flat, which makes the
+  DTO itself the field allowlist.
+- **Auth precedes the public demo.** Authentication and authorization land in PR 6, before the
+  first deploy in PR 7. The scheme mix — cookie for Blazor, token for the REST and SOAP surfaces —
+  is decided in that PR's ADR.
+- **Concurrency tokens travel through the repository.** `RowVersion` is an EF shadow property
+  (ADR 0003), so no aggregate exposes it. Update methods take it as a separate argument and
+  Infrastructure sets it as the original value; read projections use `EF.Property` to surface it.
+  An aggregate that grows a `RowVersion` field is a defect.
+
+## Known gaps
 
 Tracked deliberately rather than hidden. Each one has a PR where it closes.
 
