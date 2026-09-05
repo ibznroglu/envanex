@@ -44,44 +44,45 @@ in the README. That branch is never merged.
 | # | Title | Status |
 |---|---|---|
 | 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done |
-| 5 | `feat(api)` — application layer, repositories, REST endpoints, grid datasource | next |
-| 6 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
+| 5 | `feat(api)` — application layer, repositories, REST endpoints, hardened grid datasource
+| 6 | feat(auth) — authentication, authorization, read-only demo account |
+| 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
-PR 6 is the point where the project becomes publicly visible: Azure SQL free tier, App Service,
+PR 7 is the point where the project becomes publicly visible: Azure SQL free tier, App Service,
 automatic deployment on merge to `main`, a read-only demo account and realistic Turkish seed data.
 Everything after it ships continuously.
 
 ### Stock core
 
-| # | Title | Status |
-|---|---|---|
-| 7 | `feat(domain)` — append-only stock ledger, `StockMovement` and balance projection | |
-| 8 | `feat(domain)` — costing strategies: moving average, then FIFO | |
-| 9 | `feat(web)` — stock screens, manual adjustment, movement history | |
+| #  | Title | Status |
+|----|---|---|
+| 8  | `feat(domain)` — append-only stock ledger, `StockMovement` and balance projection | |
+| 9  | `feat(domain)` — costing strategies: moving average, then FIFO | |
+| 10 | `feat(web)` — stock screens, manual adjustment, movement history | |
 
 ### Purchasing
 
-| # | Title | Status |
-|---|---|---|
-| 10 | `feat(purchasing)` — supplier, purchase order, state machine | |
-| 11 | `feat(purchasing)` — amount-threshold approval rules | |
-| 12 | `feat(purchasing)` — goods receipt to stock movement, partial receipt | |
+| #  | Title | Status |
+|----|---|---|
+| 11 | `feat(purchasing)` — supplier, purchase order, state machine | |
+| 12 | `feat(purchasing)` — amount-threshold approval rules | |
+| 13 | `feat(purchasing)` — goods receipt to stock movement, partial receipt | |
 
 ### Sales and invoicing
 
-| # | Title | Status |
-|---|---|---|
-| 13 | `feat(sales)` — customer, sales order, stock reservation | |
-| 14 | `feat(sales)` — shipment, stock issue, cost of goods sold | |
-| 15 | `feat(invoicing)` — invoice, VAT rounding, numbering | |
+| #  | Title | Status |
+|----|---|---|
+| 14 | `feat(sales)` — customer, sales order, stock reservation | |
+| 15 | `feat(sales)` — shipment, stock issue, cost of goods sold | |
+| 16 | `feat(invoicing)` — invoice, VAT rounding, numbering | |
 
 ### Integration and operations
 
-| # | Title | Status |
-|---|---|---|
-| 16 | `feat(soap)` — SOAP endpoint, supplier price feed import | |
-| 17 | `feat(worker)` — Windows Service, outbox dispatcher, nightly jobs | |
-| 18 | `feat(reporting)` — T-SQL views, inventory reports, README and diagrams | |
+| #  | Title | Status |
+|----|---|---|
+| 17 | `feat(soap)` — SOAP endpoint, supplier price feed import | |
+| 18 | `feat(worker)` — Windows Service, outbox dispatcher, nightly jobs | |
+| 19 | `feat(reporting)` — T-SQL views, inventory reports, README and diagrams | |
 
 ## Decisions carried forward
 
@@ -90,7 +91,7 @@ ADR.
 
 - **Repositories:** interfaces in `Envanex.Application`, implementations in
   `Envanex.Infrastructure`. `Envanex.Domain` never mentions storage.
-- **Outbox:** deferred to PR 17. `IDomainEvent` and the event collection on `AggregateRoot` exist,
+- **Outbox:** deferred to PR 18. `IDomainEvent` and the event collection on `AggregateRoot` exist,
   but there is no dispatcher and no outbox table. Designing one before a single event type exists
   would mean designing it twice.
 - **Migrations:** every schema change gets a migration file committed to the repository. The test
@@ -100,18 +101,21 @@ ADR.
   be expressed as `Money.Zero` or split into separate columns. See ADR 0003.
 - **Every `Money` property needs an explicit `ComplexProperty` line** in its entity configuration.
   Forgetting it fails silently. See ADR 0003.
-
-## Known gaps
+- Grid datasource is a hardened surface. Max page size, sort/group field allowlist, and a default Take ship with the endpoint in PR 5, not later. The read DTO is flat, which makes the DTO itself the field allowlis.
+- Auth precedes the public demo. Authentication and authorization land in PR 6, before the first deploy in PR 7. The scheme mix — cookie for Blazor, token for the REST and SOAP surfaces — is decided in that PR's ADR.
+##
+Known gaps
 
 Tracked deliberately rather than hidden. Each one has a PR where it closes.
 
-| Gap | Closes in |
-|---|---|
-| Code length is not validated in the domain; an over-long code fails at `SaveChanges` as a `DbUpdateException` | PR 5 |
-| A unique-index violation reaches the caller as a raw database exception rather than a business error | PR 5 |
-| `Envanex.Application.Tests` contains no tests | PR 5 |
-| `MoneyComplexTypeConvention` only inspects complex properties one level deep | when a nested case appears |
-| `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 7, when the ledger makes it fragile |
+| Gap | Closes in                              |
+|---|----------------------------------------|
+| Code length is not validated in the domain; an over-long code fails at `SaveChanges` as a `DbUpdateException` | PR 5                                   |
+| A unique-index violation reaches the caller as a raw database exception rather than a business error | PR 5                                   |
+| `Envanex.Application.Tests` contains no tests | PR 5                                   |
+| `MoneyComplexTypeConvention` only inspects complex properties one level deep | when a nested case appears             |
+| `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 8, when the ledger makes it fragile |
+| No authentication or authorization on any endpoint | PR 6 |
 
 ## How the work is run
 

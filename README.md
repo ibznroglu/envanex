@@ -2,7 +2,7 @@
 
 > Modular ERP core — inventory, purchasing and sales. Built with .NET 10.
 
-**Status:** in development. Live demo and screenshots land with PR 6.
+**Status:** in development. Live demo and screenshots land with PR 7.
 
 Envanex implements the parts of an ERP where correctness actually matters: an append-only stock
 ledger, moving-average inventory costing, purchase and sales order state machines, and an
