@@ -37,6 +37,12 @@ ADR'de gerekçelendirilmesi gereken noktalar:
   hatasıdır; 500 sunucu arızası demektir ve kullanıcı hatası yüzünden alarm çalar.
 - Concurrency protokolü: `RowVersion` istemciye `byte[]` (JSON'da base64) olarak gider, güncelleme
   isteğinde geri gelir, uyuşmazlıkta 409.
+- Eşlemelerin Web katmanında açık bir kod tablosu olarak yaşaması, `Error` tipinin üzerinde bir
+  kategori olarak değil. Neden: Domain katmanı HTTP semantiğinden habersiz kalmalı; HTTP durum kodu
+  seçimi sunumun kararıdır. Ancak PR 17 SOAP'ı ikinci tüketici olarak eklediğinde, tablo yerine
+  `Error` üzerinde bir `ErrorCategory` enum'u (`NotFound`, `Conflict`, `Unprocessable`, `Validation`,
+  `General`) tanımlamak ve her tüketicinin kategoriyi kendi protokolüne çevirmesi daha sürdürülebilir
+  olacaktır.
 
 ---
 
@@ -53,6 +59,7 @@ ADR'de gerekçelendirilmesi gereken noktalar:
 - `tests/Envanex.IntegrationTests/Fixtures/EnvanexWebApplicationFactory.cs` — created
 - `tests/Envanex.Domain.Tests/ArchitectureTests.cs` — modified (PR 5a'da eklenmediyse)
 - `tests/Envanex.IntegrationTests/Api/ProductsApiTests.cs` — created (minimal)
+- `tests/Envanex.IntegrationTests/Api/ResultMappingTests.cs` — created
 
 ### Signatures
 
@@ -65,14 +72,37 @@ public static class ResultExtensions
     public static IActionResult ToCreatedActionResult<T>(
         this Result<T> result, string routeName, Func<T, object> routeValues);
 
-    // Error.Code önekine göre eşleme:
-    //   IsSuccess                                        → 200 Ok(value) / 201 CreatedAtRoute
-    //   *.NotFound                                       → 404
-    //   *.DuplicateCode                                  → 409
-    //   *.ConcurrencyConflict                            → 409
-    //   *.UnitOfMeasureNotFound, *.UnitOfMeasureInactive → 422
-    //   Validation.*                                     → 400 + alan bazlı hata sözlüğü
-    //   Eşlenmemiş                                       → 400   (500 DEĞİL)
+    // AÇIK KOD TABLOSU — sonek veya önek eşlemesi DEĞİL.
+    // Her Error.Code birebir string eşlemesiyle HTTP durum koduna çevrilir.
+    // Tek istisna: "Validation." öneki çalışma zamanında özellik adıyla üretildiği için
+    // önek kontrolü kullanır.
+    //
+    //   AÇIK EŞLEME TABLOSU:
+    //   ---------------------------------------------------------------
+    //   Error.Code                          | HTTP Status
+    //   ---------------------------------------------------------------
+    //   Product.NotFound                    | 404 Not Found
+    //   UnitOfMeasure.NotFound              | 404 Not Found
+    //   Product.DuplicateCode               | 409 Conflict
+    //   UnitOfMeasure.DuplicateCode         | 409 Conflict
+    //   Product.ConcurrencyConflict         | 409 Conflict
+    //   Product.UnitOfMeasureNotFound       | 422 Unprocessable Entity
+    //   Product.UnitOfMeasureInactive       | 422 Unprocessable Entity
+    //   UnitOfMeasure.BaseUnitNotFound      | 422 Unprocessable Entity
+    //   UnitOfMeasure.BaseUnitInactive      | 422 Unprocessable Entity
+    //   ---------------------------------------------------------------
+    //   Validation.* öneki                  | 400 + alan bazlı hata sözlüğü
+    //   Tabloda olmayan her şey             | 400 Bad Request
+    //   ---------------------------------------------------------------
+    //
+    // "Validation.*" TEK İSTİSNA: önek kontrolü kullanır çünkü özellik adı
+    // çalışma zamanında üretilir. Diğer HER eşleme tam string eşlemesidir.
+    //
+    // Uygulama: FrozenDictionary<string, int> veya aynı anlama gelen sabit
+    // arama yapısı. "*.NotFound" gibi sonek eşlemesi YOKTUR —
+    // "Product.UnitOfMeasureNotFound" ile "Product.NotFound" farklı
+    // HTTP kodlarına eşlenmelidir, sonek eşlemesi bunu karıştırırdı.
+    //
     // Tüm hatalar ProblemDetails (RFC 9457) gövdesiyle döner.
     // Hata kodları İngilizce, kullanıcıya giden mesajlar Türkçe.
 }
@@ -120,6 +150,20 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
 - `GetProductById_ResponseHeaders_ShouldContainXContentTypeOptions`
 - `GetProductById_ResponseHeaders_ShouldContainXFrameOptions`
 - `GetProductById_ResponseHeaders_ShouldContainReferrerPolicy`
+
+`ResultMappingTests.cs`:
+
+- `ResultMapping_EveryDomainErrorCode_ShouldHaveAnExplicitMapping` — Reflection ile
+  `Envanex.Domain` assembly'sindeki `*Errors` son ekine sahip tüm public static sınıfları tarar,
+  her birindeki `public static readonly Error` alanlarının `Code` değerlerini toplar ve her kodun
+  `ResultExtensions`'daki açık eşleme tablosunda bir girişe sahip olduğunu doğrular. Bu test,
+  yeni hata kodlarının eşleme tablosu güncellenmeden eklenmesini engeller.
+  **Not:** `Validation.*` öneki çalışma zamanında üretilir ve statik sınıf taramasına dahil
+  değildir; test onu kapsamaz, çünkü tabloda önek kuralı olarak zaten mevcuttur.
+  **Not:** Değer nesnesindeki hatalar (`Currency.InvalidCode`, `Money.CurrencyMismatch`,
+  `Quantity.Negative`, `Quantity.NegativeResult`) `*Errors` sınıflarında değil, değer nesnesinin
+  kendisinde tanımlıdır ve bu testin kapsamına girmez. Bu kodlar REST yüzeyine ulaşırsa varsayılan
+  400'e düşer, ki bu doğru davranıştır.
 
 ### Validation
 

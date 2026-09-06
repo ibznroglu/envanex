@@ -44,7 +44,8 @@ in the README. That branch is never merged.
 | # | Title | Status |
 |---|---|---|
 | 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done |
-| 5 | `feat(api)` — application layer, repositories, REST endpoints, hardened grid datasource | |
+| 5a | `feat(api)` — application layer, repositories, unit tests | |
+| 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | |
 | 6 | `feat(auth)` — authentication and authorization: cookie for Blazor, token for REST and SOAP; read-only demo account | |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
@@ -56,7 +57,7 @@ Everything after it ships continuously.
 
 | #  | Title | Status |
 |----|---|---|
-| 8  | `feat(domain)` — append-only stock ledger, `StockMovement` and balance projection | |
+| 8  | `feat(domain)` — append-only stock ledger, `StockMovement` and balance projection, Warehouse application layer and endpoints | |
 | 9  | `feat(domain)` — costing strategies: moving average, then FIFO | |
 | 10 | `feat(web)` — stock screens, manual adjustment, movement history | |
 
@@ -107,6 +108,9 @@ ADR.
 - **Auth precedes the public demo.** Authentication and authorization land in PR 6, before the
   first deploy in PR 7. The scheme mix — cookie for Blazor, token for the REST and SOAP surfaces —
   is decided in that PR's ADR.
+- **Warehouse waits for its consumer.** Warehouse has no application layer or endpoints until
+  PR 8, where the stock ledger first needs it. Endpoints with no consumer are surface to secure
+  and test for no gain.
 - **Concurrency tokens travel through the repository.** `RowVersion` is an EF shadow property
   (ADR 0003), so no aggregate exposes it. Update methods take it as a separate argument and
   Infrastructure sets it as the original value; read projections use `EF.Property` to surface it.
@@ -118,9 +122,9 @@ Tracked deliberately rather than hidden. Each one has a PR where it closes.
 
 | Gap | Closes in                              |
 |---|----------------------------------------|
-| Code length is not validated in the domain; an over-long code fails at `SaveChanges` as a `DbUpdateException` | PR 5                                   |
-| A unique-index violation reaches the caller as a raw database exception rather than a business error | PR 5                                   |
-| `Envanex.Application.Tests` contains no tests | PR 5                                   |
+| Code length is not validated in the domain; an over-long code fails at `SaveChanges` as a `DbUpdateException` | PR 5a                                  |
+| A unique-index violation reaches the caller as a raw database exception rather than a business error | PR 5a                                  |
+| `Envanex.Application.Tests` contains no tests | PR 5a                                  |
 | `MoneyComplexTypeConvention` only inspects complex properties one level deep | when a nested case appears             |
 | `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 8, when the ledger makes it fragile |
 | No authentication or authorization on any endpoint | PR 6 |
