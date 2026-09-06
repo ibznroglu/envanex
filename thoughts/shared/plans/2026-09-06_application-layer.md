@@ -81,28 +81,28 @@ public Result Update(string name, Guid unitOfMeasureId, Money listPrice, Quantit
 // - Code'a DOKUNMAZ (immutable)
 // - return Result.Success()
 
-// ProductErrors.cs — yeni alanlar
-public static readonly Error CodeTooLong = new("Product.CodeTooLong", "Ürün kodu en fazla 50 karakter olabilir.");
-public static readonly Error NameTooLong = new("Product.NameTooLong", "Ürün adı en fazla 200 karakter olabilir.");
-public static readonly Error NotFound = new("Product.NotFound", "Ürün bulunamadı.");
+// ProductErrors.cs — yeni alanlar (tüm mesajlar İngilizce, mevcut Domain stiline uygun)
+public static readonly Error CodeTooLong = new("Product.CodeTooLong", "Product code must not exceed 50 characters.");
+public static readonly Error NameTooLong = new("Product.NameTooLong", "Product name must not exceed 200 characters.");
+public static readonly Error NotFound = new("Product.NotFound", "Product was not found.");
 public static readonly Error ConcurrencyConflict = new("Product.ConcurrencyConflict",
-    "Kayıt başka bir kullanıcı tarafından değiştirilmiş. Lütfen sayfayı yenileyip tekrar deneyin.");
-public static readonly Error DuplicateCode = new("Product.DuplicateCode", "Bu ürün kodu zaten kullanılıyor.");
-public static readonly Error UnitOfMeasureNotFound = new("Product.UnitOfMeasureNotFound", "Belirtilen ölçü birimi bulunamadı.");
-public static readonly Error UnitOfMeasureInactive = new("Product.UnitOfMeasureInactive", "Pasif bir ölçü birimi atanamaz.");
+    "The record has been modified by another user.");
+public static readonly Error DuplicateCode = new("Product.DuplicateCode", "A product with this code already exists.");
+public static readonly Error UnitOfMeasureNotFound = new("Product.UnitOfMeasureNotFound", "The specified unit of measure was not found.");
+public static readonly Error UnitOfMeasureInactive = new("Product.UnitOfMeasureInactive", "Cannot assign an inactive unit of measure.");
 
 // UnitOfMeasure.cs
 public const int CodeMaxLength = 20;
 public const int NameMaxLength = 200;
 // Create'e aynı uzunluk kontrolleri
 
-// UnitOfMeasureErrors.cs
-public static readonly Error CodeTooLong = new("UnitOfMeasure.CodeTooLong", "Ölçü birimi kodu en fazla 20 karakter olabilir.");
-public static readonly Error NameTooLong = new("UnitOfMeasure.NameTooLong", "Ölçü birimi adı en fazla 200 karakter olabilir.");
-public static readonly Error DuplicateCode = new("UnitOfMeasure.DuplicateCode", "Bu ölçü birimi kodu zaten kullanılıyor.");
-public static readonly Error NotFound = new("UnitOfMeasure.NotFound", "Ölçü birimi bulunamadı.");
-public static readonly Error BaseUnitNotFound = new("UnitOfMeasure.BaseUnitNotFound", "Belirtilen temel ölçü birimi bulunamadı.");
-public static readonly Error BaseUnitInactive = new("UnitOfMeasure.BaseUnitInactive", "Pasif bir temel ölçü birimi atanamaz.");
+// UnitOfMeasureErrors.cs — yeni alanlar (tüm mesajlar İngilizce)
+public static readonly Error CodeTooLong = new("UnitOfMeasure.CodeTooLong", "Unit of measure code must not exceed 20 characters.");
+public static readonly Error NameTooLong = new("UnitOfMeasure.NameTooLong", "Unit of measure name must not exceed 200 characters.");
+public static readonly Error DuplicateCode = new("UnitOfMeasure.DuplicateCode", "A unit of measure with this code already exists.");
+public static readonly Error NotFound = new("UnitOfMeasure.NotFound", "Unit of measure was not found.");
+public static readonly Error BaseUnitNotFound = new("UnitOfMeasure.BaseUnitNotFound", "The specified base unit of measure was not found.");
+public static readonly Error BaseUnitInactive = new("UnitOfMeasure.BaseUnitInactive", "Cannot assign an inactive base unit of measure.");
 ```
 
 ### Tests to add
@@ -313,8 +313,8 @@ Validator kuralları — hepsi domain sabitlerini referans alır, sayıyı tekra
 - `DeactivateProductCommandValidator`: aynı
 - `CreateUnitOfMeasureCommandValidator`: `Code`/`Name` NotEmpty + MaxLength,
   `ConversionFactor` conditional:
-    - When `BaseUnitId` is null → `ConversionFactor` must equal 1 (message: "Temel birim için dönüşüm katsayısı 1 olmalıdır.")
-    - When `BaseUnitId` is not null → `ConversionFactor` must be > 0 (message: "Türetilmiş birim için dönüşüm katsayısı sıfırdan büyük olmalıdır.")
+    - When `BaseUnitId` is null → `ConversionFactor` must equal 1 (message: "Conversion factor must be 1 for a base unit.")
+    - When `BaseUnitId` is not null → `ConversionFactor` must be > 0 (message: "Conversion factor must be greater than zero for a derived unit.")
 
 ### Tests to add
 

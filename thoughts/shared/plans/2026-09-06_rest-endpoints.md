@@ -43,14 +43,19 @@ ADR'de gerekçelendirilmesi gereken noktalar:
   `Error` üzerinde bir `ErrorCategory` enum'u (`NotFound`, `Conflict`, `Unprocessable`, `Validation`,
   `General`) tanımlamak ve her tüketicinin kategoriyi kendi protokolüne çevirmesi daha sürdürülebilir
   olacaktır.
+- **Mesaj dilinin sunum katmanında belirlenmesi, Domain'de değil.** Domain hataları İngilizce
+  tanısal mesajlar taşır; Web katmanı hata kodlarını Türkçe kullanıcı mesajlarına eşler. Bu, Domain'i
+  dilden bağımsız tutar ve birden fazla yüzeyin (REST, SOAP, Blazor) bağımsız yerelleştirme
+  yapabilmesini sağlar.
 
 ---
 
-## Phase 1 — ResultExtensions, security headers, minimal controller, WebApplicationFactory
+## Phase 1 — ResultExtensions, Turkish message table, security headers, minimal controller, WebApplicationFactory
 
 ### Files
 
 - `src/Envanex.Web/Extensions/ResultExtensions.cs` — created
+- `src/Envanex.Web/Extensions/TurkishErrorMessages.cs` — created
 - `src/Envanex.Web/Middleware/SecurityHeadersMiddleware.cs` — created
 - `src/Envanex.Web/Controllers/ProductsController.cs` — created (minimal: yalnızca `GetById`)
 - `src/Envanex.Web/Program.cs` — modified — `AddControllers()`, `MapControllers()`, güvenlik
@@ -139,7 +144,68 @@ public static class ResultExtensions
     // HTTP kodlarına eşlenmelidir, sonek eşlemesi bunu karıştırırdı.
     //
     // Tüm hatalar ProblemDetails (RFC 9457) gövdesiyle döner.
-    // Hata kodları İngilizce, kullanıcıya giden mesajlar Türkçe.
+}
+```
+
+**Dil politikası:**
+
+- Domain ve Application mesajları **İngilizce**dir. `Error.Message` alanı tanısal amaçlıdır
+  ve geliştirici/log tüketicisi içindir.
+- Web katmanı, ProblemDetails `detail` alanını oluştururken hata kodunu
+  `TurkishErrorMessages` tablosuna bakar. Eşleşme varsa Türkçe mesajı kullanır;
+  eşleşme yoksa İngilizce `Error.Message`'ı olduğu gibi koyar (fallback).
+- Bu sayede Domain dilden bağımsız kalır ve her yüzey (REST, SOAP, Blazor) kendi
+  yerelleştirmesini yapabilir.
+
+```csharp
+// TurkishErrorMessages — hata kodu → Türkçe kullanıcı mesajı eşlemesi.
+// ResultExtensions ProblemDetails üretirken bu tabloyu kullanır.
+// Eşleşme yoksa İngilizce Error.Message fallback olarak kullanılır.
+public static class TurkishErrorMessages
+{
+    // FrozenDictionary<string, string> veya IReadOnlyDictionary<string, string>
+    // Key: Error.Code (tam eşleme), Value: Türkçe kullanıcı mesajı
+    //
+    // Her Error.Code için bir giriş:
+    //
+    //   "Product.CodeRequired"                         → "Ürün kodu zorunludur."
+    //   "Product.NameRequired"                         → "Ürün adı zorunludur."
+    //   "Product.UnitOfMeasureRequired"                → "Ölçü birimi seçilmelidir."
+    //   "Product.CodeTooLong"                          → "Ürün kodu en fazla 50 karakter olabilir."
+    //   "Product.NameTooLong"                          → "Ürün adı en fazla 200 karakter olabilir."
+    //   "Product.NotFound"                             → "Ürün bulunamadı."
+    //   "Product.ConcurrencyConflict"                  → "Kayıt başka bir kullanıcı tarafından değiştirilmiş. Lütfen sayfayı yenileyip tekrar deneyin."
+    //   "Product.DuplicateCode"                        → "Bu ürün kodu zaten kullanılıyor."
+    //   "Product.UnitOfMeasureNotFound"                → "Belirtilen ölçü birimi bulunamadı."
+    //   "Product.UnitOfMeasureInactive"                → "Pasif bir ölçü birimi atanamaz."
+    //
+    //   "UnitOfMeasure.CodeRequired"                   → "Ölçü birimi kodu zorunludur."
+    //   "UnitOfMeasure.NameRequired"                   → "Ölçü birimi adı zorunludur."
+    //   "UnitOfMeasure.InvalidBaseUnitId"              → "Temel birim kimliği boş GUID olamaz."
+    //   "UnitOfMeasure.BaseUnitFactorMustBeOne"        → "Temel birim için dönüşüm katsayısı 1 olmalıdır."
+    //   "UnitOfMeasure.ConversionFactorMustBePositive" → "Türetilmiş birim için dönüşüm katsayısı sıfırdan büyük olmalıdır."
+    //   "UnitOfMeasure.CodeTooLong"                    → "Ölçü birimi kodu en fazla 20 karakter olabilir."
+    //   "UnitOfMeasure.NameTooLong"                    → "Ölçü birimi adı en fazla 200 karakter olabilir."
+    //   "UnitOfMeasure.DuplicateCode"                  → "Bu ölçü birimi kodu zaten kullanılıyor."
+    //   "UnitOfMeasure.NotFound"                       → "Ölçü birimi bulunamadı."
+    //   "UnitOfMeasure.BaseUnitNotFound"               → "Belirtilen temel ölçü birimi bulunamadı."
+    //   "UnitOfMeasure.BaseUnitInactive"               → "Pasif bir temel ölçü birimi atanamaz."
+    //
+    //   "Warehouse.CodeRequired"                       → "Depo kodu zorunludur."
+    //   "Warehouse.NameRequired"                       → "Depo adı zorunludur."
+    //
+    //   "Currency.InvalidCode"                         → "Geçersiz para birimi kodu."
+    //   "Money.CurrencyMismatch"                       → "Farklı para birimleri ile işlem yapılamaz."
+    //   "Quantity.Negative"                            → "Miktar negatif olamaz."
+    //   "Quantity.NegativeResult"                      → "İşlem sonucu negatif bir miktar oluşurdu."
+    //
+    // "Validation.*" önekli kodlar bu tabloda YER ALMAZ — FluentValidation mesajları
+    // zaten İngilizce üretilir ve doğrudan ProblemDetails'a konur; ayrıca validator
+    // mesajları çalışma zamanında üretildiği için statik tabloya eklenemez.
+    //
+    // Public API:
+    public static string GetMessage(string errorCode, string fallbackMessage);
+    // errorCode tabloda varsa Türkçe mesajı, yoksa fallbackMessage'ı döner.
 }
 
 // SecurityHeadersMiddleware — YALNIZCA üç başlık. CSP YOK (PR 7).
@@ -208,6 +274,14 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
   `string.Empty` olmadığını doğrular. Bu test, birinci testteki tipe dayalı dışlama mekanizmasının
   gerçek bir hatayı sessizce gizlemesini önler: birisi `Error` tipi dışında boş `Code` değerine
   sahip bir hata tanımlarsa bu test kırmızıya döner.
+
+- `ResultMapping_EveryDomainErrorCode_ShouldHaveATurkishMessage` — Reflection ile
+  `Envanex.Domain` assembly'sini tarar. `typeof(Envanex.Domain.Common.Error)` HARİCİNDEKİ tüm
+  public sınıflardaki `public static readonly Error` alanlarının `Code` değerlerini toplar ve
+  her kodun `TurkishErrorMessages` tablosunda bir girişe sahip olduğunu doğrular.
+  `Validation.*` önekli kodlar kapsam dışıdır (çalışma zamanında üretilir, statik taramaya
+  dahil değildir). Bu test, yeni bir hata kodu eklendiğinde Türkçe çevirisi olmadan kullanıcıya
+  İngilizce mesaj ulaşmasını engeller.
 
 ### Validation
 
@@ -443,8 +517,9 @@ dotnet format --verify-no-changes
 
 ## Rollback notes
 
-Migration yok, şema değişmiyor. Geri alma: controller'lar, `ResultExtensions`, `DataSourceGuard`,
-model binder, rate limiter ve güvenlik başlıkları middleware'i kaldırılır; `Program.cs` önceki
+Migration yok, şema değişmiyor. Geri alma: controller'lar, `ResultExtensions`,
+`TurkishErrorMessages`, `DataSourceGuard`, model binder, rate limiter ve güvenlik başlıkları
+middleware'i kaldırılır; `Program.cs` önceki
 hâline döner; `appsettings.json`'daki `RateLimiting` bölümü silinir. `docs/adr/0006` boş dosya.
 PR 5b iptal edilirse PR 5a bağımsız geçerli kalır — Application katmanı ve repository'ler HTTP
 yüzeyi olmadan çalışır.
