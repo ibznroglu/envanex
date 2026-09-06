@@ -195,8 +195,19 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
   `*Errors` son eki ile sınırlı DEĞİLDİR — değer nesneleri (`CurrencyErrors`, `MoneyErrors`,
   `QuantityErrors`) dahil assembly'deki her `Error` alanını kapsar. Bu test, yeni hata kodlarının
   eşleme tablosu güncellenmeden eklenmesini engeller.
+  **Kapsam dışı bırakma kuralı:** `typeof(Envanex.Domain.Common.Error)` üzerinde tanımlanan
+  `public static readonly Error` alanları taramaya DAHİL EDİLMEZ. `Error.None` bir sentinel
+  değerdir, hata kataloğu girişi değildir. Dışlama mekanizması tipe dayalıdır: alanın declaring
+  type'ı `Error` olan alanlar atlanır. Kod değerinin boş olup olmadığına bakılmaz.
   **Not:** `Validation.*` öneki çalışma zamanında üretilir ve statik sınıf taramasına dahil
   değildir; test onu kapsamaz, çünkü tabloda önek kuralı olarak zaten mevcuttur.
+
+- `ResultMapping_NoDomainErrorCode_ShouldBeEmpty` — Reflection ile `Envanex.Domain`
+  assembly'sini tarar. `typeof(Envanex.Domain.Common.Error)` HARİCİNDEKİ tüm public
+  sınıflardaki `public static readonly Error` alanlarının `Code` değerlerini toplar ve hiçbirinin
+  `string.Empty` olmadığını doğrular. Bu test, birinci testteki tipe dayalı dışlama mekanizmasının
+  gerçek bir hatayı sessizce gizlemesini önler: birisi `Error` tipi dışında boş `Code` değerine
+  sahip bir hata tanımlarsa bu test kırmızıya döner.
 
 ### Validation
 
