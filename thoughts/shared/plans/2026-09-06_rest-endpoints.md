@@ -79,20 +79,55 @@ public static class ResultExtensions
     //
     //   AÇIK EŞLEME TABLOSU:
     //   ---------------------------------------------------------------
-    //   Error.Code                          | HTTP Status
+    //   Error.Code                                   | HTTP Status
     //   ---------------------------------------------------------------
-    //   Product.NotFound                    | 404 Not Found
-    //   UnitOfMeasure.NotFound              | 404 Not Found
-    //   Product.DuplicateCode               | 409 Conflict
-    //   UnitOfMeasure.DuplicateCode         | 409 Conflict
-    //   Product.ConcurrencyConflict         | 409 Conflict
-    //   Product.UnitOfMeasureNotFound       | 422 Unprocessable Entity
-    //   Product.UnitOfMeasureInactive       | 422 Unprocessable Entity
-    //   UnitOfMeasure.BaseUnitNotFound      | 422 Unprocessable Entity
-    //   UnitOfMeasure.BaseUnitInactive      | 422 Unprocessable Entity
-    //   ---------------------------------------------------------------
-    //   Validation.* öneki                  | 400 + alan bazlı hata sözlüğü
-    //   Tabloda olmayan her şey             | 400 Bad Request
+    //
+    //   --- 404 Not Found ---
+    //   Product.NotFound                              | 404
+    //   UnitOfMeasure.NotFound                        | 404
+    //
+    //   --- 409 Conflict ---
+    //   Product.DuplicateCode                         | 409
+    //   UnitOfMeasure.DuplicateCode                   | 409
+    //   Product.ConcurrencyConflict                   | 409
+    //
+    //   --- 422 Unprocessable Entity ---
+    //   Product.UnitOfMeasureNotFound                 | 422
+    //   Product.UnitOfMeasureInactive                 | 422
+    //   UnitOfMeasure.BaseUnitNotFound                | 422
+    //   UnitOfMeasure.BaseUnitInactive                | 422
+    //
+    //   --- 400 Bad Request (Product) ---
+    //   Product.CodeRequired                          | 400
+    //   Product.NameRequired                          | 400
+    //   Product.UnitOfMeasureRequired                 | 400
+    //   Product.CodeTooLong                           | 400
+    //   Product.NameTooLong                           | 400
+    //
+    //   --- 400 Bad Request (UnitOfMeasure) ---
+    //   UnitOfMeasure.CodeRequired                    | 400
+    //   UnitOfMeasure.NameRequired                    | 400
+    //   UnitOfMeasure.CodeTooLong                     | 400
+    //   UnitOfMeasure.NameTooLong                     | 400
+    //   UnitOfMeasure.InvalidBaseUnitId               | 400
+    //   UnitOfMeasure.BaseUnitFactorMustBeOne         | 400
+    //   UnitOfMeasure.ConversionFactorMustBePositive  | 400
+    //
+    //   --- 400 Bad Request (Warehouse) ---
+    //   Warehouse.CodeRequired                        | 400
+    //   Warehouse.NameRequired                        | 400
+    //
+    //   --- 400 Bad Request (Value Objects) ---
+    //   Currency.InvalidCode                          | 400
+    //   Money.CurrencyMismatch                        | 400
+    //   Quantity.Negative                             | 400
+    //   Quantity.NegativeResult                       | 400
+    //
+    //   --- Validation prefix (runtime-generated) ---
+    //   Validation.* öneki                            | 400 + alan bazlı hata sözlüğü
+    //
+    //   --- Fallback (safety net) ---
+    //   Tabloda olmayan her şey                       | 400 Bad Request
     //   ---------------------------------------------------------------
     //
     // "Validation.*" TEK İSTİSNA: önek kontrolü kullanır çünkü özellik adı
@@ -154,16 +189,14 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
 `ResultMappingTests.cs`:
 
 - `ResultMapping_EveryDomainErrorCode_ShouldHaveAnExplicitMapping` — Reflection ile
-  `Envanex.Domain` assembly'sindeki `*Errors` son ekine sahip tüm public static sınıfları tarar,
-  her birindeki `public static readonly Error` alanlarının `Code` değerlerini toplar ve her kodun
-  `ResultExtensions`'daki açık eşleme tablosunda bir girişe sahip olduğunu doğrular. Bu test,
-  yeni hata kodlarının eşleme tablosu güncellenmeden eklenmesini engeller.
+  `Envanex.Domain` assembly'sini tarar. Assembly'deki TÜM public sınıflardaki (static veya
+  non-static) `public static readonly Error` alanlarının `Code` değerlerini toplar ve her kodun
+  `ResultExtensions`'daki açık eşleme tablosunda bir girişe sahip olduğunu doğrular. Tarama
+  `*Errors` son eki ile sınırlı DEĞİLDİR — değer nesneleri (`CurrencyErrors`, `MoneyErrors`,
+  `QuantityErrors`) dahil assembly'deki her `Error` alanını kapsar. Bu test, yeni hata kodlarının
+  eşleme tablosu güncellenmeden eklenmesini engeller.
   **Not:** `Validation.*` öneki çalışma zamanında üretilir ve statik sınıf taramasına dahil
   değildir; test onu kapsamaz, çünkü tabloda önek kuralı olarak zaten mevcuttur.
-  **Not:** Değer nesnesindeki hatalar (`Currency.InvalidCode`, `Money.CurrencyMismatch`,
-  `Quantity.Negative`, `Quantity.NegativeResult`) `*Errors` sınıflarında değil, değer nesnesinin
-  kendisinde tanımlıdır ve bu testin kapsamına girmez. Bu kodlar REST yüzeyine ulaşırsa varsayılan
-  400'e düşer, ki bu doğru davranıştır.
 
 ### Validation
 

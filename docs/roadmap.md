@@ -57,7 +57,7 @@ Everything after it ships continuously.
 
 | #  | Title | Status |
 |----|---|---|
-| 8  | `feat(domain)` — append-only stock ledger, `StockMovement` and balance projection, Warehouse application layer and endpoints | |
+| 8  | `feat(domain)` — append-only stock ledger, `StockMovement` and balance projection | |
 | 9  | `feat(domain)` — costing strategies: moving average, then FIFO | |
 | 10 | `feat(web)` — stock screens, manual adjustment, movement history | |
 
@@ -103,7 +103,7 @@ ADR.
 - **Every `Money` property needs an explicit `ComplexProperty` line** in its entity configuration.
   Forgetting it fails silently. See ADR 0003.
 - **Grid datasource is a hardened surface.** Max page size, sort/group field allowlist, and a
-  default `Take` ship with the endpoint in PR 5, not later. The read DTO is flat, which makes the
+  default `Take` ship with the endpoint in PR 5b, not later. The read DTO is flat, which makes the
   DTO itself the field allowlist.
 - **Auth precedes the public demo.** Authentication and authorization land in PR 6, before the
   first deploy in PR 7. The scheme mix — cookie for Blazor, token for the REST and SOAP surfaces —
@@ -127,6 +127,7 @@ Tracked deliberately rather than hidden. Each one has a PR where it closes.
 | `Envanex.Application.Tests` contains no tests | PR 5a                                  |
 | `MoneyComplexTypeConvention` only inspects complex properties one level deep | when a nested case appears             |
 | `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 8, when the ledger makes it fragile |
+| Warehouse has no application layer or endpoints | PR 8 |
 | No authentication or authorization on any endpoint | PR 6 |
 
 ## How the work is run
