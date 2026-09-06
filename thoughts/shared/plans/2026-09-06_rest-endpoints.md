@@ -97,6 +97,10 @@ public sealed class ProductsController : ControllerBase
 //   başlatır, test süresini ikiye katlar ve CI'da bellek sorunu çıkarır.
 //   Tüm API testleri mevcut DatabaseCollection altında kalır.
 // - Testing ortamını ayarlar; rate limiting Testing'de devre dışıdır.
+//
+// Yaşam döngüsü: EnvanexWebApplicationFactory, SqlServerFixture içinde TEK SEFER oluşturulur
+// ve fixture'ın DisposeAsync'inde dispose edilir. Koleksiyon başına tek host, test sınıfı başına
+// DEĞİL. API test sınıfları factory'yi fixture üzerinden alır, kendileri oluşturmaz.
 public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program>
 {
     public EnvanexWebApplicationFactory(string connectionString);
@@ -268,6 +272,8 @@ dotnet format --verify-no-changes
 - `docs/adr/0006-rest-error-mapping.md` — created (başlık + ADR'de cevaplanacak soruları
   listeleyen HTML yorumu)
 - `tests/Envanex.IntegrationTests/Fixtures/RateLimitedWebApplicationFactory.cs` — created
+  (RateLimitedWebApplicationFactory yalnızca RateLimiterTests içinde oluşturulur ve o sınıfın
+  IAsyncLifetime.DisposeAsync'inde dispose edilir. EnvanexWebApplicationFactory ile paylaşılmaz.)
 - `tests/Envanex.IntegrationTests/Api/UnitOfMeasuresApiTests.cs` — created
 - `tests/Envanex.IntegrationTests/Api/RateLimiterTests.cs` — created
 - `tests/Envanex.IntegrationTests/Api/ConcurrencyApiTests.cs` — created
@@ -315,6 +321,8 @@ Rate limiter — ASP.NET Core yerleşik (`AddRateLimiter`), politika taksonomisi
 - `CreateUnitOfMeasure_WithValidPayload_ShouldReturn201WithLocationHeader`
 - `CreateUnitOfMeasure_WithDuplicateCode_ShouldReturn409`
 - `CreateUnitOfMeasure_WithInvalidPayload_ShouldReturn400WithProblemDetails`
+- `CreateUnitOfMeasure_WithNonExistentBaseUnit_ShouldReturn422`
+- `CreateUnitOfMeasure_WithInactiveBaseUnit_ShouldReturn422`
 - `GetUnitOfMeasureById_WithExistingUnit_ShouldReturn200`
 - `GetUnitOfMeasureById_WithNonExistentId_ShouldReturn404`
 - `ListUnitOfMeasures_ShouldReturnAllUnits`

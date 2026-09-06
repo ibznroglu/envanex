@@ -101,6 +101,8 @@ public static readonly Error CodeTooLong = new("UnitOfMeasure.CodeTooLong", "Öl
 public static readonly Error NameTooLong = new("UnitOfMeasure.NameTooLong", "Ölçü birimi adı en fazla 200 karakter olabilir.");
 public static readonly Error DuplicateCode = new("UnitOfMeasure.DuplicateCode", "Bu ölçü birimi kodu zaten kullanılıyor.");
 public static readonly Error NotFound = new("UnitOfMeasure.NotFound", "Ölçü birimi bulunamadı.");
+public static readonly Error BaseUnitNotFound = new("UnitOfMeasure.BaseUnitNotFound", "Belirtilen temel ölçü birimi bulunamadı.");
+public static readonly Error BaseUnitInactive = new("UnitOfMeasure.BaseUnitInactive", "Pasif bir temel ölçü birimi atanamaz.");
 ```
 
 ### Tests to add
@@ -310,7 +312,9 @@ Validator kuralları — hepsi domain sabitlerini referans alır, sayıyı tekra
 - `ActivateProductCommandValidator`: `Id NotEqual(Guid.Empty)`, `RowVersion` NotNull + NotEmpty
 - `DeactivateProductCommandValidator`: aynı
 - `CreateUnitOfMeasureCommandValidator`: `Code`/`Name` NotEmpty + MaxLength,
-  `ConversionFactor > 0`
+  `ConversionFactor` conditional:
+    - When `BaseUnitId` is null → `ConversionFactor` must equal 1 (message: "Temel birim için dönüşüm katsayısı 1 olmalıdır.")
+    - When `BaseUnitId` is not null → `ConversionFactor` must be > 0 (message: "Türetilmiş birim için dönüşüm katsayısı sıfırdan büyük olmalıdır.")
 
 ### Tests to add
 
@@ -334,7 +338,9 @@ Validator kuralları — hepsi domain sabitlerini referans alır, sayıyı tekra
 `CreateUnitOfMeasureCommandValidatorTests.cs`: `Validate_WithValidBaseUnitCommand_ShouldPass`,
 `Validate_WithValidDerivedUnitCommand_ShouldPass`, `Validate_WithEmptyCode_ShouldFail`,
 `Validate_WithCodeExceedingMaxLength_ShouldFail`, `Validate_WithEmptyName_ShouldFail`,
-`Validate_WithNameExceedingMaxLength_ShouldFail`
+`Validate_WithNameExceedingMaxLength_ShouldFail`,
+`Validate_BaseUnitWithConversionFactorNotOne_ShouldFail`,
+`Validate_DerivedUnitWithZeroConversionFactor_ShouldFail`
 
 `ValidationDecoratorTests.cs`: `HandleAsync_WithValidCommand_ShouldDelegateToInner`,
 `HandleAsync_WithInvalidCommand_ShouldReturnFailure_WithoutCallingInner`,
@@ -417,7 +423,11 @@ Handler'lar YALNIZCA Application'ın kendi exception tiplerini yakalar. `DbUpdat
 // Akış: readRepo.GetByIdAsync → null → ProductErrors.NotFound | Result.Success(dto)
 
 // CreateUnitOfMeasureCommandHandler : ICommandHandler<CreateUnitOfMeasureCommand, Guid>
-// Akış: ExistsByCodeAsync → DuplicateCode | UnitOfMeasure.Create → AddAsync → SaveChangesAsync
+// Akış: ExistsByCodeAsync → DuplicateCode
+//     | BaseUnitId != null ise: GetActiveStatusAsync (aynı IUnitOfMeasureRepository üzerinde)
+//       (null → UnitOfMeasureErrors.BaseUnitNotFound, false → UnitOfMeasureErrors.BaseUnitInactive)
+//     | BaseUnitId == null ise: bu kontrol atlanır
+//     | UnitOfMeasure.Create → AddAsync → SaveChangesAsync
 //     | catch DuplicateKeyException → UnitOfMeasureErrors.DuplicateCode | return unit.Id
 
 // GetUnitOfMeasureByIdQueryHandler : IQueryHandler<GetUnitOfMeasureByIdQuery, UnitOfMeasureDetailDto>
@@ -458,7 +468,10 @@ Handler'lar YALNIZCA Application'ın kendi exception tiplerini yakalar. `DbUpdat
 `CreateUnitOfMeasureCommandHandlerTests.cs`:
 `HandleAsync_WithValidBaseUnitCommand_ShouldReturnUnitId`,
 `HandleAsync_WithDuplicateCode_ShouldReturnDuplicateCodeError`,
-`HandleAsync_WhenUnitOfWorkThrowsDuplicateKey_ShouldReturnDuplicateCodeError`
+`HandleAsync_WhenUnitOfWorkThrowsDuplicateKey_ShouldReturnDuplicateCodeError`,
+`HandleAsync_WithNonExistentBaseUnit_ShouldReturnBaseUnitNotFoundError`,
+`HandleAsync_WithInactiveBaseUnit_ShouldReturnBaseUnitInactiveError`,
+`HandleAsync_WithNullBaseUnit_ShouldNotCheckBaseUnit`
 
 `GetUnitOfMeasureByIdQueryHandlerTests.cs`: `HandleAsync_WithExistingUnit_ShouldReturnUnitDetail`,
 `HandleAsync_WithNonExistentUnit_ShouldReturnNotFoundError`
