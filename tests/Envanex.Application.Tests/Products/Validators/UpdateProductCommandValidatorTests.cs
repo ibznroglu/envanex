@@ -1,0 +1,84 @@
+using Envanex.Application.Products.Commands;
+using Envanex.Application.Products.Validators;
+using Envanex.Domain.Aggregates.Products;
+using Shouldly;
+
+namespace Envanex.Application.Tests.Products.Validators;
+
+public class UpdateProductCommandValidatorTests
+{
+    private readonly UpdateProductCommandValidator _validator = new();
+
+    private static UpdateProductCommand ValidCommand => new(
+        Id: Guid.CreateVersion7(),
+        Name: "Widget",
+        UnitOfMeasureId: Guid.CreateVersion7(),
+        ListPriceAmount: 100.50m,
+        ListPriceCurrency: "TRY",
+        ReorderPoint: 10m,
+        RowVersion: [1, 2, 3, 4, 5, 6, 7, 8]);
+
+    [Fact]
+    public void Validate_WithValidCommand_ShouldPass()
+    {
+        var result = _validator.Validate(ValidCommand);
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_WithEmptyName_ShouldFail()
+    {
+        var command = ValidCommand with { Name = "" };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.ErrorCode == "Product.NameRequired");
+    }
+
+    [Fact]
+    public void Validate_WithNameExceedingMaxLength_ShouldFail()
+    {
+        string longName = new('A', Product.NameMaxLength + 1);
+        var command = ValidCommand with { Name = longName };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.ErrorCode == "Product.NameTooLong");
+    }
+
+    [Fact]
+    public void Validate_WithEmptyGuidUnitOfMeasureId_ShouldFail()
+    {
+        var command = ValidCommand with { UnitOfMeasureId = Guid.Empty };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.ErrorCode == "Product.UnitOfMeasureRequired");
+    }
+
+    [Fact]
+    public void Validate_WithNullRowVersion_ShouldFail()
+    {
+        var command = ValidCommand with { RowVersion = null! };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.ErrorCode == "Product.RowVersionRequired");
+    }
+
+    [Fact]
+    public void Validate_WithEmptyRowVersion_ShouldFail()
+    {
+        var command = ValidCommand with { RowVersion = [] };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.ErrorCode == "Product.RowVersionRequired");
+    }
+}
