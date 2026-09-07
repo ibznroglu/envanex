@@ -220,4 +220,58 @@ public class ProductTests
 
         Should.Throw<ArgumentNullException>(() => product.Update("Widget", ValidUnitOfMeasureId, null!, DefaultReorderPoint));
     }
+
+    [Fact]
+    public void Create_WithCodeAtExactMaxLength_ShouldSucceed()
+    {
+        string code = new('A', Product.CodeMaxLength);
+
+        var result = Product.Create(code, "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Code.ShouldBe(code);
+    }
+
+    [Fact]
+    public void Create_WithNameAtExactMaxLength_ShouldSucceed()
+    {
+        string name = new('A', Product.NameMaxLength);
+
+        var result = Product.Create("SKU001", name, ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Name.ShouldBe(name);
+    }
+
+    [Fact]
+    public void Create_WithWhitespaceOnlyName_ShouldFail()
+    {
+        var result = Product.Create("SKU001", "   ", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.NameRequired);
+    }
+
+    [Fact]
+    public void Update_WithNameAtExactMaxLength_ShouldSucceed()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        string name = new('A', Product.NameMaxLength);
+
+        var result = product.Update(name, ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.Name.ShouldBe(name);
+    }
+
+    [Fact]
+    public void Update_WithWhitespaceOnlyName_ShouldFail()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+
+        var result = product.Update("   ", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.NameRequired);
+    }
 }

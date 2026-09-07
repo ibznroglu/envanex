@@ -169,4 +169,26 @@ public class UnitOfMeasureTests
         result.IsFailure.ShouldBeTrue();
         result.Error.ShouldBe(UnitOfMeasureErrors.NameTooLong);
     }
+
+    [Fact]
+    public void Create_WithCodeAtExactMaxLength_ShouldSucceed()
+    {
+        string code = new('A', UnitOfMeasure.CodeMaxLength);
+
+        var result = UnitOfMeasure.Create(code, "Adet", null, 1m);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Code.ShouldBe(code);
+    }
+
+    [Fact]
+    public void Create_WithNameAtExactMaxLength_ShouldSucceed()
+    {
+        string name = new('A', UnitOfMeasure.NameMaxLength);
+
+        var result = UnitOfMeasure.Create("ADET", name, null, 1m);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Name.ShouldBe(name);
+    }
 }
