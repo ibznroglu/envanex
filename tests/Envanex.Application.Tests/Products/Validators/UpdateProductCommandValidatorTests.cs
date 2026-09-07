@@ -81,4 +81,48 @@ public class UpdateProductCommandValidatorTests
         result.IsValid.ShouldBeFalse();
         result.Errors.ShouldContain(e => e.ErrorCode == "Product.RowVersionRequired");
     }
+
+    [Fact]
+    public void Validate_WithNegativeListPriceAmount_ShouldFail()
+    {
+        var command = ValidCommand with { ListPriceAmount = -1m };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.ErrorCode == "Product.ListPriceAmountNegative");
+    }
+
+    [Fact]
+    public void Validate_WithEmptyListPriceCurrency_ShouldFail()
+    {
+        var command = ValidCommand with { ListPriceCurrency = "" };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.ErrorCode == "Product.ListPriceCurrencyRequired");
+    }
+
+    [Fact]
+    public void Validate_WithNegativeReorderPoint_ShouldFail()
+    {
+        var command = ValidCommand with { ReorderPoint = -5m };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeFalse();
+        result.Errors.ShouldContain(e => e.ErrorCode == "Product.ReorderPointNegative");
+    }
+
+    [Fact]
+    public void Validate_WithNameAtExactMaxLength_ShouldPass()
+    {
+        string name = new('A', Product.NameMaxLength);
+        var command = ValidCommand with { Name = name };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
 }

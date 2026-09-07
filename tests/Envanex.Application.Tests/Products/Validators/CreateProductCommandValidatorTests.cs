@@ -114,4 +114,26 @@ public class CreateProductCommandValidatorTests
         result.IsValid.ShouldBeFalse();
         result.Errors.ShouldContain(e => e.ErrorCode == "Product.ReorderPointNegative");
     }
+
+    [Fact]
+    public void Validate_WithCodeAtExactMaxLength_ShouldPass()
+    {
+        string code = new('A', Product.CodeMaxLength);
+        var command = ValidCommand with { Code = code };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_WithNameAtExactMaxLength_ShouldPass()
+    {
+        string name = new('A', Product.NameMaxLength);
+        var command = ValidCommand with { Name = name };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
 }

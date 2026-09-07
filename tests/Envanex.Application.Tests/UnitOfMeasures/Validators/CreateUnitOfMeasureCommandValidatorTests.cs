@@ -104,4 +104,26 @@ public class CreateUnitOfMeasureCommandValidatorTests
         result.IsValid.ShouldBeFalse();
         result.Errors.ShouldContain(e => e.ErrorCode == "UnitOfMeasure.ConversionFactorMustBePositive");
     }
+
+    [Fact]
+    public void Validate_WithCodeAtExactMaxLength_ShouldPass()
+    {
+        string code = new('A', UnitOfMeasure.CodeMaxLength);
+        var command = ValidBaseUnitCommand with { Code = code };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Fact]
+    public void Validate_WithNameAtExactMaxLength_ShouldPass()
+    {
+        string name = new('A', UnitOfMeasure.NameMaxLength);
+        var command = ValidBaseUnitCommand with { Name = name };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
 }
