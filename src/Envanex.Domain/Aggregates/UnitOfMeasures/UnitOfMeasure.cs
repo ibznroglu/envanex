@@ -4,6 +4,9 @@ namespace Envanex.Domain.Aggregates.UnitOfMeasures;
 
 public sealed class UnitOfMeasure : AggregateRoot<Guid>
 {
+    public const int CodeMaxLength = 20;
+    public const int NameMaxLength = 200;
+
     public string Code { get; private set; }
     public string Name { get; private set; }
     public Guid? BaseUnitId { get; private set; }
@@ -37,6 +40,16 @@ public sealed class UnitOfMeasure : AggregateRoot<Guid>
         if (string.IsNullOrWhiteSpace(name))
         {
             return Result.Failure<UnitOfMeasure>(UnitOfMeasureErrors.NameRequired);
+        }
+
+        if (code.Trim().Length > CodeMaxLength)
+        {
+            return Result.Failure<UnitOfMeasure>(UnitOfMeasureErrors.CodeTooLong);
+        }
+
+        if (name.Trim().Length > NameMaxLength)
+        {
+            return Result.Failure<UnitOfMeasure>(UnitOfMeasureErrors.NameTooLong);
         }
 
         string normalizedCode = code.Trim().ToUpperInvariant();

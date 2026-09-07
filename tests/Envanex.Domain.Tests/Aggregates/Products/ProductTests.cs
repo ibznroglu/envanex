@@ -117,4 +117,107 @@ public class ProductTests
 
         product.IsActive.ShouldBeTrue();
     }
+
+    [Fact]
+    public void Create_WithCodeExceedingMaxLength_ShouldFail()
+    {
+        string longCode = new('A', Product.CodeMaxLength + 1);
+
+        var result = Product.Create(longCode, "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.CodeTooLong);
+    }
+
+    [Fact]
+    public void Create_WithNameExceedingMaxLength_ShouldFail()
+    {
+        string longName = new('A', Product.NameMaxLength + 1);
+
+        var result = Product.Create("SKU001", longName, ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.NameTooLong);
+    }
+
+    [Fact]
+    public void Update_WithValidInputs_ShouldSucceed()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var newUomId = Guid.CreateVersion7();
+        var newPrice = Money.Of(200.75m, Currency.TRY).Value;
+        var newReorderPoint = Quantity.Of(20m).Value;
+
+        var result = product.Update("New Name", newUomId, newPrice, newReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.Name.ShouldBe("New Name");
+        product.UnitOfMeasureId.ShouldBe(newUomId);
+        product.ListPrice.ShouldBe(newPrice);
+        product.ReorderPoint.ShouldBe(newReorderPoint);
+    }
+
+    [Fact]
+    public void Update_WithEmptyName_ShouldFail()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+
+        var result = product.Update("", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.NameRequired);
+    }
+
+    [Fact]
+    public void Update_WithNameExceedingMaxLength_ShouldFail()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        string longName = new('A', Product.NameMaxLength + 1);
+
+        var result = product.Update(longName, ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.NameTooLong);
+    }
+
+    [Fact]
+    public void Update_WithEmptyGuidUnitOfMeasureId_ShouldFail()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+
+        var result = product.Update("Widget", Guid.Empty, DefaultPrice, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.UnitOfMeasureRequired);
+    }
+
+    [Fact]
+    public void Update_ShouldTrimName()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+
+        var result = product.Update(" Updated Name ", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.Name.ShouldBe("Updated Name");
+    }
+
+    [Fact]
+    public void Update_ShouldNotChangeCode()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        string originalCode = product.Code;
+
+        product.Update("New Name", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint);
+
+        product.Code.ShouldBe(originalCode);
+    }
+
+    [Fact]
+    public void Update_WithNullListPrice_ShouldThrow()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+
+        Should.Throw<ArgumentNullException>(() => product.Update("Widget", ValidUnitOfMeasureId, null!, DefaultReorderPoint));
+    }
 }
