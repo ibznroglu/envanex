@@ -77,15 +77,16 @@ public static class ResultExtensions
     public static IActionResult ToCreatedActionResult<T>(
         this Result<T> result, string routeName, Func<T, object> routeValues);
 
-    // AÇIK KOD TABLOSU — sonek veya önek eşlemesi DEĞİL.
-    // Her Error.Code birebir string eşlemesiyle HTTP durum koduna çevrilir.
-    // Tek istisna: "Validation." öneki çalışma zamanında özellik adıyla üretildiği için
-    // önek kontrolü kullanır.
+    // AÇIK KOD TABLOSU — her Error.Code birebir string eşlemesiyle HTTP durum koduna çevrilir.
+    // İstisna YOK — tüm eşlemeler tam string eşlemesidir.
     //
     //   AÇIK EŞLEME TABLOSU:
     //   ---------------------------------------------------------------
     //   Error.Code                                   | HTTP Status
     //   ---------------------------------------------------------------
+    //
+    //   --- 400 Bad Request (ValidationError) ---
+    //   Validation.Failed                             | 400
     //
     //   --- 404 Not Found ---
     //   Product.NotFound                              | 404
@@ -102,12 +103,19 @@ public static class ResultExtensions
     //   UnitOfMeasure.BaseUnitNotFound                | 422
     //   UnitOfMeasure.BaseUnitInactive                | 422
     //
-    //   --- 400 Bad Request (Product) ---
+    //   --- 400 Bad Request (Product — domain) ---
     //   Product.CodeRequired                          | 400
     //   Product.NameRequired                          | 400
     //   Product.UnitOfMeasureRequired                 | 400
-    //   Product.CodeTooLong                           | 400
-    //   Product.NameTooLong                           | 400
+    //   Product.CodeTooLong                            | 400
+    //   Product.NameTooLong                            | 400
+    //
+    //   --- 400 Bad Request (Product — validator) ---
+    //   Product.IdRequired                            | 400
+    //   Product.RowVersionRequired                    | 400
+    //   Product.ListPriceAmountNegative               | 400
+    //   Product.ReorderPointNegative                  | 400
+    //   Product.ListPriceCurrencyRequired             | 400
     //
     //   --- 400 Bad Request (UnitOfMeasure) ---
     //   UnitOfMeasure.CodeRequired                    | 400
@@ -128,15 +136,9 @@ public static class ResultExtensions
     //   Quantity.Negative                             | 400
     //   Quantity.NegativeResult                       | 400
     //
-    //   --- Validation prefix (runtime-generated) ---
-    //   Validation.* öneki                            | 400 + alan bazlı hata sözlüğü
-    //
     //   --- Fallback (safety net) ---
     //   Tabloda olmayan her şey                       | 400 Bad Request
     //   ---------------------------------------------------------------
-    //
-    // "Validation.*" TEK İSTİSNA: önek kontrolü kullanır çünkü özellik adı
-    // çalışma zamanında üretilir. Diğer HER eşleme tam string eşlemesidir.
     //
     // Uygulama: FrozenDictionary<string, int> veya aynı anlama gelen sabit
     // arama yapısı. "*.NotFound" gibi sonek eşlemesi YOKTUR —
@@ -144,6 +146,22 @@ public static class ResultExtensions
     // HTTP kodlarına eşlenmelidir, sonek eşlemesi bunu karıştırırdı.
     //
     // Tüm hatalar ProblemDetails (RFC 9457) gövdesiyle döner.
+    //
+    // ProblemDetails üretimi iki yola ayrılır:
+    //
+    // A) result.Error, ValidationError ise (alan bazlı doğrulama hatası):
+    //    - Status: 400
+    //    - Title: "Validation Failed"
+    //    - Detail: TurkishErrorMessages.GetMessage("Validation.Failed", error.Message)
+    //    - Extensions["errors"]: Dictionary<string, string[]> — her ValidationFailure'ın
+    //      PropertyName'i anahtar, ErrorCode'unun TurkishErrorMessages çevirisi değer.
+    //      Aynı PropertyName'e ait birden fazla hata aynı dizide toplanır.
+    //
+    // B) result.Error, sıradan Error ise (tekil hata):
+    //    - Status: eşleme tablosundan
+    //    - Title: HTTP durum kodunun standart adı
+    //    - Detail: TurkishErrorMessages.GetMessage(error.Code, error.Message)
+    //    - Extensions["errors"] YOKTUR
 }
 ```
 
@@ -168,6 +186,8 @@ public static class TurkishErrorMessages
     //
     // Her Error.Code için bir giriş:
     //
+    //   "Validation.Failed"                            → "Bir veya daha fazla doğrulama hatası oluştu."
+    //
     //   "Product.CodeRequired"                         → "Ürün kodu zorunludur."
     //   "Product.NameRequired"                         → "Ürün adı zorunludur."
     //   "Product.UnitOfMeasureRequired"                → "Ölçü birimi seçilmelidir."
@@ -178,6 +198,11 @@ public static class TurkishErrorMessages
     //   "Product.DuplicateCode"                        → "Bu ürün kodu zaten kullanılıyor."
     //   "Product.UnitOfMeasureNotFound"                → "Belirtilen ölçü birimi bulunamadı."
     //   "Product.UnitOfMeasureInactive"                → "Pasif bir ölçü birimi atanamaz."
+    //   "Product.IdRequired"                            → "Ürün kimliği zorunludur."
+    //   "Product.RowVersionRequired"                    → "Eşzamanlılık kontrolü için satır sürümü zorunludur."
+    //   "Product.ListPriceAmountNegative"               → "Liste fiyatı negatif olamaz."
+    //   "Product.ReorderPointNegative"                  → "Yeniden sipariş noktası negatif olamaz."
+    //   "Product.ListPriceCurrencyRequired"             → "Liste fiyatı para birimi zorunludur."
     //
     //   "UnitOfMeasure.CodeRequired"                   → "Ölçü birimi kodu zorunludur."
     //   "UnitOfMeasure.NameRequired"                   → "Ölçü birimi adı zorunludur."
@@ -198,10 +223,6 @@ public static class TurkishErrorMessages
     //   "Money.CurrencyMismatch"                       → "Farklı para birimleri ile işlem yapılamaz."
     //   "Quantity.Negative"                            → "Miktar negatif olamaz."
     //   "Quantity.NegativeResult"                      → "İşlem sonucu negatif bir miktar oluşurdu."
-    //
-    // "Validation.*" önekli kodlar bu tabloda YER ALMAZ — FluentValidation mesajları
-    // zaten İngilizce üretilir ve doğrudan ProblemDetails'a konur; ayrıca validator
-    // mesajları çalışma zamanında üretildiği için statik tabloya eklenemez.
     //
     // Public API:
     public static string GetMessage(string errorCode, string fallbackMessage);
@@ -251,6 +272,13 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
 - `GetProductById_ResponseHeaders_ShouldContainXContentTypeOptions`
 - `GetProductById_ResponseHeaders_ShouldContainXFrameOptions`
 - `GetProductById_ResponseHeaders_ShouldContainReferrerPolicy`
+- `ValidationError_ShouldReturnTurkishMessageInProblemDetails` — geçersiz bir payload gönderilir
+  (örn. boş Code ile POST), dönen ProblemDetails'ın `errors` sözlüğündeki mesajın Türkçe olduğu
+  doğrulanır. Validator `.WithErrorCode("Product.CodeRequired")` üretir, `ValidationDecorator`
+  bunu `ValidationError`'a sarar, `ResultExtensions` alan bazlı ProblemDetails üretir,
+  `TurkishErrorMessages` tablosu `"Product.CodeRequired"` kodunu `"Ürün kodu zorunludur."` olarak
+  çevirir. Test, dönen JSON'daki `errors` sözlüğünde `"Code"` anahtarı altında bu Türkçe mesajın
+  bulunduğunu doğrular.
 
 `ResultMappingTests.cs`:
 
@@ -261,27 +289,30 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
   `*Errors` son eki ile sınırlı DEĞİLDİR — değer nesneleri (`CurrencyErrors`, `MoneyErrors`,
   `QuantityErrors`) dahil assembly'deki her `Error` alanını kapsar. Bu test, yeni hata kodlarının
   eşleme tablosu güncellenmeden eklenmesini engeller.
-  **Kapsam dışı bırakma kuralı:** `typeof(Envanex.Domain.Common.Error)` üzerinde tanımlanan
-  `public static readonly Error` alanları taramaya DAHİL EDİLMEZ. `Error.None` bir sentinel
-  değerdir, hata kataloğu girişi değildir. Dışlama mekanizması tipe dayalıdır: alanın declaring
-  type'ı `Error` olan alanlar atlanır. Kod değerinin boş olup olmadığına bakılmaz.
-  **Not:** `Validation.*` öneki çalışma zamanında üretilir ve statik sınıf taramasına dahil
-  değildir; test onu kapsamaz, çünkü tabloda önek kuralı olarak zaten mevcuttur.
+  **Kapsam dışı bırakma kuralı:** `typeof(Envanex.Domain.Common.Error)` ve
+  `typeof(Envanex.Domain.Common.ValidationError)` üzerinde tanımlanan `public static readonly Error`
+  alanları taramaya DAHİL EDİLMEZ. `Error.None` bir sentinel değerdir, hata kataloğu girişi
+  değildir. `ValidationError` bir altyapı tipidir, hata kataloğu değildir — kendi `Code` değeri
+  (`"Validation.Failed"`) eşleme tablosuna ayrıca eklenir (bkz. eşleme tablosundaki ilk giriş)
+  ancak reflection taraması ile zorlanmaz. Dışlama mekanizması tipe dayalıdır: alanın declaring
+  type'ı `Error` veya `ValidationError` olan alanlar atlanır. Kod değerinin boş olup olmadığına
+  bakılmaz.
 
 - `ResultMapping_NoDomainErrorCode_ShouldBeEmpty` — Reflection ile `Envanex.Domain`
-  assembly'sini tarar. `typeof(Envanex.Domain.Common.Error)` HARİCİNDEKİ tüm public
-  sınıflardaki `public static readonly Error` alanlarının `Code` değerlerini toplar ve hiçbirinin
+  assembly'sini tarar. `typeof(Envanex.Domain.Common.Error)` ve
+  `typeof(Envanex.Domain.Common.ValidationError)` HARİCİNDEKİ tüm public sınıflardaki
+  `public static readonly Error` alanlarının `Code` değerlerini toplar ve hiçbirinin
   `string.Empty` olmadığını doğrular. Bu test, birinci testteki tipe dayalı dışlama mekanizmasının
-  gerçek bir hatayı sessizce gizlemesini önler: birisi `Error` tipi dışında boş `Code` değerine
-  sahip bir hata tanımlarsa bu test kırmızıya döner.
+  gerçek bir hatayı sessizce gizlemesini önler: birisi `Error` veya `ValidationError` tipi
+  dışında boş `Code` değerine sahip bir hata tanımlarsa bu test kırmızıya döner.
 
 - `ResultMapping_EveryDomainErrorCode_ShouldHaveATurkishMessage` — Reflection ile
-  `Envanex.Domain` assembly'sini tarar. `typeof(Envanex.Domain.Common.Error)` HARİCİNDEKİ tüm
-  public sınıflardaki `public static readonly Error` alanlarının `Code` değerlerini toplar ve
-  her kodun `TurkishErrorMessages` tablosunda bir girişe sahip olduğunu doğrular.
-  `Validation.*` önekli kodlar kapsam dışıdır (çalışma zamanında üretilir, statik taramaya
-  dahil değildir). Bu test, yeni bir hata kodu eklendiğinde Türkçe çevirisi olmadan kullanıcıya
-  İngilizce mesaj ulaşmasını engeller.
+  `Envanex.Domain` assembly'sini tarar. `typeof(Envanex.Domain.Common.Error)` ve
+  `typeof(Envanex.Domain.Common.ValidationError)` HARİCİNDEKİ tüm public sınıflardaki
+  `public static readonly Error` alanlarının `Code` değerlerini toplar ve her kodun
+  `TurkishErrorMessages` tablosunda bir girişe sahip olduğunu doğrular. Bu test, yeni
+  bir hata kodu eklendiğinde Türkçe çevirisi olmadan kullanıcıya İngilizce mesaj ulaşmasını
+  engeller.
 
 ### Validation
 

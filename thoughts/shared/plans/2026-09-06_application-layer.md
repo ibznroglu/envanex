@@ -43,27 +43,61 @@ ADR'de gerekçelendirilmesi gereken noktalar:
   bunları `DuplicateKeyException` ve `ConcurrencyConflictException`'a çevirir. Bu, Application'ın EF'e
   hiç referans vermemesini mümkün kılar ve `Application_ShouldNotReference_EntityFrameworkPackages`
   testiyle mekanik olarak korunur.
+- **Validator hata kodları domain hata kataloğundan gelir.** FluentValidation kuralları `.WithErrorCode(...)`
+  ile domain hata kodlarını (`"Product.CodeRequired"` vb.) kullanır, `.WithMessage(...)` KULLANILMAZ.
+  `ValidationDecorator` başarısız kuralların tümünü `ValidationError`'a toplar ve `Result.Failure` döner.
+  ProblemDetails üretimi Web katmanında yapılır ve TurkishErrorMessages tablosuyla yerelleştirilir.
+- **Error tipinin `sealed` olmaktan çıkarılması ve `ValidationError` alt tipinin eklenmesi PR 2'nin
+  shared kernel'ine dokunur.** Gerekçe: alan bazlı doğrulama raporlaması tek `Error` ile taşınamaz;
+  PR 7 form UI'ı her alan için ayrı hata mesajı gerektirir. `ValidationError : Error` kalıtımı
+  `Result<T>` mekanizmasını kırmadan çoklu hata taşınmasını sağlar.
 
 ---
 
-## Phase 1 — Domain constants, length validation in factories, Product.Update, new errors
+## Phase 1 — Domain constants, length validation in factories, Product.Update, new errors, ValidationError subtype
 
 ### Files
 
+- `src/Envanex.Domain/Common/Error.cs` — modified — `sealed` keyword kaldırılır, `record` kalır
+- `src/Envanex.Domain/Common/ValidationError.cs` — created — `ValidationError` ve `ValidationFailure`
+  record tipleri
 - `src/Envanex.Domain/Aggregates/Products/Product.cs` — modified — `CodeMaxLength = 50`,
   `NameMaxLength = 200` sabitleri. `Create`'e uzunluk kontrolleri. `Update(...)` metodu.
 - `src/Envanex.Domain/Aggregates/Products/ProductErrors.cs` — modified — `CodeTooLong`, `NameTooLong`,
-  `NotFound`, `ConcurrencyConflict`, `DuplicateCode`, `UnitOfMeasureNotFound`, `UnitOfMeasureInactive`
+  `NotFound`, `ConcurrencyConflict`, `DuplicateCode`, `UnitOfMeasureNotFound`, `UnitOfMeasureInactive`,
+  `IdRequired`, `RowVersionRequired`, `ListPriceAmountNegative`, `ReorderPointNegative`,
+  `ListPriceCurrencyRequired`
 - `src/Envanex.Domain/Aggregates/UnitOfMeasures/UnitOfMeasure.cs` — modified — `CodeMaxLength = 20`,
   `NameMaxLength = 200`. `Create`'e uzunluk kontrolleri.
 - `src/Envanex.Domain/Aggregates/UnitOfMeasures/UnitOfMeasureErrors.cs` — modified — `CodeTooLong`,
   `NameTooLong`, `DuplicateCode`, `NotFound`
 - `tests/Envanex.Domain.Tests/Aggregates/Products/ProductTests.cs` — modified
 - `tests/Envanex.Domain.Tests/Aggregates/UnitOfMeasures/UnitOfMeasureTests.cs` — modified
+- `tests/Envanex.Domain.Tests/Common/ValidationErrorTests.cs` — created
 
 ### Signatures
 
 ```csharp
+// Error.cs — sealed kaldırılır, record kalır
+public record Error(string Code, string Message)
+{
+    public static readonly Error None = new(string.Empty, string.Empty);
+}
+
+// ValidationError.cs
+public sealed record ValidationError : Error
+{
+    public IReadOnlyList<ValidationFailure> Failures { get; }
+
+    public ValidationError(IReadOnlyList<ValidationFailure> failures)
+        : base("Validation.Failed", "One or more validation errors occurred.")
+    {
+        Failures = failures;
+    }
+}
+
+public sealed record ValidationFailure(string PropertyName, string ErrorCode);
+
 // Product.cs — sabitler doğrudan aggregate üzerinde, ayrı bir Constants sınıfında DEĞİL
 public const int CodeMaxLength = 50;
 public const int NameMaxLength = 200;
@@ -90,6 +124,11 @@ public static readonly Error ConcurrencyConflict = new("Product.ConcurrencyConfl
 public static readonly Error DuplicateCode = new("Product.DuplicateCode", "A product with this code already exists.");
 public static readonly Error UnitOfMeasureNotFound = new("Product.UnitOfMeasureNotFound", "The specified unit of measure was not found.");
 public static readonly Error UnitOfMeasureInactive = new("Product.UnitOfMeasureInactive", "Cannot assign an inactive unit of measure.");
+public static readonly Error IdRequired = new("Product.IdRequired", "Product identifier is required.");
+public static readonly Error RowVersionRequired = new("Product.RowVersionRequired", "Row version is required for concurrency control.");
+public static readonly Error ListPriceAmountNegative = new("Product.ListPriceAmountNegative", "List price amount must not be negative.");
+public static readonly Error ReorderPointNegative = new("Product.ReorderPointNegative", "Reorder point must not be negative.");
+public static readonly Error ListPriceCurrencyRequired = new("Product.ListPriceCurrencyRequired", "List price currency is required.");
 
 // UnitOfMeasure.cs
 public const int CodeMaxLength = 20;
@@ -124,6 +163,14 @@ public static readonly Error BaseUnitInactive = new("UnitOfMeasure.BaseUnitInact
 - `Create_WithCodeExceedingMaxLength_ShouldFail`
 - `Create_WithNameExceedingMaxLength_ShouldFail`
 
+`ValidationErrorTests.cs` (yeni sınıf):
+
+- `ValidationError_ShouldBeAnError` — `ValidationError` bir `Error` olduğundan `Result.Failure`
+  parametresi olarak geçilebilir ve `result.Error` olarak geri alındığında `is ValidationError`
+  pattern match'i çalışır.
+- `ValidationError_ShouldCarryAllFailures` — birden fazla `ValidationFailure` ile oluşturulan
+  `ValidationError`'ın `Failures` listesinin tüm girişleri koruduğu doğrulanır.
+
 Sabitin literal değerini doğrulayan test YAZILMAZ (`MaxCodeLength_ShouldBe50` gibi). Testler davranış
 doğrular.
 
@@ -131,7 +178,7 @@ doğrular.
 
 ```
 dotnet build -warnaserror
-dotnet test --filter "FullyQualifiedName~ProductTests|FullyQualifiedName~UnitOfMeasureTests"
+dotnet test --filter "FullyQualifiedName~ProductTests|FullyQualifiedName~UnitOfMeasureTests|FullyQualifiedName~ValidationErrorTests"
 dotnet format --verify-no-changes
 ```
 
@@ -297,24 +344,51 @@ public sealed record GetUnitOfMeasureByIdQuery(Guid Id);
 
 // ValidationDecorator<TCommand, TResponse> : ICommandHandler<TCommand, TResponse>
 // ctor: (ICommandHandler<TCommand, TResponse> inner, IEnumerable<IValidator<TCommand>> validators)
-// Hata kodu: "Validation.<PropertyName>", mesaj FluentValidation'dan gelir.
+// TÜM başarısız kuralları toplar (ilkinde durmaz) ve tek bir ValidationError döner.
+// Her ValidationFailure, FluentValidation sonucunun PropertyName ve ErrorCode alanlarını taşır.
 // Validator yoksa doğrudan inner'a devreder.
+// Akış:
+//   1. validator yoksa → inner.HandleAsync
+//   2. validators.SelectMany(v => v.Validate(command).Errors) ile tüm hatalar toplanır
+//   3. hata yoksa → inner.HandleAsync
+//   4. hata varsa → her FluentValidation.Results.ValidationFailure'dan
+//      new ValidationFailure(failure.PropertyName, failure.ErrorCode) üretilir
+//   5. Result.Failure<TResponse>(new ValidationError(failures)) döner
 ```
 
-Validator kuralları — hepsi domain sabitlerini referans alır, sayıyı tekrar yazmaz:
+Validator kuralları — hepsi domain sabitlerini referans alır, sayıyı tekrar yazmaz.
+Her kural `.WithErrorCode(...)` kullanır, `.WithMessage(...)` KULLANILMAZ.
+Mesaj üretimi Web katmanında `TurkishErrorMessages` tablosuyla yapılır.
 
-- `CreateProductCommandValidator`: `Code` NotEmpty + `MaximumLength(Product.CodeMaxLength)`,
-  `Name` NotEmpty + `MaximumLength(Product.NameMaxLength)`, `UnitOfMeasureId` `NotEqual(Guid.Empty)`,
-  `ListPriceAmount >= 0`, `ListPriceCurrency` NotEmpty + `Length(3)`, `ReorderPoint >= 0`
-- `UpdateProductCommandValidator`: `Id NotEqual(Guid.Empty)`, `Name` NotEmpty + MaxLength,
-  `UnitOfMeasureId NotEqual(Guid.Empty)`, `ListPriceAmount >= 0`, `ListPriceCurrency` NotEmpty +
-  `Length(3)`, `ReorderPoint >= 0`, `RowVersion` NotNull + NotEmpty
-- `ActivateProductCommandValidator`: `Id NotEqual(Guid.Empty)`, `RowVersion` NotNull + NotEmpty
+- `CreateProductCommandValidator`:
+  `Code` NotEmpty `.WithErrorCode("Product.CodeRequired")` +
+  `MaximumLength(Product.CodeMaxLength)` `.WithErrorCode("Product.CodeTooLong")`,
+  `Name` NotEmpty `.WithErrorCode("Product.NameRequired")` +
+  `MaximumLength(Product.NameMaxLength)` `.WithErrorCode("Product.NameTooLong")`,
+  `UnitOfMeasureId` `NotEqual(Guid.Empty)` `.WithErrorCode("Product.UnitOfMeasureRequired")`,
+  `ListPriceAmount >= 0` `.WithErrorCode("Product.ListPriceAmountNegative")`,
+  `ListPriceCurrency` NotEmpty + `Length(3)` `.WithErrorCode("Product.ListPriceCurrencyRequired")`,
+  `ReorderPoint >= 0` `.WithErrorCode("Product.ReorderPointNegative")`
+- `UpdateProductCommandValidator`:
+  `Id` `NotEqual(Guid.Empty)` `.WithErrorCode("Product.IdRequired")`,
+  `Name` NotEmpty `.WithErrorCode("Product.NameRequired")` + MaxLength `.WithErrorCode("Product.NameTooLong")`,
+  `UnitOfMeasureId` `NotEqual(Guid.Empty)` `.WithErrorCode("Product.UnitOfMeasureRequired")`,
+  `ListPriceAmount >= 0` `.WithErrorCode("Product.ListPriceAmountNegative")`,
+  `ListPriceCurrency` NotEmpty + `Length(3)` `.WithErrorCode("Product.ListPriceCurrencyRequired")`,
+  `ReorderPoint >= 0` `.WithErrorCode("Product.ReorderPointNegative")`,
+  `RowVersion` NotNull + NotEmpty `.WithErrorCode("Product.RowVersionRequired")`
+- `ActivateProductCommandValidator`:
+  `Id` `NotEqual(Guid.Empty)` `.WithErrorCode("Product.IdRequired")`,
+  `RowVersion` NotNull + NotEmpty `.WithErrorCode("Product.RowVersionRequired")`
 - `DeactivateProductCommandValidator`: aynı
-- `CreateUnitOfMeasureCommandValidator`: `Code`/`Name` NotEmpty + MaxLength,
+- `CreateUnitOfMeasureCommandValidator`:
+  `Code` NotEmpty `.WithErrorCode("UnitOfMeasure.CodeRequired")` +
+  MaxLength `.WithErrorCode("UnitOfMeasure.CodeTooLong")`,
+  `Name` NotEmpty `.WithErrorCode("UnitOfMeasure.NameRequired")` +
+  MaxLength `.WithErrorCode("UnitOfMeasure.NameTooLong")`,
   `ConversionFactor` conditional:
-    - When `BaseUnitId` is null → `ConversionFactor` must equal 1 (message: "Conversion factor must be 1 for a base unit.")
-    - When `BaseUnitId` is not null → `ConversionFactor` must be > 0 (message: "Conversion factor must be greater than zero for a derived unit.")
+    - When `BaseUnitId` is null → must equal 1 `.WithErrorCode("UnitOfMeasure.BaseUnitFactorMustBeOne")`
+    - When `BaseUnitId` is not null → must be > 0 `.WithErrorCode("UnitOfMeasure.ConversionFactorMustBePositive")`
 
 ### Tests to add
 
@@ -344,7 +418,9 @@ Validator kuralları — hepsi domain sabitlerini referans alır, sayıyı tekra
 
 `ValidationDecoratorTests.cs`: `HandleAsync_WithValidCommand_ShouldDelegateToInner`,
 `HandleAsync_WithInvalidCommand_ShouldReturnFailure_WithoutCallingInner`,
-`HandleAsync_WithNoValidators_ShouldDelegateToInner`
+`HandleAsync_WithNoValidators_ShouldDelegateToInner`,
+`HandleAsync_WithMultipleInvalidFields_ShouldReturnAllFailures`,
+`HandleAsync_ValidationError_ShouldCarryPropertyNames`
 
 ### Validation
 
@@ -676,4 +752,5 @@ Migration yok, şema değişmiyor; geri alma veritabanı işlemi gerektirmez. T�
 `ColumnNames` sabiti `AggregateRootConvention`'da aynı string değerini üretir, SQL özdeş.
 `Envanex.Web` → `Envanex.Application` `ProjectReference`'ı additif; kaldırmak PR 5b'yi kırar ama
 PR 5a'yı kırmaz. `docs/adr/0005` boş dosya, silmek güvenli. PR 5a, HTTP yüzeyi olmadan bağımsız
-geçerlidir.
+geçerlidir. `Error` tipinden `sealed` kaldırılması geri yönde uyumludur; mevcut tüketici kodlar
+değişmeden çalışır.
