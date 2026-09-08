@@ -1,4 +1,5 @@
 using Envanex.Domain.Common;
+using Envanex.Infrastructure.Persistence.Constants;
 using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Metadata.Builders;
 using Microsoft.EntityFrameworkCore.Metadata.Conventions;
@@ -20,12 +21,12 @@ internal sealed class AggregateRootConvention : IModelFinalizingConvention
                 continue;
             }
 
-            if (entityType.FindProperty("RowVersion") is not null)
+            if (entityType.FindProperty(ColumnNames.RowVersion) is not null)
             {
                 continue;
             }
 
-            var property = entityType.AddProperty("RowVersion", typeof(byte[]));
+            var property = entityType.AddProperty(ColumnNames.RowVersion, typeof(byte[]));
             if (property is not null)
             {
                 property.SetIsConcurrencyToken(true, fromDataAnnotation: false);

@@ -51,6 +51,8 @@ ADR'de gerekçelendirilmesi gereken noktalar:
   shared kernel'ine dokunur.** Gerekçe: alan bazlı doğrulama raporlaması tek `Error` ile taşınamaz;
   PR 7 form UI'ı her alan için ayrı hata mesajı gerektirir. `ValidationError : Error` kalıtımı
   `Result<T>` mekanizmasını kırmadan çoklu hata taşınmasını sağlar.
+- **Infrastructure'ın iç yüzeyinin integration test projesine açılması bilinçli bir karardır,
+  gerekçesi ADR 0005'te yazılmalıdır.**
 
 ---
 
@@ -584,6 +586,7 @@ dotnet format --verify-no-changes
 - `tests/Envanex.Domain.Tests/ArchitectureTests.cs` — modified
 - `tests/Envanex.IntegrationTests/Persistence/RepositoryTests.cs` — created
 - `docs/adr/0005-application-layer-patterns.md` — created (yalnızca başlık satırı)
+- `src/Envanex.Infrastructure/Envanex.Infrastructure.csproj` — modified — InternalsVisibleTo Envanex.IntegrationTests eklenir; UnitOfWork ve repository'ler internal olduğu için integration testleri onları doğrudan örnekleyebilsin diye.
 
 Test projelerine YENİ PAKET EKLENMEZ.
 

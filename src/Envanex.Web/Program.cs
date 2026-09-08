@@ -1,3 +1,4 @@
+using Envanex.Application;
 using Envanex.Infrastructure;
 using Envanex.Web.Components;
 using Scalar.AspNetCore;
@@ -8,6 +9,7 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 
 if (builder.Environment.IsDevelopment())
