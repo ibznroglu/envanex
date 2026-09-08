@@ -289,4 +289,22 @@ public sealed class RepositoryTests : IAsyncLifetime
         var rowsAffected = await unitOfWork.SaveChangesAsync();
         rowsAffected.ShouldBeGreaterThan(0);
     }
+
+    [Fact]
+    public async Task UnitOfWork_SaveChangesAsync_WithForeignKeyViolation_ShouldNotTranslateToDuplicateKey()
+    {
+        // Create a product with a non-existent UnitOfMeasureId, bypassing the handler's pre-check
+        var nonExistentUomId = Guid.CreateVersion7();
+        var product = Product.Create("FK-TEST", "FK Violation Product", nonExistentUomId, DefaultPrice, DefaultQuantity).Value;
+
+        await using var context = _fixture.CreateDbContext();
+        context.Products.Add(product);
+        var unitOfWork = new UnitOfWork(context);
+
+        // FK violation should throw DbUpdateException but NOT be translated to DuplicateKeyException
+        var ex = await Should.ThrowAsync<DbUpdateException>(
+            () => unitOfWork.SaveChangesAsync());
+
+        ex.ShouldNotBeOfType<DuplicateKeyException>();
+    }
 }
