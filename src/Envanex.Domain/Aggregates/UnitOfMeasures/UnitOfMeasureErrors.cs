@@ -13,4 +13,6 @@ public static class UnitOfMeasureErrors
     public static readonly Error NameTooLong = new("UnitOfMeasure.NameTooLong", "Unit of measure name must not exceed 200 characters.");
     public static readonly Error DuplicateCode = new("UnitOfMeasure.DuplicateCode", "A unit of measure with this code already exists.");
     public static readonly Error NotFound = new("UnitOfMeasure.NotFound", "Unit of measure was not found.");
+    public static readonly Error BaseUnitNotFound = new("UnitOfMeasure.BaseUnitNotFound", "The specified base unit of measure was not found.");
+    public static readonly Error BaseUnitInactive = new("UnitOfMeasure.BaseUnitInactive", "Cannot assign an inactive base unit of measure.");
 }
