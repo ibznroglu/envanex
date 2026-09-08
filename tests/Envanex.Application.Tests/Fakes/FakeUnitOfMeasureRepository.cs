@@ -17,7 +17,9 @@ public sealed class FakeUnitOfMeasureRepository : IUnitOfMeasureRepository
 
     /// <summary>
     /// Seeds the active status for a given unit of measure identifier.
-    /// Use null value to simulate a non-existent unit, false for inactive, true for active.
+    /// An unseeded identifier simulates a non-existent unit (<see langword="null"/> from
+    /// <see cref="GetActiveStatusAsync"/>). Use <see langword="false"/> for inactive,
+    /// <see langword="true"/> for active.
     /// </summary>
     public void SeedActiveStatus(Guid id, bool isActive)
     {

@@ -11,7 +11,7 @@ namespace Envanex.Application.Tests.Products.Commands;
 public class DeactivateProductCommandHandlerTests
 {
     private readonly FakeProductRepository _productRepository = new();
-    private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly FakeUnitOfWork _unitOfWork;
     private readonly DeactivateProductCommandHandler _handler;
 
     private static readonly Guid UnitOfMeasureId = Guid.CreateVersion7();
@@ -19,6 +19,7 @@ public class DeactivateProductCommandHandlerTests
 
     public DeactivateProductCommandHandlerTests()
     {
+        _unitOfWork = new FakeUnitOfWork(_productRepository);
         _handler = new DeactivateProductCommandHandler(_productRepository, _unitOfWork);
     }
 
@@ -77,5 +78,17 @@ public class DeactivateProductCommandHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.ShouldBe(ProductErrors.ConcurrencyConflict);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldSetRowVersionBeforeSavingChanges()
+    {
+        Product product = SeedActiveProduct();
+        var command = new DeactivateProductCommand(product.Id, RowVersion);
+
+        await _handler.HandleAsync(command);
+
+        _unitOfWork.RowVersionWasSetBeforeSave.ShouldNotBeNull();
+        _unitOfWork.RowVersionWasSetBeforeSave.Value.ShouldBeTrue();
     }
 }

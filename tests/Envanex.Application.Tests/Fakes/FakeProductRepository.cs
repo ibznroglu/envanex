@@ -11,6 +11,12 @@ public sealed class FakeProductRepository : IProductRepository
     public IReadOnlyList<Product> Products => _products.AsReadOnly();
     public IReadOnlyDictionary<Guid, byte[]> OriginalRowVersions => _originalRowVersions;
 
+    /// <summary>
+    /// Number of times <see cref="SetOriginalRowVersion"/> has been called.
+    /// Used by <see cref="FakeUnitOfWork"/> to verify call ordering.
+    /// </summary>
+    public int SetOriginalRowVersionCallCount { get; private set; }
+
     public void Seed(Product product)
     {
         _products.Add(product);
@@ -39,5 +45,6 @@ public sealed class FakeProductRepository : IProductRepository
     {
         ArgumentNullException.ThrowIfNull(product);
         _originalRowVersions[product.Id] = rowVersion;
+        SetOriginalRowVersionCallCount++;
     }
 }

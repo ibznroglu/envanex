@@ -12,7 +12,7 @@ public class UpdateProductCommandHandlerTests
 {
     private readonly FakeProductRepository _productRepository = new();
     private readonly FakeUnitOfMeasureRepository _unitOfMeasureRepository = new();
-    private readonly FakeUnitOfWork _unitOfWork = new();
+    private readonly FakeUnitOfWork _unitOfWork;
     private readonly UpdateProductCommandHandler _handler;
 
     private static readonly Guid ActiveUnitOfMeasureId = Guid.CreateVersion7();
@@ -20,6 +20,7 @@ public class UpdateProductCommandHandlerTests
 
     public UpdateProductCommandHandlerTests()
     {
+        _unitOfWork = new FakeUnitOfWork(_productRepository);
         _unitOfMeasureRepository.SeedActiveStatus(ActiveUnitOfMeasureId, true);
         _handler = new UpdateProductCommandHandler(
             _productRepository, _unitOfMeasureRepository, _unitOfWork);
@@ -113,5 +114,18 @@ public class UpdateProductCommandHandlerTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.ShouldBe(ProductErrors.ConcurrencyConflict);
+    }
+
+    [Fact]
+    public async Task HandleAsync_ShouldSetRowVersionBeforeSavingChanges()
+    {
+        Product product = SeedProduct();
+        var command = new UpdateProductCommand(
+            product.Id, "Updated", ActiveUnitOfMeasureId, 100m, "TRY", 10m, RowVersion);
+
+        await _handler.HandleAsync(command);
+
+        _unitOfWork.RowVersionWasSetBeforeSave.ShouldNotBeNull();
+        _unitOfWork.RowVersionWasSetBeforeSave.Value.ShouldBeTrue();
     }
 }

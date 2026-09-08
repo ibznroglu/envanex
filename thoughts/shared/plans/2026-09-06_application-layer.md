@@ -732,6 +732,7 @@ services.AddScoped<IUnitOfWork, UnitOfWork>();
 - `UnitOfMeasureRepository_GetActiveStatusAsync_Active_ShouldReturnTrue`
 - `UnitOfMeasureRepository_GetActiveStatusAsync_Inactive_ShouldReturnFalse`
 - `UnitOfMeasureRepository_GetActiveStatusAsync_NonExistent_ShouldReturnNull`
+- `ProductRepository_SetOriginalRowVersion_MustBeCalledBeforeSaveChanges_OtherwiseConcurrencyIsDisabled` — proves that when SaveChanges is called without first writing RowVersion to the EF entry's OriginalValue, concurrency control is silently disabled (the real EF entry state integration test).
 
 Unique-index yakalamasının tek gerçek testi `UnitOfWork_SaveChangesAsync_WithDuplicateCode_...` —
 ön kontrolü atlayarak doğrudan repository üzerinden aynı kodla ikinci kayıt eklenir.
