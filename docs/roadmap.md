@@ -35,19 +35,22 @@ in the README. That branch is never merged.
 
 | # | Title | Status |
 |---|---|---|
-| 1 | `chore(solution)` — solution, projects, central package management, CI | done |
-| 2 | `feat(domain)` — shared kernel: `Result`, `Entity`, `AggregateRoot`, `Money`, `Quantity`, `Currency` | done |
-| 3 | `feat(infra)` — EF Core, mapping conventions, Testcontainers harness | done |
+| 1 | `chore(solution)` — solution, projects, central package management, CI | done (#1) |
+| 2 | `feat(domain)` — shared kernel: `Result`, `Entity`, `AggregateRoot`, `Money`, `Quantity`, `Currency` | done (#2) |
+| 3 | `feat(infra)` — EF Core, mapping conventions, Testcontainers harness | done (#3) |
 
 ### Master data and first deployment
 
 | # | Title | Status |
 |---|---|---|
-| 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done |
-| 5a | `feat(api)` — application layer, repositories, unit tests | |
+| 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done (#4) |
+| 5a | `feat(api)` — application layer, repositories, unit tests | done (#6) |
 | 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | |
 | 6 | `feat(auth)` — authentication and authorization: cookie for Blazor, token for REST and SOAP; read-only demo account | |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
+
+Roadmap numbers and GitHub PR numbers are not the same. The status cell of a completed row
+carries the GitHub PR number it merged as.
 
 PR 7 is the point where the project becomes publicly visible: Azure SQL free tier, App Service,
 automatic deployment on merge to `main`, a read-only demo account and realistic Turkish seed data.
