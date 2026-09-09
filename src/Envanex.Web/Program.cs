@@ -1,6 +1,7 @@
 using Envanex.Application;
 using Envanex.Infrastructure;
 using Envanex.Web.Components;
+using Envanex.Web.Middleware;
 using Scalar.AspNetCore;
 
 var builder = WebApplication.CreateBuilder(args);
@@ -8,6 +9,8 @@ var builder = WebApplication.CreateBuilder(args);
 // Add services to the container.
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
+
+builder.Services.AddControllers();
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
@@ -33,12 +36,15 @@ if (app.Environment.IsDevelopment())
     app.MapScalarApiReference();
 }
 
+app.UseMiddleware<SecurityHeadersMiddleware>();
+
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
 
 app.UseAntiforgery();
 
 app.MapStaticAssets();
+app.MapControllers();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
 
