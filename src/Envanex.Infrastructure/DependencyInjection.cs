@@ -1,4 +1,6 @@
+using Envanex.Application.Abstractions.Persistence;
 using Envanex.Infrastructure.Persistence;
+using Envanex.Infrastructure.Persistence.Repositories;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -27,6 +29,12 @@ public static class DependencyInjection
 
         services.AddDbContext<EnvanexDbContext>(options =>
             options.UseSqlServer(connectionString));
+
+        services.AddScoped<IProductRepository, ProductRepository>();
+        services.AddScoped<IProductReadRepository, ProductReadRepository>();
+        services.AddScoped<IUnitOfMeasureRepository, UnitOfMeasureRepository>();
+        services.AddScoped<IUnitOfMeasureReadRepository, UnitOfMeasureReadRepository>();
+        services.AddScoped<IUnitOfWork, UnitOfWork>();
 
         return services;
     }

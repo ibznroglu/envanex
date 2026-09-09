@@ -147,4 +147,48 @@ public class UnitOfMeasureTests
         result.IsSuccess.ShouldBeTrue();
         result.Value.Id.ShouldNotBe(Guid.Empty);
     }
+
+    [Fact]
+    public void Create_WithCodeExceedingMaxLength_ShouldFail()
+    {
+        string longCode = new('A', UnitOfMeasure.CodeMaxLength + 1);
+
+        var result = UnitOfMeasure.Create(longCode, "Adet", null, 1m);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.CodeTooLong);
+    }
+
+    [Fact]
+    public void Create_WithNameExceedingMaxLength_ShouldFail()
+    {
+        string longName = new('A', UnitOfMeasure.NameMaxLength + 1);
+
+        var result = UnitOfMeasure.Create("ADET", longName, null, 1m);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.NameTooLong);
+    }
+
+    [Fact]
+    public void Create_WithCodeAtExactMaxLength_ShouldSucceed()
+    {
+        string code = new('A', UnitOfMeasure.CodeMaxLength);
+
+        var result = UnitOfMeasure.Create(code, "Adet", null, 1m);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Code.ShouldBe(code);
+    }
+
+    [Fact]
+    public void Create_WithNameAtExactMaxLength_ShouldSucceed()
+    {
+        string name = new('A', UnitOfMeasure.NameMaxLength);
+
+        var result = UnitOfMeasure.Create("ADET", name, null, 1m);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.Name.ShouldBe(name);
+    }
 }

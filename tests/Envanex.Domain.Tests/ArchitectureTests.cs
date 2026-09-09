@@ -7,6 +7,7 @@ public class ArchitectureTests
     private static readonly string[] ExpectedApplicationReferences = ["Envanex.Domain"];
     private static readonly string[] ExpectedInfrastructureReferences = ["Envanex.Application", "Envanex.Domain"];
     private static readonly string[] ExpectedSoapApiReferences = ["Envanex.Application"];
+    private static readonly string[] ExpectedWebReferences = ["Envanex.Application", "Envanex.Infrastructure", "Envanex.SoapApi"];
 
     [Fact]
     public void Domain_ShouldNotReference_AnyProject()
@@ -38,6 +39,29 @@ public class ArchitectureTests
         var references = GetProjectReferences("Envanex.SoapApi");
 
         references.ShouldBe(ExpectedSoapApiReferences);
+    }
+
+    [Fact]
+    public void Application_ShouldNotReference_EntityFrameworkPackages()
+    {
+        var solutionDir = FindSolutionDirectory();
+        var csprojPath = Path.Combine(solutionDir, "src", "Envanex.Application", "Envanex.Application.csproj");
+        var csprojContent = File.ReadAllText(csprojPath);
+
+        var efPackageReferences = System.Text.RegularExpressions.Regex
+            .Matches(csprojContent, @"<PackageReference\s+Include=""([^""]*Microsoft\.EntityFrameworkCore[^""]*)""")
+            .Select(m => m.Groups[1].Value)
+            .ToArray();
+
+        efPackageReferences.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void Web_ShouldOnlyReference_ApplicationInfrastructureAndSoapApi()
+    {
+        var references = GetProjectReferences("Envanex.Web");
+
+        references.ShouldBe(ExpectedWebReferences);
     }
 
     /// <summary>

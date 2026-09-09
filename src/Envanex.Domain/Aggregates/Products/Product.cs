@@ -5,6 +5,9 @@ namespace Envanex.Domain.Aggregates.Products;
 
 public sealed class Product : AggregateRoot<Guid>
 {
+    public const int CodeMaxLength = 50;
+    public const int NameMaxLength = 200;
+
     public string Code { get; private set; }
     public string Name { get; private set; }
     public Guid UnitOfMeasureId { get; private set; }
@@ -45,6 +48,16 @@ public sealed class Product : AggregateRoot<Guid>
             return Result.Failure<Product>(ProductErrors.NameRequired);
         }
 
+        if (code.Trim().Length > CodeMaxLength)
+        {
+            return Result.Failure<Product>(ProductErrors.CodeTooLong);
+        }
+
+        if (name.Trim().Length > NameMaxLength)
+        {
+            return Result.Failure<Product>(ProductErrors.NameTooLong);
+        }
+
         if (unitOfMeasureId == Guid.Empty)
         {
             return Result.Failure<Product>(ProductErrors.UnitOfMeasureRequired);
@@ -71,5 +84,32 @@ public sealed class Product : AggregateRoot<Guid>
     public void Activate()
     {
         IsActive = true;
+    }
+
+    public Result Update(string name, Guid unitOfMeasureId, Money listPrice, Quantity reorderPoint)
+    {
+        ArgumentNullException.ThrowIfNull(listPrice);
+
+        if (string.IsNullOrWhiteSpace(name))
+        {
+            return Result.Failure(ProductErrors.NameRequired);
+        }
+
+        if (name.Trim().Length > NameMaxLength)
+        {
+            return Result.Failure(ProductErrors.NameTooLong);
+        }
+
+        if (unitOfMeasureId == Guid.Empty)
+        {
+            return Result.Failure(ProductErrors.UnitOfMeasureRequired);
+        }
+
+        Name = name.Trim();
+        UnitOfMeasureId = unitOfMeasureId;
+        ListPrice = listPrice;
+        ReorderPoint = reorderPoint;
+
+        return Result.Success();
     }
 }
