@@ -117,6 +117,7 @@ public sealed class ProductsApiTests : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("status").GetInt32().ShouldBe(400);
         body.GetProperty("title").GetString().ShouldBe("Validation Failed");
+        body.GetProperty("detail").GetString().ShouldBe("Bir veya daha fazla do\u011frulama hatas\u0131 olu\u015ftu.");
 
         var errors = body.GetProperty("errors");
         var codeErrors = errors.GetProperty("Code");
@@ -124,5 +125,46 @@ public sealed class ProductsApiTests : IAsyncLifetime
 
         // The Turkish message for Product.CodeRequired
         codeErrors[0].GetString().ShouldBe("\u00dcr\u00fcn kodu zorunludur.");
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithMultipleInvalidFields_ShouldReturnAllFieldsInErrorsDictionary()
+    {
+        // Empty Code, empty Name, and negative ReorderPoint each trigger a separate validation error
+        var command = new CreateProductCommand("", "", Guid.NewGuid(), 100m, "TRY", -1m);
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+
+        var errors = body.GetProperty("errors");
+
+        // Should have entries for Code, Name, and ReorderPoint (PropertyName keys, not ErrorCodes)
+        errors.TryGetProperty("Code", out _).ShouldBeTrue("Expected 'Code' key in errors dictionary");
+        errors.TryGetProperty("Name", out _).ShouldBeTrue("Expected 'Name' key in errors dictionary");
+        errors.TryGetProperty("ReorderPoint", out _).ShouldBeTrue("Expected 'ReorderPoint' key in errors dictionary");
+
+        // Each entry should contain a Turkish message, not an error code
+        errors.GetProperty("Code")[0].GetString().ShouldBe("\u00dcr\u00fcn kodu zorunludur.");
+        errors.GetProperty("Name")[0].GetString().ShouldBe("\u00dcr\u00fcn ad\u0131 zorunludur.");
+        errors.GetProperty("ReorderPoint")[0].GetString().ShouldBe("Yeniden sipari\u015f noktas\u0131 negatif olamaz.");
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithNonExistentUnitOfMeasure_ShouldReturn422()
+    {
+        // A random Guid that doesn't exist as a UnitOfMeasure in the database.
+        // The handler returns ProductErrors.UnitOfMeasureNotFound which maps to 422.
+        var command = new CreateProductCommand("UOM-TEST", "UoM Test Product", Guid.NewGuid(), 100m, "TRY", 10m);
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(422);
+        body.GetProperty("title").GetString().ShouldBe("Unprocessable Entity");
+        body.GetProperty("detail").GetString().ShouldBe("Belirtilen \u00f6l\u00e7\u00fc birimi bulunamad\u0131.");
     }
 }

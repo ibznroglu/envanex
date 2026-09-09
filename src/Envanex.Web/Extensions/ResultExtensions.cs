@@ -6,6 +6,13 @@ namespace Envanex.Web.Extensions;
 
 public static class ResultExtensions
 {
+    /// <summary>
+    /// Generic Turkish fallback for ValidationFailure messages. ValidationFailure only carries
+    /// PropertyName and ErrorCode (no Message field), so a generic Turkish fallback is used
+    /// instead of the raw error code.
+    /// </summary>
+    internal const string GenericValidationFallback = "Bu alan geçersiz.";
+
     private static readonly FrozenDictionary<string, int> StatusCodeMap = new Dictionary<string, int>
     {
         // 400 Bad Request - ValidationError
@@ -106,7 +113,7 @@ public static class ResultExtensions
 
         foreach (var failure in validationError.Failures)
         {
-            string message = TurkishErrorMessages.GetMessage(failure.ErrorCode, failure.ErrorCode);
+            string message = TurkishErrorMessages.GetMessage(failure.ErrorCode, GenericValidationFallback);
 
             if (errors.TryGetValue(failure.PropertyName, out var existing))
             {
