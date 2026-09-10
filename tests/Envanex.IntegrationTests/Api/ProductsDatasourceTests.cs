@@ -267,4 +267,65 @@ public sealed class ProductsDatasourceTests : IAsyncLifetime
         body.TryGetProperty("data", out var data).ShouldBeTrue();
         data.GetArrayLength().ShouldBeGreaterThan(0);
     }
+
+    [Fact]
+    public async Task Datasource_WithDisallowedFilterField_ShouldReturn400()
+    {
+        // "RowVersion" is not in the allowlist — must return 400, not 500
+        var response = await _client.GetAsync(
+            "/api/products/datasource?filter=[\"RowVersion\",\"=\",\"abc\"]");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+    }
+
+    [Fact]
+    public async Task Datasource_WithAllowedFilterField_ShouldReturn200()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        await SeedProductViaApiAsync(uomId, "FILT-001", "Filter Product");
+
+        // "Code" is in the allowlist — should succeed
+        var response = await _client.GetAsync(
+            "/api/products/datasource?filter=[\"Code\",\"=\",\"FILT-001\"]");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.TryGetProperty("data", out var data).ShouldBeTrue();
+        data.GetArrayLength().ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
+    public async Task Datasource_WithNestedDisallowedFilterField_ShouldReturn400()
+    {
+        // Nested filter: [["Code","=","X"],"and",["RowVersion","=","Y"]]
+        // "RowVersion" is not in the allowlist — proves recursive checking works
+        var response = await _client.GetAsync(
+            "/api/products/datasource?filter=[[\"Code\",\"=\",\"X\"],\"and\",[\"RowVersion\",\"=\",\"Y\"]]");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+    }
+
+    [Fact]
+    public async Task Datasource_WithCombinedSortGroupAndFilter_ShouldReturn200()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        await SeedProductViaApiAsync(uomId, "COMBO-001", "Combo Product");
+
+        // Sort by "Code", group by "IsActive", filter by "Name" — all allowed fields
+        var url = "/api/products/datasource"
+            + "?sort=[{\"selector\":\"Code\",\"desc\":false}]"
+            + "&group=[{\"selector\":\"IsActive\",\"desc\":false,\"isExpanded\":true}]"
+            + "&filter=[\"Name\",\"contains\",\"Combo\"]";
+
+        var response = await _client.GetAsync(url);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
 }

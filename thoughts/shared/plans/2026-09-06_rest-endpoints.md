@@ -365,11 +365,22 @@ API farklıysa DUR ve bildir; uydurma.
 ```csharp
 // DataSourceGuard — ihlalde 400 döner, SESSİZCE DÜZELTMEZ (clamp etmez).
 // Sessiz clamp, istemciye isteğinin karşılandığı yanılgısını verir ve saldırı yüzeyini gizler.
+//
+// Sort, filter ve group alanları TEK BİR `allowedFields` allowlist'i paylaşır (sort + filter).
+// Group alanları ayrı bir alt küme olarak kalır çünkü gruplanabilir alanlar sıralanabilir alanların
+// bir alt kümesidir. Filter alanları sort ile aynı kümeyi kullanır: bir alan sıralanabilirse
+// filtrelenebilir de olmalıdır. Bu, DTO projeksiyon yüzeyinden ayrı bir koruma katmanıdır —
+// projeksiyon hangi alanların varolduğunu belirler, allowlist hangilerine sorgu yapılabileceğini.
+// Bu ayırım, DTO'ya yeni bir alan eklendiğinde istemcinin o alanı otomatik olarak
+// filtreleyememesini sağlar; allowlist bilinçli olarak güncellenmelidir.
+//
+// Filter doğrulaması REKÜRSİFTİR: DevExtreme filter yapısı iç içe olabilir
+// ([["Code","=","X"],"and",["Name","=","Y"]]) ve her seviyedeki alan adları kontrol edilir.
 public sealed class DataSourceGuard
 {
     public DataSourceGuard(
-        IReadOnlySet<string> allowedSortFields,
-        IReadOnlySet<string> allowedGroupFields,
+        IReadOnlySet<string> allowedFields,       // sort + filter use this
+        IReadOnlySet<string> allowedGroupFields,   // group uses this (subset)
         int defaultTake,
         int maxTake,
         int maxSkip = 10_000);
@@ -384,6 +395,7 @@ public sealed class DataSourceGuard
     //   Skip > maxSkip                       → hata (prevents expensive OFFSET queries)
     //   Sort alanı allowlist dışında         → hata
     //   Group alanı allowlist dışında        → hata
+    //   Filter alanı allowlist dışında       → hata (recursive check)
     //   RequireGroupCount istendi            → hata
     //   GroupSummary istendi                 → hata
     // Uygulama:
@@ -396,12 +408,12 @@ public sealed class DataSourceGuard
 public sealed class ProductsController : ControllerBase
 {
     private static readonly DataSourceGuard Guard = new(
-        allowedSortFields: ["Code", "Name", "UnitOfMeasureName", "ListPriceAmount",
-                            "ListPriceCurrency", "ReorderPoint", "IsActive"],
+        allowedFields: ["Code", "Name", "UnitOfMeasureName", "ListPriceAmount",
+                        "ListPriceCurrency", "ReorderPoint", "IsActive"],
         allowedGroupFields: ["UnitOfMeasureName", "IsActive"],
         defaultTake: 20,
         maxTake: 100);
-    // RowVersion allowlist'lerde YOK — sıralanabilir veya gruplanabilir bir alan değil.
+    // RowVersion allowlist'lerde YOK — sıralanabilir, filtrelenebilir veya gruplanabilir bir alan değil.
 
     [HttpPost]                       // → 201 + Location
     public async Task<IActionResult> Create([FromBody] CreateProductCommand command, CancellationToken ct);
@@ -461,6 +473,10 @@ uyuşmuyorsa istek 400 ProblemDetails ile reddedilir. Sessizce birini tercih etm
 - `Datasource_WithExcessiveSkip_ShouldReturn400` (security hardening, skip > 10000)
 - `Datasource_WithMalformedFilter_ShouldReturn400NotServerError` (model binder hardening)
 - `Datasource_WithZeroTake_ShouldApplyDefault` (documents take=0 → defaultTake behavior)
+- `Datasource_WithDisallowedFilterField_ShouldReturn400` (filter allowlist — prevents 500 on unmapped fields)
+- `Datasource_WithAllowedFilterField_ShouldReturn200` (filter allowlist — proves allowed fields pass)
+- `Datasource_WithNestedDisallowedFilterField_ShouldReturn400` (recursive filter check)
+- `Datasource_WithCombinedSortGroupAndFilter_ShouldReturn200` (sort + group + filter together)
 
 ### Validation
 

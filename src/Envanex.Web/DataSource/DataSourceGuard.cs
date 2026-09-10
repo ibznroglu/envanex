@@ -1,3 +1,4 @@
+using System.Collections;
 using System.Collections.Frozen;
 using DevExtreme.AspNet.Data;
 using Envanex.Domain.Common;
@@ -6,23 +7,23 @@ namespace Envanex.Web.DataSource;
 
 public sealed class DataSourceGuard
 {
-    private readonly FrozenSet<string> _allowedSortFields;
+    private readonly FrozenSet<string> _allowedFields;
     private readonly FrozenSet<string> _allowedGroupFields;
     private readonly int _defaultTake;
     private readonly int _maxTake;
     private readonly int _maxSkip;
 
     public DataSourceGuard(
-        IReadOnlySet<string> allowedSortFields,
+        IReadOnlySet<string> allowedFields,
         IReadOnlySet<string> allowedGroupFields,
         int defaultTake,
         int maxTake,
         int maxSkip = 10_000)
     {
-        ArgumentNullException.ThrowIfNull(allowedSortFields);
+        ArgumentNullException.ThrowIfNull(allowedFields);
         ArgumentNullException.ThrowIfNull(allowedGroupFields);
 
-        _allowedSortFields = allowedSortFields.ToFrozenSet();
+        _allowedFields = allowedFields.ToFrozenSet();
         _allowedGroupFields = allowedGroupFields.ToFrozenSet();
         _defaultTake = defaultTake;
         _maxTake = maxTake;
@@ -61,7 +62,7 @@ public sealed class DataSourceGuard
         {
             foreach (var sort in options.Sort)
             {
-                if (!_allowedSortFields.Contains(sort.Selector))
+                if (!_allowedFields.Contains(sort.Selector))
                 {
                     return Result.Failure<DataSourceLoadOptionsBase>(
                         new Error("DataSource.DisallowedSortField", $"Sorting by '{sort.Selector}' is not allowed."));
@@ -78,6 +79,16 @@ public sealed class DataSourceGuard
                     return Result.Failure<DataSourceLoadOptionsBase>(
                         new Error("DataSource.DisallowedGroupField", $"Grouping by '{group.Selector}' is not allowed."));
                 }
+            }
+        }
+
+        if (options.Filter is { Count: > 0 })
+        {
+            var disallowedField = FindDisallowedFilterField(options.Filter);
+            if (disallowedField is not null)
+            {
+                return Result.Failure<DataSourceLoadOptionsBase>(
+                    new Error("DataSource.DisallowedFilterField", $"Filtering by '{disallowedField}' is not allowed."));
             }
         }
 
@@ -102,5 +113,72 @@ public sealed class DataSourceGuard
         }
 
         return Result.Success(options);
+    }
+
+    /// <summary>
+    /// Recursively walks a DevExtreme filter structure and returns the first
+    /// field name that is not in the allowlist, or null if all fields are allowed.
+    /// </summary>
+    /// <remarks>
+    /// DevExtreme filter formats:
+    /// - Simple condition: ["fieldName", "=", "value"] — IList with 3 elements, first is string
+    /// - Unary operator: ["!", [...]] — IList with 2 elements, first is "!"
+    /// - Compound: [cond1, "and"/"or", cond2, ...] — IList of alternating conditions and operators
+    /// - Nested: conditions can be IList themselves, recursively
+    /// </remarks>
+    private string? FindDisallowedFilterField(IList filter)
+    {
+        // A simple condition: [fieldName, operator, value]
+        // Detected by: first element is a string that is NOT a logical operator,
+        // and the list has at least 2 elements (unary like ["!", cond] is handled below).
+        if (filter.Count >= 2 && filter[0] is string fieldOrOp)
+        {
+            // "!" is a unary NOT operator; the second element is a sub-condition
+            if (string.Equals(fieldOrOp, "!", StringComparison.Ordinal))
+            {
+                if (filter[1] is IList subFilter)
+                {
+                    return FindDisallowedFilterField(subFilter);
+                }
+
+                return null;
+            }
+
+            // Logical operators ("and", "or") at position 0 are not valid DevExtreme format,
+            // but we treat any known operator as non-field-name to be safe.
+            if (!IsLogicalOperator(fieldOrOp))
+            {
+                // This is a field name — validate it
+                if (!_allowedFields.Contains(fieldOrOp))
+                {
+                    return fieldOrOp;
+                }
+
+                return null;
+            }
+        }
+
+        // Compound filter: [cond1, "and", cond2, "or", cond3, ...]
+        // Walk each element; skip string operators, recurse into IList sub-conditions.
+        foreach (var element in filter)
+        {
+            if (element is IList subList)
+            {
+                var result = FindDisallowedFilterField(subList);
+                if (result is not null)
+                {
+                    return result;
+                }
+            }
+            // String elements at this level are logical operators ("and", "or") — skip them.
+        }
+
+        return null;
+    }
+
+    private static bool IsLogicalOperator(string value)
+    {
+        return string.Equals(value, "and", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "or", StringComparison.OrdinalIgnoreCase);
     }
 }

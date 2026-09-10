@@ -15,7 +15,7 @@ namespace Envanex.Web.Controllers;
 public sealed class ProductsController : ControllerBase
 {
     private static readonly DataSourceGuard Guard = new(
-        allowedSortFields: new HashSet<string>
+        allowedFields: new HashSet<string>
         {
             "Code", "Name", "UnitOfMeasureName", "ListPriceAmount",
             "ListPriceCurrency", "ReorderPoint", "IsActive",
