@@ -1,3 +1,4 @@
+using System.Threading.RateLimiting;
 using Envanex.Application;
 using Envanex.Infrastructure;
 using Envanex.Web.Components;
@@ -18,6 +19,27 @@ builder.Services.AddControllers(options =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+
+var rateLimitingSection = builder.Configuration.GetSection("RateLimiting");
+bool rateLimitingEnabled = rateLimitingSection.GetValue("Enabled", true);
+
+if (rateLimitingEnabled)
+{
+    int permitLimit = rateLimitingSection.GetValue("PermitLimit", 100);
+    int windowSeconds = rateLimitingSection.GetValue("WindowSeconds", 60);
+
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+
+        options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(_ =>
+            RateLimitPartition.GetFixedWindowLimiter("global", _ => new FixedWindowRateLimiterOptions
+            {
+                PermitLimit = permitLimit,
+                Window = TimeSpan.FromSeconds(windowSeconds),
+            }));
+    });
+}
 
 if (builder.Environment.IsDevelopment())
 {
@@ -41,6 +63,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
+
+if (rateLimitingEnabled)
+{
+    app.UseRateLimiter();
+}
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();

@@ -19,5 +19,9 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
         builder.UseEnvironment("Testing");
 
         builder.UseSetting("ConnectionStrings:EnvanexDb", _connectionString);
+
+        // Disable rate limiting so that the combined test count across all test classes
+        // does not exceed the limit and cause random 429 responses.
+        builder.UseSetting("RateLimiting:Enabled", "false");
     }
 }
