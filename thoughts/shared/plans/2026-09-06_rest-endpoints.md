@@ -351,8 +351,10 @@ parser sağlar. Custom model binder şunu yapar:
 
 1. Yeni bir `DataSourceLoadOptionsBase` oluşturur
 2. `DataSourceLoadOptionsParser.Parse(options, key => valueProvider.GetValue(key).FirstValue)` ile
-   doldurur
-3. `bindingContext.Result = ModelBindingResult.Success(options)` ayarlar
+   doldurur — **try/catch ile sarılır**: parse hatası durumunda ModelState'e hata eklenir ve
+   `ModelBindingResult.Failed()` döner. `[ApiController]` bu durumu otomatik 400 ProblemDetails'a
+   çevirir. Ham exception mesajı istemciye sızmaz.
+3. `bindingContext.Result = ModelBindingResult.Success(options)` ayarlar (yalnızca parse başarılıysa)
 
 Coder, faza başlarken kurulu 5.1.0 paketine karşı `DataSourceLoadOptionsParser`'ın public olduğunu ve
 `DataSourceLoadOptionsBase`'in parametresiz constructor'ı bulunduğunu **komutla doğrulamalıdır**.
@@ -369,16 +371,23 @@ public sealed class DataSourceGuard
         IReadOnlySet<string> allowedSortFields,
         IReadOnlySet<string> allowedGroupFields,
         int defaultTake,
-        int maxTake);
+        int maxTake,
+        int maxSkip = 10_000);
+        // maxSkip default: 10_000. Rationale: at 100 rows/page (maxTake), 10000 skip = 100 pages,
+        // which is generous for any realistic UI paging scenario. An OFFSET beyond this is almost
+        // certainly a probe or a bug, and sends an expensive query to SQL Server.
 
     // Doğrulama (hepsi ihlalde Result.Failure → controller 400 döner):
+    //   Take < 0                             → hata (negative take is invalid)
     //   Take > maxTake                       → hata
+    //   Skip < 0                             → hata (negative skip is invalid)
+    //   Skip > maxSkip                       → hata (prevents expensive OFFSET queries)
     //   Sort alanı allowlist dışında         → hata
     //   Group alanı allowlist dışında        → hata
     //   RequireGroupCount istendi            → hata
     //   GroupSummary istendi                 → hata
     // Uygulama:
-    //   Take belirtilmemişse defaultTake ayarlanır (sınırsız sorgu OLMAZ)
+    //   Take == 0 → defaultTake ayarlanır (0 means "not specified"; sınırsız sorgu OLMAZ)
     public Result<DataSourceLoadOptionsBase> ValidateAndApply(DataSourceLoadOptionsBase options);
 }
 
@@ -447,6 +456,11 @@ uyuşmuyorsa istek 400 ProblemDetails ile reddedilir. Sessizce birini tercih etm
 - `GetDatasource_WithDisallowedGroupField_ShouldReturn400`
 - `GetDatasource_WithRequireGroupCount_ShouldReturn400`
 - `GetDatasource_WithGroupSummary_ShouldReturn400`
+- `Datasource_WithNegativeTake_ShouldReturn400` (security hardening)
+- `Datasource_WithNegativeSkip_ShouldReturn400` (security hardening)
+- `Datasource_WithExcessiveSkip_ShouldReturn400` (security hardening, skip > 10000)
+- `Datasource_WithMalformedFilter_ShouldReturn400NotServerError` (model binder hardening)
+- `Datasource_WithZeroTake_ShouldApplyDefault` (documents take=0 → defaultTake behavior)
 
 ### Validation
 

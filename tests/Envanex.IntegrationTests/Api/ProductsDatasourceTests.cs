@@ -204,4 +204,67 @@ public sealed class ProductsDatasourceTests : IAsyncLifetime
         loadResult.data.ShouldNotBeNull();
         loadResult.data.Cast<object>().Count().ShouldBeGreaterThan(0);
     }
+
+    [Fact]
+    public async Task Datasource_WithNegativeTake_ShouldReturn400()
+    {
+        var response = await _client.GetAsync("/api/products/datasource?take=-1");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+    }
+
+    [Fact]
+    public async Task Datasource_WithNegativeSkip_ShouldReturn400()
+    {
+        var response = await _client.GetAsync("/api/products/datasource?skip=-1");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+    }
+
+    [Fact]
+    public async Task Datasource_WithExcessiveSkip_ShouldReturn400()
+    {
+        var response = await _client.GetAsync("/api/products/datasource?skip=100000");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+    }
+
+    [Fact]
+    public async Task Datasource_WithMalformedFilter_ShouldReturn400NotServerError()
+    {
+        // Send a malformed filter value that cannot be parsed
+        var response = await _client.GetAsync("/api/products/datasource?filter=[[[invalid");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task Datasource_WithZeroTake_ShouldApplyDefault()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+
+        // Seed a few products so we can verify data is returned
+        for (int i = 1; i <= 3; i++)
+        {
+            await SeedProductViaApiAsync(uomId, $"ZERO-{i:D3}", $"Zero Take Product {i}");
+        }
+
+        // take=0 means "not specified" — the guard should apply defaultTake (20)
+        var response = await _client.GetAsync("/api/products/datasource?take=0");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.TryGetProperty("data", out var data).ShouldBeTrue();
+        data.GetArrayLength().ShouldBeGreaterThan(0);
+    }
 }
