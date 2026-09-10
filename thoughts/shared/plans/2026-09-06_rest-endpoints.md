@@ -541,6 +541,9 @@ Rate limiter — ASP.NET Core yerleşik (`AddRateLimiter`), politika taksonomisi
   yalnızca bu factory doğrular.
 - Not (PR 7'ye taşınacak): App Service'in arkasında IP bazlı bölümleme `ForwardedHeaders` olmadan
   yanlış çalışır. Bu PR'ın işi değil, kaydedildi.
+- 429 yanıtı artık `OnRejected` callback ile ProblemDetails JSON gövdesi dönüyor; boş bir gövde
+  `UseStatusCodePagesWithReExecute` tarafından yakalanıp `/not-found` HTML sayfasına yeniden
+  yazılıyordu.
 
 ### Tests to add
 

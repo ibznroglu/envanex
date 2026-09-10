@@ -8,4 +8,5 @@
 - When should this change? (PR 17 SOAP: consider ErrorCategory enum on Error)
 - Why are user-facing messages determined in the presentation layer, not in Domain?
 - Why can't datasource projection DTOs be positional records or use EF.Property shadow properties?
+- Why does the rate limiter write a ProblemDetails body instead of returning an empty 429?
 -->
