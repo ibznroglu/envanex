@@ -24,16 +24,17 @@ internal sealed class ProductReadRepository : IProductReadRepository
                 _context.UnitOfMeasures,
                 p => p.UnitOfMeasureId,
                 u => u.Id,
-                (p, u) => new ProductListDto(
-                    p.Id,
-                    p.Code,
-                    p.Name,
-                    u.Name,
-                    p.ListPrice.Amount,
-                    p.ListPrice.Currency.Code,
-                    p.ReorderPoint.Value,
-                    p.IsActive,
-                    EF.Property<byte[]>(p, ColumnNames.RowVersion)));
+                (p, u) => new ProductListDto
+                {
+                    Id = p.Id,
+                    Code = p.Code,
+                    Name = p.Name,
+                    UnitOfMeasureName = u.Name,
+                    ListPriceAmount = p.ListPrice.Amount,
+                    ListPriceCurrency = p.ListPrice.Currency.Code,
+                    ReorderPoint = p.ReorderPoint.Value,
+                    IsActive = p.IsActive,
+                });
     }
 
     public async Task<ProductDetailDto?> GetByIdAsync(Guid id, CancellationToken ct = default)

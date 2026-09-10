@@ -47,6 +47,11 @@ ADR'de gerekçelendirilmesi gereken noktalar:
   tanısal mesajlar taşır; Web katmanı hata kodlarını Türkçe kullanıcı mesajlarına eşler. Bu, Domain'i
   dilden bağımsız tutar ve birden fazla yüzeyin (REST, SOAP, Blazor) bağımsız yerelleştirme
   yapabilmesini sağlar.
+- **Datasource projeksiyon DTO'ları pozisyonel record olamaz ve shadow property (EF.Property)
+  içeremez.** Her iki durum da DataSourceLoader'ın OrderBy kompozisyonunu çevirilemez kılar ve tüm
+  tablonun istemci tarafında materialize edilmesine neden olur. Bu, ADR 0005'in IQueryable tercihinin
+  arkasındaki somut kısıttır.
+- Bu kısıt PR 8'de stok grid'i eklendiğinde tekrar karşımıza çıkacaktır.
 
 ---
 

@@ -39,6 +39,18 @@ public sealed class ProductsApiTests : IAsyncLifetime
         return uom.Id;
     }
 
+    private async Task<Guid> SeedInactiveUnitOfMeasureAsync(string code = "PASIF", string name = "Pasif Birim")
+    {
+        var uom = UnitOfMeasure.Create(code, name, null, 1m).Value;
+        uom.Deactivate();
+
+        await using var context = _fixture.CreateDbContext();
+        context.UnitOfMeasures.Add(uom);
+        await context.SaveChangesAsync();
+
+        return uom.Id;
+    }
+
     private async Task<Guid> SeedProductViaApiAsync(Guid unitOfMeasureId, string code = "PROD-001", string name = "Test Product")
     {
         var command = new CreateProductCommand(code, name, unitOfMeasureId, 100m, "TRY", 10m);
@@ -46,6 +58,13 @@ public sealed class ProductsApiTests : IAsyncLifetime
         response.EnsureSuccessStatusCode();
 
         return await response.Content.ReadFromJsonAsync<Guid>();
+    }
+
+    private async Task<JsonElement> GetProductDetailAsync(Guid productId)
+    {
+        var response = await _client.GetAsync($"/api/products/{productId}");
+        response.EnsureSuccessStatusCode();
+        return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
 
     [Fact]
@@ -166,5 +185,213 @@ public sealed class ProductsApiTests : IAsyncLifetime
         body.GetProperty("status").GetInt32().ShouldBe(422);
         body.GetProperty("title").GetString().ShouldBe("Unprocessable Entity");
         body.GetProperty("detail").GetString().ShouldBe("Belirtilen \u00f6l\u00e7\u00fc birimi bulunamad\u0131.");
+    }
+
+    // --- Phase 2 tests ---
+
+    [Fact]
+    public async Task CreateProduct_WithValidPayload_ShouldReturn201WithLocationHeader()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var command = new CreateProductCommand("NEW-001", "New Product", uomId, 50m, "TRY", 5m);
+
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        response.Headers.Location.ShouldNotBeNull();
+        response.Headers.Location!.PathAndQuery.ShouldContain("/api/products/");
+
+        var productId = await response.Content.ReadFromJsonAsync<Guid>();
+        productId.ShouldNotBe(Guid.Empty);
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithDuplicateCode_ShouldReturn409()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        await SeedProductViaApiAsync(uomId, code: "DUP-001");
+
+        var command = new CreateProductCommand("DUP-001", "Another Product", uomId, 10m, "TRY", 1m);
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Conflict);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(409);
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithInvalidPayload_ShouldReturn400WithProblemDetails()
+    {
+        // Empty code triggers validation failure
+        var command = new CreateProductCommand("", "Valid Name", Guid.NewGuid(), 100m, "TRY", 10m);
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+        body.GetProperty("title").GetString().ShouldBe("Validation Failed");
+        body.TryGetProperty("errors", out _).ShouldBeTrue();
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithInactiveUnitOfMeasure_ShouldReturn422()
+    {
+        var uomId = await SeedInactiveUnitOfMeasureAsync();
+        var command = new CreateProductCommand("INACT-001", "Product With Inactive UoM", uomId, 10m, "TRY", 1m);
+
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.UnprocessableEntity);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(422);
+    }
+
+    [Fact]
+    public async Task UpdateProduct_WithValidPayload_ShouldReturn200()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var productId = await SeedProductViaApiAsync(uomId);
+        var detail = await GetProductDetailAsync(productId);
+        var rowVersion = detail.GetProperty("rowVersion").GetString()!;
+
+        var command = new UpdateProductCommand(
+            productId, "Updated Name", uomId, 200m, "TRY", 20m,
+            Convert.FromBase64String(rowVersion));
+
+        var response = await _client.PutAsJsonAsync($"/api/products/{productId}", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task UpdateProduct_RouteIdMismatchesBodyId_ShouldReturn400()
+    {
+        var routeId = Guid.NewGuid();
+        var bodyId = Guid.NewGuid();
+        var command = new UpdateProductCommand(
+            bodyId, "Name", Guid.NewGuid(), 100m, "TRY", 10m, [1, 2, 3]);
+
+        var response = await _client.PutAsJsonAsync($"/api/products/{routeId}", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+        body.GetProperty("detail").GetString()!.ShouldContain("Route id and body Id do not match");
+    }
+
+    [Fact]
+    public async Task UpdateProduct_WithNonExistentProduct_ShouldReturn404()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var nonExistentId = Guid.NewGuid();
+        var command = new UpdateProductCommand(
+            nonExistentId, "Name", uomId, 100m, "TRY", 10m, [1, 2, 3, 4, 5, 6, 7, 8]);
+
+        var response = await _client.PutAsJsonAsync($"/api/products/{nonExistentId}", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(404);
+    }
+
+    [Fact]
+    public async Task UpdateProduct_WithMissingRowVersion_ShouldReturn400()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var productId = await SeedProductViaApiAsync(uomId);
+
+        // Send update with null RowVersion (serialized as null in JSON)
+        var payload = new
+        {
+            Id = productId,
+            Name = "Updated",
+            UnitOfMeasureId = uomId,
+            ListPriceAmount = 100m,
+            ListPriceCurrency = "TRY",
+            ReorderPoint = 10m,
+            RowVersion = (byte[]?)null,
+        };
+
+        var response = await _client.PutAsJsonAsync($"/api/products/{productId}", payload);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+    }
+
+    [Fact]
+    public async Task ActivateProduct_WithExistingProduct_ShouldReturn200()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var productId = await SeedProductViaApiAsync(uomId);
+
+        // Deactivate first, then activate
+        var detail = await GetProductDetailAsync(productId);
+        var rowVersion = Convert.FromBase64String(detail.GetProperty("rowVersion").GetString()!);
+
+        var deactivateResponse = await _client.PostAsJsonAsync(
+            $"/api/products/{productId}/deactivate",
+            new DeactivateProductCommand(productId, rowVersion));
+        deactivateResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // Get fresh RowVersion after deactivation
+        var updatedDetail = await GetProductDetailAsync(productId);
+        var updatedRowVersion = Convert.FromBase64String(updatedDetail.GetProperty("rowVersion").GetString()!);
+
+        var activateResponse = await _client.PostAsJsonAsync(
+            $"/api/products/{productId}/activate",
+            new ActivateProductCommand(productId, updatedRowVersion));
+
+        activateResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task ActivateProduct_RouteIdMismatchesBodyId_ShouldReturn400()
+    {
+        var routeId = Guid.NewGuid();
+        var bodyId = Guid.NewGuid();
+        var command = new ActivateProductCommand(bodyId, [1, 2, 3]);
+
+        var response = await _client.PostAsJsonAsync($"/api/products/{routeId}/activate", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+        body.GetProperty("detail").GetString()!.ShouldContain("Route id and body Id do not match");
+    }
+
+    [Fact]
+    public async Task DeactivateProduct_WithExistingProduct_ShouldReturn200()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var productId = await SeedProductViaApiAsync(uomId);
+        var detail = await GetProductDetailAsync(productId);
+        var rowVersion = Convert.FromBase64String(detail.GetProperty("rowVersion").GetString()!);
+
+        var response = await _client.PostAsJsonAsync(
+            $"/api/products/{productId}/deactivate",
+            new DeactivateProductCommand(productId, rowVersion));
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+    }
+
+    [Fact]
+    public async Task DeactivateProduct_RouteIdMismatchesBodyId_ShouldReturn400()
+    {
+        var routeId = Guid.NewGuid();
+        var bodyId = Guid.NewGuid();
+        var command = new DeactivateProductCommand(bodyId, [1, 2, 3]);
+
+        var response = await _client.PostAsJsonAsync($"/api/products/{routeId}/deactivate", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+        body.GetProperty("detail").GetString()!.ShouldContain("Route id and body Id do not match");
     }
 }

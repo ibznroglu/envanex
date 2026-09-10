@@ -1,6 +1,7 @@
 using Envanex.Application;
 using Envanex.Infrastructure;
 using Envanex.Web.Components;
+using Envanex.Web.DataSource;
 using Envanex.Web.Middleware;
 using Scalar.AspNetCore;
 
@@ -10,7 +11,10 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddRazorComponents()
     .AddInteractiveServerComponents();
 
-builder.Services.AddControllers();
+builder.Services.AddControllers(options =>
+{
+    options.ModelBinderProviders.Insert(0, new DataSourceLoadOptionsModelBinderProvider());
+});
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
