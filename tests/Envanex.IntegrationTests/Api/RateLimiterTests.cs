@@ -1,6 +1,7 @@
 using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using System.Net.Http.Json;
+using System.Text.Json;
 using Envanex.Application.UnitOfMeasures.Commands;
 using Envanex.IntegrationTests.Fixtures;
 using Shouldly;
@@ -53,6 +54,21 @@ public sealed class RateLimiterTests : IAsyncLifetime
 
         // Third should be rate-limited (429 Too Many Requests)
         response3.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+
+        // Verify Content-Type is application/problem+json
+        response3.Content.Headers.ContentType.ShouldNotBeNull();
+        response3.Content.Headers.ContentType.MediaType.ShouldBe("application/problem+json");
+
+        // Verify the body is a ProblemDetails JSON with status 429 and Turkish message
+        var body = await response3.Content.ReadAsStringAsync();
+        body.ShouldNotContain("<html", Case.Insensitive, "Response body must not be HTML; UseStatusCodePagesWithReExecute should not intercept a 429 with a body.");
+
+        using var doc = JsonDocument.Parse(body);
+        var root = doc.RootElement;
+        root.GetProperty("status").GetInt32().ShouldBe(429);
+        root.GetProperty("type").GetString().ShouldBe("https://httpstatuses.io/429");
+        root.GetProperty("title").GetString().ShouldNotBeNullOrWhiteSpace();
+        root.GetProperty("detail").GetString().ShouldNotBeNullOrWhiteSpace();
     }
 
     [Fact]
