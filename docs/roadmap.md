@@ -129,6 +129,9 @@ Tracked deliberately rather than hidden. Each one has a PR where it closes.
 | `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 8, when the ledger makes it fragile |
 | Warehouse has no application layer or endpoints | PR 8 |
 | No authentication or authorization on any endpoint | PR 6 |
+| UnitOfMeasure lookup list is unbounded and unordered | PR 7, when seed data makes it visible |
+| No index supports datasource sorting on Name, ListPriceAmount or ReorderPoint | PR 7, with realistic seed data |
+| Datasource cannot sort or filter on ListPriceCurrency or ReorderPoint; value converters block translation | PR 7 |
 
 ## How the work is run
 

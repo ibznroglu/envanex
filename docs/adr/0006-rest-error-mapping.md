@@ -94,6 +94,26 @@ whole decision exists to prevent.
 because it binds the domain to a language, and PR 6 and PR 7 will present the same errors through
 SOAP and Blazor.
 
+**Mapping `Quantity` and `Currency` as complex types instead of value converters.** Both are
+registered as global value converters in `EnvanexDbContext.ConfigureConventions`, so
+`p.ReorderPoint.Value` and `p.ListPrice.Currency.Code` are member access *into* a converted CLR
+type. EF Core can only evaluate those in a final projection, where it materialises the column and
+applies the converter client-side per row. As soon as `DataSourceLoader` composes `OrderBy` or
+`Where` on top, the projection is no longer final, EF Core must translate the member access, and it
+throws `InvalidOperationException` — measured by experiment, not assumed. Mapping the two value
+objects as complex types with `HasColumnName` pinned to the existing column names would make
+`.Value` and `.Code` real column access and translate cleanly. Not done in this PR because the
+converters are registered by type, so every `Quantity` and `Currency` in the model would change at
+once; that needs its own db-reviewer round and most likely a migration. Instead `ListPriceCurrency`
+and `ReorderPoint` were removed from the datasource allowlist: such a request now gets a 400 from
+`DataSourceGuard` rather than a 500 from EF Core, and the limitation is pinned by tests.
+
+**Making `RowVersion` a mapped property instead of a shadow property.** This would have solved the
+translation problem too — plain member access (`p.RowVersion`) is translatable, and what broke the
+query was not the presence of `RowVersion` but the `EF.Property<byte[]>(...)` call in the
+projection. Not attempted in this PR because it requires a model change and a migration, and it
+would reopen the shadow property decision recorded in ADR 0003.
+
 ## Consequences
 
 **Two tables must be updated by hand for every new error code.** A code needs an entry in the
