@@ -120,10 +120,12 @@ request that should have worked.
 be natural to express as a positional record cannot be, and the reason lives in a comment and a
 test rather than in the type system.
 
-**`Retry-After` is written but unproven.** The `OnRejected` callback reads
-`MetadataName.RetryAfter` from the lease and sets the header when present. Whether
-`FixedWindowRateLimiter` supplies that metadata was asserted but never demonstrated, and no test
-makes a claim about the header either way. Rather than delete code on an unverified claim, the next
-change here should be a test that asserts the header is present: if it passes, the code is live and
-stays; if it fails, the block goes. Until one of those happens this is the least-supported line in
-the PR.
+**`Retry-After` is proven, not assumed.** The `OnRejected` callback reads
+`MetadataName.RetryAfter` from the lease and sets the header when present, and an experiment now
+settles what was previously only asserted: `FixedWindowRateLimiter` does supply that metadata on a
+failed lease, so the block is live code and stays. The proof is
+`MutationEndpoint_ExceedingRateLimit_ShouldIncludeRetryAfterHeader` in
+`tests/Envanex.IntegrationTests/Api/RateLimiterTests.cs`, which asserts that a rejected request
+carries `Retry-After` with a positive delta-seconds value. That test is also the guard: swapping the
+global limiter for one that does not populate the metadata — a concurrency or token-bucket
+partition, say — turns a silently missing header into a failing test.
