@@ -72,6 +72,27 @@ public sealed class RateLimiterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task MutationEndpoint_ExceedingRateLimit_ShouldIncludeRetryAfterHeader()
+    {
+        // The RateLimitedWebApplicationFactory has a global limit of 2 requests per window.
+        // Send 3 POST requests; the third is rejected and must tell the client how long to wait.
+        var command1 = new CreateUnitOfMeasureCommand("RA-001", "Retry After 1", null, 1m);
+        var command2 = new CreateUnitOfMeasureCommand("RA-002", "Retry After 2", null, 1m);
+        var command3 = new CreateUnitOfMeasureCommand("RA-003", "Retry After 3", null, 1m);
+
+        await _client.PostAsJsonAsync("/api/unit-of-measures", command1);
+        await _client.PostAsJsonAsync("/api/unit-of-measures", command2);
+        var rejectedResponse = await _client.PostAsJsonAsync("/api/unit-of-measures", command3);
+
+        rejectedResponse.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+
+        // The Retry-After header must be present and expressed as a positive delta-seconds value.
+        rejectedResponse.Headers.RetryAfter.ShouldNotBeNull();
+        rejectedResponse.Headers.RetryAfter.Delta.ShouldNotBeNull();
+        rejectedResponse.Headers.RetryAfter.Delta.Value.TotalSeconds.ShouldBeGreaterThan(0);
+    }
+
+    [Fact]
     public async Task MutationEndpoint_UnderRateLimit_ShouldReturn201()
     {
         // A single request under the limit should succeed.
