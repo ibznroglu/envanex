@@ -9,6 +9,7 @@ public sealed class DataSourceGuard
 {
     private readonly FrozenSet<string> _allowedFields;
     private readonly FrozenSet<string> _allowedGroupFields;
+    private readonly string _defaultSortSelector;
     private readonly int _defaultTake;
     private readonly int _maxTake;
     private readonly int _maxSkip;
@@ -16,15 +17,25 @@ public sealed class DataSourceGuard
     public DataSourceGuard(
         IReadOnlySet<string> allowedFields,
         IReadOnlySet<string> allowedGroupFields,
+        string defaultSortSelector,
         int defaultTake,
         int maxTake,
         int maxSkip = 10_000)
     {
         ArgumentNullException.ThrowIfNull(allowedFields);
         ArgumentNullException.ThrowIfNull(allowedGroupFields);
+        ArgumentException.ThrowIfNullOrWhiteSpace(defaultSortSelector);
+
+        if (!allowedFields.Contains(defaultSortSelector))
+        {
+            throw new ArgumentException(
+                $"The default sort selector '{defaultSortSelector}' must be one of the allowed fields.",
+                nameof(defaultSortSelector));
+        }
 
         _allowedFields = allowedFields.ToFrozenSet();
         _allowedGroupFields = allowedGroupFields.ToFrozenSet();
+        _defaultSortSelector = defaultSortSelector;
         _defaultTake = defaultTake;
         _maxTake = maxTake;
         _maxSkip = maxSkip;
@@ -110,6 +121,15 @@ public sealed class DataSourceGuard
         if (options.Take == 0)
         {
             options.Take = _defaultTake;
+        }
+
+        // Apply a deterministic default sort when none is specified.
+        // OFFSET/FETCH without ORDER BY leaves row order undefined, so SQL Server may repeat
+        // or skip rows across pages. Like the default take, this fills in a missing parameter;
+        // a sort the client did supply is never overridden.
+        if (options.Sort is null or { Length: 0 })
+        {
+            options.Sort = [new SortingInfo { Selector = _defaultSortSelector, Desc = false }];
         }
 
         return Result.Success(options);

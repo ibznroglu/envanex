@@ -1,3 +1,4 @@
+using System.Collections.Frozen;
 using DevExtreme.AspNet.Data;
 using Envanex.Application.Abstractions.Messaging;
 using Envanex.Application.Abstractions.Persistence;
@@ -14,13 +15,35 @@ namespace Envanex.Web.Controllers;
 [Route("api/products")]
 public sealed class ProductsController : ControllerBase
 {
+    /// <summary>
+    /// Fields the product datasource endpoint accepts for sorting and filtering.
+    /// </summary>
+    /// <remarks>
+    /// "ListPriceCurrency" and "ReorderPoint" are deliberately absent. They map through
+    /// value converters (Quantity, Currency), so the projection reads them as member access
+    /// into a converted CLR type — translatable only in a final projection. Once
+    /// DataSourceLoader composes OrderBy/Where on top, EF Core throws. Keeping them out of
+    /// the allowlist turns a 500 into a 400. See ADR 0006 "Alternatives".
+    /// <para>
+    /// Exposed as a frozen set so integration tests derive their cases from this list instead of
+    /// restating it. A field added here is covered by the datasource tests automatically.
+    /// </para>
+    /// </remarks>
+    public static readonly FrozenSet<string> AllowedDataSourceFields = FrozenSet.Create(
+        "Code", "Name", "UnitOfMeasureName", "ListPriceAmount", "IsActive");
+
+    /// <summary>
+    /// Fields the product datasource endpoint accepts for grouping. A strict subset of
+    /// <see cref="AllowedDataSourceFields"/>: grouping by a high-cardinality field such as
+    /// "Code" produces one group per row.
+    /// </summary>
+    public static readonly FrozenSet<string> AllowedDataSourceGroupFields = FrozenSet.Create(
+        "UnitOfMeasureName", "IsActive");
+
     private static readonly DataSourceGuard Guard = new(
-        allowedFields: new HashSet<string>
-        {
-            "Code", "Name", "UnitOfMeasureName", "ListPriceAmount",
-            "ListPriceCurrency", "ReorderPoint", "IsActive",
-        },
-        allowedGroupFields: new HashSet<string> { "UnitOfMeasureName", "IsActive" },
+        allowedFields: AllowedDataSourceFields,
+        allowedGroupFields: AllowedDataSourceGroupFields,
+        defaultSortSelector: "Code",
         defaultTake: 20,
         maxTake: 100);
 

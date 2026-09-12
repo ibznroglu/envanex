@@ -1,11 +1,12 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
-using DevExtreme.AspNet.Data;
 using Envanex.Application.Abstractions.Persistence;
 using Envanex.Application.Products.Commands;
 using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.IntegrationTests.Fixtures;
+using Envanex.Web.Controllers;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
 
@@ -181,7 +182,7 @@ public sealed class ProductsDatasourceTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task GetDatasource_LoadAsync_OnIQueryable_ShouldNotThrow()
+    public async Task Datasource_Query_ShouldTranslateOrderByAndPagingToSql()
     {
         var uomId = await SeedUnitOfMeasureAsync();
         await SeedProductViaApiAsync(uomId, "REGR-001", "Regression Guard Product");
@@ -189,20 +190,178 @@ public sealed class ProductsDatasourceTests : IAsyncLifetime
         using var scope = _fixture.WebApplicationFactory.Services.CreateScope();
         var repo = scope.ServiceProvider.GetRequiredService<IProductReadRepository>();
 
-        var options = new DataSourceLoadOptionsBase
+        // Compose exactly what DataSourceLoader composes: an OrderBy over a projected field,
+        // plus Skip/Take paging.
+        var query = repo.GetAll()
+            .OrderBy(p => p.Code)
+            .Skip(0)
+            .Take(10);
+
+        // ToQueryString() shows what actually reaches SQL Server. A silent fall back to
+        // client evaluation does not throw, so asserting "does not throw" proves nothing —
+        // only the generated SQL does.
+        var sql = query.ToQueryString();
+
+        sql.ShouldContain("ORDER BY");
+        sql.ShouldContain("OFFSET");
+        sql.ShouldContain("FETCH NEXT");
+    }
+
+    /// <summary>
+    /// One test case per field in the endpoint's sort/filter allowlist. Deriving the cases from
+    /// <see cref="ProductsController.AllowedDataSourceFields"/> instead of restating them keeps
+    /// the two lists from drifting apart — the drift that let a 500 on ListPriceCurrency and
+    /// ReorderPoint reach production.
+    /// </summary>
+    public static TheoryData<string> AllowlistedFields()
+    {
+        var data = new TheoryData<string>();
+        foreach (var field in ProductsController.AllowedDataSourceFields)
         {
-            Take = 10,
-            Sort = [new SortingInfo { Selector = "Code", Desc = false }],
-        };
+            data.Add(field);
+        }
 
-        // If RowVersion is added back to the GetAll() projection, this call will throw
-        // because EF Core cannot translate DataSourceLoader's OrderBy composition
-        // against a Join-projected query that includes EF.Property shadow property access.
-        var loadResult = await DataSourceLoader.LoadAsync(repo.GetAll(), options, CancellationToken.None);
+        return data;
+    }
 
-        loadResult.ShouldNotBeNull();
-        loadResult.data.ShouldNotBeNull();
-        loadResult.data.Cast<object>().Count().ShouldBeGreaterThan(0);
+    /// <summary>
+    /// Filter values keyed by allowlisted field. A field with no entry here yields a null value,
+    /// which the test asserts on and fails — see <see cref="AllowlistedFieldsWithFilterValues"/>.
+    /// </summary>
+    private static readonly Dictionary<string, string> FilterValuesByField = new(StringComparer.Ordinal)
+    {
+        ["Code"] = "\"TFILT-001\"",
+        ["Name"] = "\"Translatable Filter Product\"",
+        ["UnitOfMeasureName"] = "\"Adet\"",
+        ["ListPriceAmount"] = "0",
+        ["IsActive"] = "true",
+    };
+
+    /// <summary>
+    /// Every allowlisted field paired with its filter value, or null when none is defined.
+    /// The unmatched field is still emitted as a case rather than dropped, so adding a field to
+    /// the allowlist without adding a filter value here produces a red test naming that field.
+    /// </summary>
+    public static TheoryData<string, string?> AllowlistedFieldsWithFilterValues()
+    {
+        var data = new TheoryData<string, string?>();
+        foreach (var field in ProductsController.AllowedDataSourceFields)
+        {
+            data.Add(field, FilterValuesByField.GetValueOrDefault(field));
+        }
+
+        return data;
+    }
+
+    [Theory]
+    [MemberData(nameof(AllowlistedFields))]
+    public async Task Datasource_EverySortableFieldInAllowlist_ShouldReturn200(string field)
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        await SeedProductViaApiAsync(uomId, "TSORT-001", "Translatable Sort Product");
+
+        var response = await _client.GetAsync(
+            $"/api/products/datasource?sort=[{{\"selector\":\"{field}\",\"desc\":false}}]");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.TryGetProperty("data", out var data).ShouldBeTrue();
+        data.GetArrayLength().ShouldBeGreaterThan(0);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllowlistedFieldsWithFilterValues))]
+    public async Task Datasource_EveryFilterableFieldInAllowlist_ShouldReturn200(string field, string? value)
+    {
+        value.ShouldNotBeNull(
+            $"'{field}' is in ProductsController.AllowedDataSourceFields but has no filter value in "
+            + $"{nameof(FilterValuesByField)}. Add an entry for it so the field is actually covered.");
+
+        var uomId = await SeedUnitOfMeasureAsync();
+        await SeedProductViaApiAsync(uomId, "TFILT-001", "Translatable Filter Product");
+
+        // ListPriceAmount is compared with ">" so the seeded row (100) matches; the rest use "=".
+        var op = string.Equals(field, "ListPriceAmount", StringComparison.Ordinal) ? ">" : "=";
+        var response = await _client.GetAsync(
+            $"/api/products/datasource?filter=[\"{field}\",\"{op}\",{value}]");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.TryGetProperty("data", out var data).ShouldBeTrue();
+        data.GetArrayLength().ShouldBeGreaterThan(0);
+    }
+
+    [Theory]
+    [InlineData("ListPriceCurrency")]
+    [InlineData("ReorderPoint")]
+    public async Task Datasource_SortOnValueConvertedField_ShouldReturn400NotServerError(string field)
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        await SeedProductViaApiAsync(uomId, "VCSORT-001", "Value Converted Sort Product");
+
+        // These fields map through value converters (Quantity, Currency). EF Core cannot
+        // translate DataSourceLoader's OrderBy composition over them and throws, so they are
+        // not in the allowlist. Putting them back without fixing the mapping turns this red.
+        var response = await _client.GetAsync(
+            $"/api/products/datasource?sort=[{{\"selector\":\"{field}\",\"desc\":false}}]");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+        body.GetProperty("title").GetString().ShouldBe("Bad Request");
+    }
+
+    [Theory]
+    [InlineData("ListPriceCurrency", "\"TRY\"")]
+    [InlineData("ReorderPoint", "0")]
+    public async Task Datasource_FilterOnValueConvertedField_ShouldReturn400NotServerError(string field, string value)
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        await SeedProductViaApiAsync(uomId, "VCFILT-001", "Value Converted Filter Product");
+
+        // Same reason as the sort case: the guard must reject before EF Core can throw.
+        var response = await _client.GetAsync(
+            $"/api/products/datasource?filter=[\"{field}\",\"=\",{value}]");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("status").GetInt32().ShouldBe(400);
+        body.GetProperty("title").GetString().ShouldBe("Bad Request");
+    }
+
+    [Fact]
+    public async Task Datasource_WithoutSort_ShouldApplyDeterministicDefaultOrder()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+
+        for (int i = 1; i <= 6; i++)
+        {
+            await SeedProductViaApiAsync(uomId, $"ORDER-{i:D3}", $"Ordered Product {i}");
+        }
+
+        // No sort parameter: the guard must supply one so OFFSET/FETCH is deterministic.
+        var firstPage = await _client.GetAsync("/api/products/datasource?skip=0&take=2");
+        var secondPage = await _client.GetAsync("/api/products/datasource?skip=2&take=2");
+
+        firstPage.StatusCode.ShouldBe(HttpStatusCode.OK);
+        secondPage.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var firstIds = await ReadIdsAsync(firstPage);
+        var secondIds = await ReadIdsAsync(secondPage);
+
+        firstIds.Count.ShouldBe(2);
+        secondIds.Count.ShouldBe(2);
+        firstIds.Intersect(secondIds).ShouldBeEmpty();
+    }
+
+    private static async Task<List<string>> ReadIdsAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return [.. body.GetProperty("data").EnumerateArray().Select(e => e.GetProperty("id").GetString()!)];
     }
 
     [Fact]
