@@ -21,7 +21,7 @@ memory and quietly undid the reason `IQueryable` was chosen in ADR 0005.
 
 **Error codes map to status codes through an explicit table of exact strings.** No suffix or prefix
 matching. `Product.NotFound` is 404 and `Product.UnitOfMeasureNotFound` is 422; a suffix rule would
-collapse them. All twenty-seven domain error codes appear in the table by name, including the ones
+collapse them. All thirty-two domain error codes appear in the table by name, including the ones
 that map to 400. Three reflection tests hold it closed: every code declared in `Envanex.Domain` must
 have a mapping entry and a Turkish message, and every entry in either table must correspond to a
 code that still exists. `Error` and `ValidationError` are skipped by declaring type — they are
