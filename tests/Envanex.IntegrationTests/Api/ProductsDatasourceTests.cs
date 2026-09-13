@@ -270,6 +270,23 @@ public sealed class ProductsDatasourceTests : IAsyncLifetime
         data.GetArrayLength().ShouldBeGreaterThan(0);
     }
 
+    /// <summary>
+    /// One test case per field in the endpoint's group allowlist, derived from
+    /// <see cref="ProductsController.AllowedDataSourceGroupFields"/> for the same reason as
+    /// <see cref="AllowlistedFields"/>. The group path had no derived coverage at all, so the
+    /// drift that shipped a 500 on the sort path was still open here.
+    /// </summary>
+    public static TheoryData<string> AllowlistedGroupFields()
+    {
+        var data = new TheoryData<string>();
+        foreach (var field in ProductsController.AllowedDataSourceGroupFields)
+        {
+            data.Add(field);
+        }
+
+        return data;
+    }
+
     [Theory]
     [MemberData(nameof(AllowlistedFieldsWithFilterValues))]
     public async Task Datasource_EveryFilterableFieldInAllowlist_ShouldReturn200(string field, string? value)
@@ -285,6 +302,23 @@ public sealed class ProductsDatasourceTests : IAsyncLifetime
         var op = string.Equals(field, "ListPriceAmount", StringComparison.Ordinal) ? ">" : "=";
         var response = await _client.GetAsync(
             $"/api/products/datasource?filter=[\"{field}\",\"{op}\",{value}]");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.TryGetProperty("data", out var data).ShouldBeTrue();
+        data.GetArrayLength().ShouldBeGreaterThan(0);
+    }
+
+    [Theory]
+    [MemberData(nameof(AllowlistedGroupFields))]
+    public async Task Datasource_EveryGroupableFieldInAllowlist_ShouldReturn200(string field)
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        await SeedProductViaApiAsync(uomId, "TGROUP-001", "Translatable Group Product");
+
+        var response = await _client.GetAsync(
+            $"/api/products/datasource?group=[{{\"selector\":\"{field}\",\"desc\":false,\"isExpanded\":true}}]");
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
 
@@ -358,10 +392,63 @@ public sealed class ProductsDatasourceTests : IAsyncLifetime
         firstIds.Intersect(secondIds).ShouldBeEmpty();
     }
 
+    [Fact]
+    public async Task Datasource_SortingByNonUniqueField_ShouldReturnStablePagesAcrossOffsets()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+
+        // Every product created through the API is active, so "IsActive" is one repeated key
+        // across all six rows and cannot order them on its own. Codes are seeded in descending
+        // order so ascending Code order is not the insertion order — a page that merely comes
+        // back in physical order cannot satisfy the assertions below by accident.
+        for (int i = 6; i >= 1; i--)
+        {
+            await SeedProductViaApiAsync(uomId, $"STABLE-{i:D3}", $"Stable Paging Product {i}");
+        }
+
+        const string sort = "sort=[{\"selector\":\"IsActive\",\"desc\":false}]";
+        var firstPage = await _client.GetAsync($"/api/products/datasource?{sort}&skip=0&take=3");
+        var secondPage = await _client.GetAsync($"/api/products/datasource?{sort}&skip=3&take=3");
+
+        firstPage.StatusCode.ShouldBe(HttpStatusCode.OK);
+        secondPage.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var firstRows = await ReadRowsAsync(firstPage);
+        var secondRows = await ReadRowsAsync(secondPage);
+
+        firstRows.Count.ShouldBe(3);
+        secondRows.Count.ShouldBe(3);
+
+        var firstIds = firstRows.Select(r => r.Id).ToList();
+        var secondIds = secondRows.Select(r => r.Id).ToList();
+
+        // No row may appear on both pages, and no row may be skipped: together the two pages
+        // are exactly the six seeded products.
+        firstIds.Intersect(secondIds).ShouldBeEmpty();
+        firstIds.Concat(secondIds).Distinct().Count().ShouldBe(6);
+
+        // The Code tiebreaker is what makes that hold. Without it the ordering is the single
+        // repeated IsActive key and the split between the pages is whatever the plan produces,
+        // so asserting the exact Code sequence is what turns a removed tiebreaker red.
+        var codes = firstRows.Concat(secondRows).Select(r => r.Code).ToList();
+        codes.ShouldBe(Enumerable.Range(1, 6).Select(i => $"STABLE-{i:D3}"));
+    }
+
     private static async Task<List<string>> ReadIdsAsync(HttpResponseMessage response)
     {
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         return [.. body.GetProperty("data").EnumerateArray().Select(e => e.GetProperty("id").GetString()!)];
+    }
+
+    private static async Task<List<(string Id, string Code)>> ReadRowsAsync(HttpResponseMessage response)
+    {
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        return
+        [
+            .. body.GetProperty("data").EnumerateArray().Select(e => (
+                Id: e.GetProperty("id").GetString()!,
+                Code: e.GetProperty("code").GetString()!))
+        ];
     }
 
     [Fact]

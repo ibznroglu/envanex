@@ -123,16 +123,47 @@ public sealed class DataSourceGuard
             options.Take = _defaultTake;
         }
 
-        // Apply a deterministic default sort when none is specified.
-        // OFFSET/FETCH without ORDER BY leaves row order undefined, so SQL Server may repeat
-        // or skip rows across pages. Like the default take, this fills in a missing parameter;
-        // a sort the client did supply is never overridden.
-        if (options.Sort is null or { Length: 0 })
-        {
-            options.Sort = [new SortingInfo { Selector = _defaultSortSelector, Desc = false }];
-        }
+        // Give every request a deterministic total ordering.
+        // The risk is not the absence of an ordering but its non-uniqueness: OFFSET/FETCH over
+        // an ORDER BY whose key repeats leaves rows with equal keys in an undefined relative
+        // order, so SQL Server may repeat a row on one page and skip it on the next. Most
+        // allowlisted fields are non-unique, so a sort the client did supply is not enough on
+        // its own. The default selector maps to a uniquely indexed column, so appending it
+        // makes the ordering total. The client's own sort keys stay primary and are never
+        // overridden or reordered; when the client supplied none, the tiebreaker is the whole
+        // ordering.
+        options.Sort = AppendTiebreaker(options.Sort);
 
         return Result.Success(options);
+    }
+
+    /// <summary>
+    /// Returns the client's sort keys with the default selector appended as a final tiebreaker,
+    /// or just the tiebreaker when the client supplied no sort at all. A client list that already
+    /// sorts on the default selector is returned unchanged: it is already total.
+    /// </summary>
+    /// <remarks>
+    /// Appending the default selector cannot bypass the sort allowlist — the constructor rejects
+    /// a default selector that is not in <see cref="_allowedFields"/>.
+    /// </remarks>
+    private SortingInfo[] AppendTiebreaker(SortingInfo[]? sort)
+    {
+        var tiebreaker = new SortingInfo { Selector = _defaultSortSelector, Desc = false };
+
+        if (sort is null or { Length: 0 })
+        {
+            return [tiebreaker];
+        }
+
+        foreach (var entry in sort)
+        {
+            if (string.Equals(entry.Selector, _defaultSortSelector, StringComparison.Ordinal))
+            {
+                return sort;
+            }
+        }
+
+        return [.. sort, tiebreaker];
     }
 
     /// <summary>
