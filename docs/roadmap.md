@@ -45,7 +45,7 @@ in the README. That branch is never merged.
 |---|---|---|
 | 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done (#4) |
 | 5a | `feat(api)` — application layer, repositories, unit tests | done (#6) |
-| 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | |
+| 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | done (#8) |
 | 6 | `feat(auth)` — authentication and authorization: cookie for Blazor, token for REST and SOAP; read-only demo account | |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
@@ -132,6 +132,10 @@ Tracked deliberately rather than hidden. Each one has a PR where it closes.
 | UnitOfMeasure lookup list is unbounded and unordered | PR 7, when seed data makes it visible |
 | No index supports datasource sorting on Name, UnitOfMeasureName, ListPriceAmount or IsActive, nor the composite ORDER BY <field>, Code the tiebreaker produces | PR 7, with realistic seed data |
 | Datasource cannot sort or filter on ListPriceCurrency or ReorderPoint; value converters block translation | PR 7 |
+| Datasource allowlist expects PascalCase selectors while JSON responses serialize camelCase; a real grid sending `code` would get 400 on every sort and filter | PR 7, before the grid is wired |
+| `DataSourceGuard` can throw on a sort entry with no selector (`sort=[{"desc":true}]`), producing 500 where the guard intends 400 | PR 7 |
+| Grouped paging stability is untested; the group theory never combines with skip/take | PR 7 |
+| `DataSourceGuard` has no unit tests; its constructor invariant is unprotected | PR 7 |
 
 ## How the work is run
 
