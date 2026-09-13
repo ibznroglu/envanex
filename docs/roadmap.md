@@ -125,13 +125,13 @@ Tracked deliberately rather than hidden. Each one has a PR where it closes.
 
 | Gap | Closes in                              |
 |---|----------------------------------------|
-| Code length is not validated in the domain; an over-long code fails at `SaveChanges` as a `DbUpdateException` | PR 5a                                  |
-| A unique-index violation reaches the caller as a raw database exception rather than a business error | PR 5a                                  |
-| `Envanex.Application.Tests` contains no tests | PR 5a                                  |
 | `MoneyComplexTypeConvention` only inspects complex properties one level deep | when a nested case appears             |
 | `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 8, when the ledger makes it fragile |
 | Warehouse has no application layer or endpoints | PR 8 |
 | No authentication or authorization on any endpoint | PR 6 |
+| UnitOfMeasure lookup list is unbounded and unordered | PR 7, when seed data makes it visible |
+| No index supports datasource sorting on Name, UnitOfMeasureName, ListPriceAmount or IsActive, nor the composite ORDER BY <field>, Code the tiebreaker produces | PR 7, with realistic seed data |
+| Datasource cannot sort or filter on ListPriceCurrency or ReorderPoint; value converters block translation | PR 7 |
 
 ## How the work is run
 

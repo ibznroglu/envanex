@@ -64,6 +64,34 @@ public class ArchitectureTests
         references.ShouldBe(ExpectedWebReferences);
     }
 
+    [Fact]
+    public void DataSourceListDtos_ShouldNotBePositionalRecords()
+    {
+        var solutionDir = FindSolutionDirectory();
+        var applicationDir = Path.Combine(solutionDir, "src", "Envanex.Application");
+
+        var listDtoFiles = Directory
+            .GetFiles(applicationDir, "*ListDto.cs", SearchOption.AllDirectories)
+            .ToArray();
+
+        listDtoFiles.ShouldNotBeEmpty(
+            $"No *ListDto.cs files found under {applicationDir} — " +
+            "check that the path is correct so this test does not silently pass.");
+
+        var positionalRecordPattern = new System.Text.RegularExpressions.Regex(
+            @"\brecord\s+\w+\s*\(");
+
+        var violatingFiles = listDtoFiles
+            .Where(f => positionalRecordPattern.IsMatch(File.ReadAllText(f)))
+            .Select(Path.GetFileName)
+            .ToArray();
+
+        violatingFiles.ShouldBeEmpty(
+            "Positional records produce NewExpression which EF Core DataSourceLoader " +
+            "cannot translate OrderBy over — query falls back to client evaluation. " +
+            $"Violating files: {string.Join(", ", violatingFiles)}");
+    }
+
     /// <summary>
     /// Reads the .csproj file from disk and extracts project names (directory names)
     /// from ProjectReference elements, returning them in alphabetical order.

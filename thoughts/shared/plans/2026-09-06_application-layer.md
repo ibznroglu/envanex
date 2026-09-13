@@ -314,7 +314,10 @@ public sealed record ProductDetailDto(
 public sealed record ProductListDto(
     Guid Id, string Code, string Name, string UnitOfMeasureName,
     decimal ListPriceAmount, string ListPriceCurrency,
-    decimal ReorderPoint, bool IsActive, byte[] RowVersion);
+    decimal ReorderPoint, bool IsActive);
+// NOTE: RowVersion removed from datasource projection because EF.Property shadow property
+// access makes DataSourceLoader's OrderBy composition untranslatable, forcing full-table
+// materialization. RowVersion remains on ProductDetailDto for concurrency control.
 
 public sealed record UnitOfMeasureDetailDto(
     Guid Id, string Code, string Name, Guid? BaseUnitId,
@@ -610,9 +613,10 @@ public void SetOriginalRowVersion(Product product, byte[] rowVersion)
 }
 
 // ProductReadRepository.GetAll() — IQueryable<ProductListDto>
-//   AsNoTracking, UnitOfMeasures join (UnitOfMeasureName),
-//   EF.Property<byte[]>(p, ColumnNames.RowVersion) ile RowVersion yüzeye çıkar,
-//   Select(...) ile sorgu Infrastructure'da BİTER.
+//   AsNoTracking, UnitOfMeasures join (UnitOfMeasureName).
+//   NOTE: RowVersion removed from datasource projection because EF.Property shadow property
+//   access makes DataSourceLoader's OrderBy composition untranslatable, forcing full-table
+//   materialization. RowVersion remains on ProductDetailDto (GetByIdAsync) for concurrency control.
 
 // UnitOfMeasureRepository.GetActiveStatusAsync — tek sorgu
 public async Task<bool?> GetActiveStatusAsync(Guid id, CancellationToken ct)
@@ -729,7 +733,9 @@ services.AddScoped<IUnitOfWork, UnitOfWork>();
 - `UnitOfWork_SaveChangesAsync_WithDuplicateCode_ShouldThrowDuplicateKeyException`
 - `ProductRepository_SetOriginalRowVersion_WithStaleValue_ShouldCauseConcurrencyConflict`
 - `ProductRepository_ExistsByCodeAsync_ExistingCode_ShouldReturnTrue`
-- `ProductReadRepository_GetAll_ShouldSurfaceRowVersion`
+- `ProductReadRepository_GetByIdAsync_ShouldSurfaceRowVersion`
+  (NOTE: RowVersion removed from GetAll/ProductListDto projection; RowVersion surfacing
+  is now verified only on GetByIdAsync/ProductDetailDto.)
 - `ProductReadRepository_GetAll_ShouldJoinUnitOfMeasureName`
 - `ProductReadRepository_GetByIdAsync_ShouldReturnDetailDto`
 - `UnitOfMeasureRepository_GetActiveStatusAsync_Active_ShouldReturnTrue`

@@ -47,6 +47,11 @@ ADR'de gerekçelendirilmesi gereken noktalar:
   tanısal mesajlar taşır; Web katmanı hata kodlarını Türkçe kullanıcı mesajlarına eşler. Bu, Domain'i
   dilden bağımsız tutar ve birden fazla yüzeyin (REST, SOAP, Blazor) bağımsız yerelleştirme
   yapabilmesini sağlar.
+- **Datasource projeksiyon DTO'ları pozisyonel record olamaz ve shadow property (EF.Property)
+  içeremez.** Her iki durum da DataSourceLoader'ın OrderBy kompozisyonunu çevirilemez kılar ve tüm
+  tablonun istemci tarafında materialize edilmesine neden olur. Bu, ADR 0005'in IQueryable tercihinin
+  arkasındaki somut kısıttır.
+- Bu kısıt PR 8'de stok grid'i eklendiğinde tekrar karşımıza çıkacaktır.
 
 ---
 
@@ -346,8 +351,10 @@ parser sağlar. Custom model binder şunu yapar:
 
 1. Yeni bir `DataSourceLoadOptionsBase` oluşturur
 2. `DataSourceLoadOptionsParser.Parse(options, key => valueProvider.GetValue(key).FirstValue)` ile
-   doldurur
-3. `bindingContext.Result = ModelBindingResult.Success(options)` ayarlar
+   doldurur — **try/catch ile sarılır**: parse hatası durumunda ModelState'e hata eklenir ve
+   `ModelBindingResult.Failed()` döner. `[ApiController]` bu durumu otomatik 400 ProblemDetails'a
+   çevirir. Ham exception mesajı istemciye sızmaz.
+3. `bindingContext.Result = ModelBindingResult.Success(options)` ayarlar (yalnızca parse başarılıysa)
 
 Coder, faza başlarken kurulu 5.1.0 paketine karşı `DataSourceLoadOptionsParser`'ın public olduğunu ve
 `DataSourceLoadOptionsBase`'in parametresiz constructor'ı bulunduğunu **komutla doğrulamalıdır**.
@@ -358,22 +365,41 @@ API farklıysa DUR ve bildir; uydurma.
 ```csharp
 // DataSourceGuard — ihlalde 400 döner, SESSİZCE DÜZELTMEZ (clamp etmez).
 // Sessiz clamp, istemciye isteğinin karşılandığı yanılgısını verir ve saldırı yüzeyini gizler.
+//
+// Sort, filter ve group alanları TEK BİR `allowedFields` allowlist'i paylaşır (sort + filter).
+// Group alanları ayrı bir alt küme olarak kalır çünkü gruplanabilir alanlar sıralanabilir alanların
+// bir alt kümesidir. Filter alanları sort ile aynı kümeyi kullanır: bir alan sıralanabilirse
+// filtrelenebilir de olmalıdır. Bu, DTO projeksiyon yüzeyinden ayrı bir koruma katmanıdır —
+// projeksiyon hangi alanların varolduğunu belirler, allowlist hangilerine sorgu yapılabileceğini.
+// Bu ayırım, DTO'ya yeni bir alan eklendiğinde istemcinin o alanı otomatik olarak
+// filtreleyememesini sağlar; allowlist bilinçli olarak güncellenmelidir.
+//
+// Filter doğrulaması REKÜRSİFTİR: DevExtreme filter yapısı iç içe olabilir
+// ([["Code","=","X"],"and",["Name","=","Y"]]) ve her seviyedeki alan adları kontrol edilir.
 public sealed class DataSourceGuard
 {
     public DataSourceGuard(
-        IReadOnlySet<string> allowedSortFields,
-        IReadOnlySet<string> allowedGroupFields,
+        IReadOnlySet<string> allowedFields,       // sort + filter use this
+        IReadOnlySet<string> allowedGroupFields,   // group uses this (subset)
         int defaultTake,
-        int maxTake);
+        int maxTake,
+        int maxSkip = 10_000);
+        // maxSkip default: 10_000. Rationale: at 100 rows/page (maxTake), 10000 skip = 100 pages,
+        // which is generous for any realistic UI paging scenario. An OFFSET beyond this is almost
+        // certainly a probe or a bug, and sends an expensive query to SQL Server.
 
     // Doğrulama (hepsi ihlalde Result.Failure → controller 400 döner):
+    //   Take < 0                             → hata (negative take is invalid)
     //   Take > maxTake                       → hata
+    //   Skip < 0                             → hata (negative skip is invalid)
+    //   Skip > maxSkip                       → hata (prevents expensive OFFSET queries)
     //   Sort alanı allowlist dışında         → hata
     //   Group alanı allowlist dışında        → hata
+    //   Filter alanı allowlist dışında       → hata (recursive check)
     //   RequireGroupCount istendi            → hata
     //   GroupSummary istendi                 → hata
     // Uygulama:
-    //   Take belirtilmemişse defaultTake ayarlanır (sınırsız sorgu OLMAZ)
+    //   Take == 0 → defaultTake ayarlanır (0 means "not specified"; sınırsız sorgu OLMAZ)
     public Result<DataSourceLoadOptionsBase> ValidateAndApply(DataSourceLoadOptionsBase options);
 }
 
@@ -382,12 +408,12 @@ public sealed class DataSourceGuard
 public sealed class ProductsController : ControllerBase
 {
     private static readonly DataSourceGuard Guard = new(
-        allowedSortFields: ["Code", "Name", "UnitOfMeasureName", "ListPriceAmount",
-                            "ListPriceCurrency", "ReorderPoint", "IsActive"],
+        allowedFields: ["Code", "Name", "UnitOfMeasureName", "ListPriceAmount",
+                        "ListPriceCurrency", "ReorderPoint", "IsActive"],
         allowedGroupFields: ["UnitOfMeasureName", "IsActive"],
         defaultTake: 20,
         maxTake: 100);
-    // RowVersion allowlist'lerde YOK — sıralanabilir veya gruplanabilir bir alan değil.
+    // RowVersion allowlist'lerde YOK — sıralanabilir, filtrelenebilir veya gruplanabilir bir alan değil.
 
     [HttpPost]                       // → 201 + Location
     public async Task<IActionResult> Create([FromBody] CreateProductCommand command, CancellationToken ct);
@@ -442,6 +468,15 @@ uyuşmuyorsa istek 400 ProblemDetails ile reddedilir. Sessizce birini tercih etm
 - `GetDatasource_WithDisallowedGroupField_ShouldReturn400`
 - `GetDatasource_WithRequireGroupCount_ShouldReturn400`
 - `GetDatasource_WithGroupSummary_ShouldReturn400`
+- `Datasource_WithNegativeTake_ShouldReturn400` (security hardening)
+- `Datasource_WithNegativeSkip_ShouldReturn400` (security hardening)
+- `Datasource_WithExcessiveSkip_ShouldReturn400` (security hardening, skip > 10000)
+- `Datasource_WithMalformedFilter_ShouldReturn400NotServerError` (model binder hardening)
+- `Datasource_WithZeroTake_ShouldApplyDefault` (documents take=0 → defaultTake behavior)
+- `Datasource_WithDisallowedFilterField_ShouldReturn400` (filter allowlist — prevents 500 on unmapped fields)
+- `Datasource_WithAllowedFilterField_ShouldReturn200` (filter allowlist — proves allowed fields pass)
+- `Datasource_WithNestedDisallowedFilterField_ShouldReturn400` (recursive filter check)
+- `Datasource_WithCombinedSortGroupAndFilter_ShouldReturn200` (sort + group + filter together)
 
 ### Validation
 
@@ -506,6 +541,9 @@ Rate limiter — ASP.NET Core yerleşik (`AddRateLimiter`), politika taksonomisi
   yalnızca bu factory doğrular.
 - Not (PR 7'ye taşınacak): App Service'in arkasında IP bazlı bölümleme `ForwardedHeaders` olmadan
   yanlış çalışır. Bu PR'ın işi değil, kaydedildi.
+- 429 yanıtı artık `OnRejected` callback ile ProblemDetails JSON gövdesi dönüyor; boş bir gövde
+  `UseStatusCodePagesWithReExecute` tarafından yakalanıp `/not-found` HTML sayfasına yeniden
+  yazılıyordu.
 
 ### Tests to add
 

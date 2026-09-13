@@ -138,22 +138,6 @@ public sealed class RepositoryTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task ProductReadRepository_GetAll_ShouldSurfaceRowVersion()
-    {
-        var uom = await SeedUnitOfMeasureAsync();
-        await SeedProductAsync(uom.Id);
-
-        await using var context = _fixture.CreateDbContext();
-        var readRepo = new ProductReadRepository(context);
-
-        var items = await readRepo.GetAll().ToListAsync();
-
-        items.ShouldNotBeEmpty();
-        items.First().RowVersion.ShouldNotBeNull();
-        items.First().RowVersion.ShouldNotBeEmpty();
-    }
-
-    [Fact]
     public async Task ProductReadRepository_GetAll_ShouldJoinUnitOfMeasureName()
     {
         var uom = await SeedUnitOfMeasureAsync("KG", "Kilogram");
@@ -184,6 +168,22 @@ public sealed class RepositoryTests : IAsyncLifetime
         dto.Code.ShouldBe("DETAIL-TEST");
         dto.Name.ShouldBe("Detail Product");
         dto.UnitOfMeasureName.ShouldBe("Metre");
+        dto.RowVersion.ShouldNotBeNull();
+        dto.RowVersion.ShouldNotBeEmpty();
+    }
+
+    [Fact]
+    public async Task ProductReadRepository_GetByIdAsync_ShouldSurfaceRowVersion()
+    {
+        var uom = await SeedUnitOfMeasureAsync();
+        var product = await SeedProductAsync(uom.Id, "RV-DETAIL", "RowVersion Detail");
+
+        await using var context = _fixture.CreateDbContext();
+        var readRepo = new ProductReadRepository(context);
+
+        var dto = await readRepo.GetByIdAsync(product.Id);
+
+        dto.ShouldNotBeNull();
         dto.RowVersion.ShouldNotBeNull();
         dto.RowVersion.ShouldNotBeEmpty();
     }

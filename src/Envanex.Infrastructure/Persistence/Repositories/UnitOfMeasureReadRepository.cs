@@ -19,11 +19,13 @@ internal sealed class UnitOfMeasureReadRepository : IUnitOfMeasureReadRepository
     {
         return await _context.UnitOfMeasures
             .AsNoTracking()
-            .Select(u => new UnitOfMeasureListDto(
-                u.Id,
-                u.Code,
-                u.Name,
-                u.IsActive))
+            .Select(u => new UnitOfMeasureListDto
+            {
+                Id = u.Id,
+                Code = u.Code,
+                Name = u.Name,
+                IsActive = u.IsActive,
+            })
             .ToListAsync(ct);
     }
 

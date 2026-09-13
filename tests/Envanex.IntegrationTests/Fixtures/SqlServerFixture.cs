@@ -10,6 +10,8 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public string ConnectionString => _container.GetConnectionString();
 
+    public EnvanexWebApplicationFactory WebApplicationFactory { get; private set; } = null!;
+
     public EnvanexDbContext CreateDbContext()
     {
         var options = new DbContextOptionsBuilder<EnvanexDbContext>()
@@ -37,10 +39,17 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
         await using var context = CreateDbContext();
         await context.Database.MigrateAsync();
+
+        WebApplicationFactory = new EnvanexWebApplicationFactory(ConnectionString);
     }
 
     public async Task DisposeAsync()
     {
+        if (WebApplicationFactory is not null)
+        {
+            await WebApplicationFactory.DisposeAsync();
+        }
+
         await _container.DisposeAsync();
     }
 }

@@ -14,7 +14,7 @@ integration surface for legacy clients.
 |---|---|
 | Runtime | .NET 10 (LTS) |
 | UI | Blazor Web App (Server interactive) + Radzen Blazor Components |
-| API | ASP.NET Core REST + Swagger, `DevExtreme.AspNet.Data` grid protocol |
+| API | ASP.NET Core REST + OpenAPI + Scalar, `DevExtreme.AspNet.Data` grid protocol |
 | Integration | SoapCore (XML web service) |
 | Background | .NET Worker Service, hosted as a Windows Service |
 | Data | EF Core + SQL Server 2022 |
