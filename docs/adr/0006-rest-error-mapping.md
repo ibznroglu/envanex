@@ -155,7 +155,8 @@ sort the client supplied is not by itself enough: four of the five allowlisted f
 values, and `OFFSET`/`FETCH` over an `ORDER BY` whose key repeats leaves rows with equal keys in
 an undefined relative order, so a row can appear on two pages while another is never returned.
 `DataSourceGuard` therefore appends the default selector, `Code`, as a final tiebreaker to every
-request's sort, leaving the client's own keys primary. The cost is that every datasource query
-now sorts secondarily on `Code`, and how well `IX_Products_Code` supports that pattern has not
-been measured — the current test data is too small to say anything about the plan, and the
-roadmap tracks the missing sort indexes as an open gap.
+request's sort that does not already contain it, leaving the client's own keys primary. The cost
+is that a datasource query whose sort does not already name `Code` now sorts secondarily on it,
+and how well `IX_Products_Code` supports that pattern has not been measured — the current test
+data is too small to say anything about the plan, and the roadmap tracks the missing sort
+indexes as an open gap.
