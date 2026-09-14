@@ -7,8 +7,15 @@ decided along the way, and how the work is run. Architectural reasoning lives in
 
 ## Scope
 
-An ERP core covering inventory, purchasing and sales/invoicing — the parts of an ERP where
-correctness is not negotiable. Not a whole ERP: no HR, no accounting ledger, no manufacturing.
+An inventory ERP core: master data, an append-only stock ledger, inventory costing, and the
+REST and grid surface that serves them. Purchasing, sales, invoicing, SOAP integration, the
+background worker and reporting are deliberately out of scope — they were in the original plan
+and were cut so the project could be finished rather than left half-built. The deferred table
+below keeps them recorded.
+
+Envanex is a portfolio project, not a commercial product. It is built to be read and judged by
+engineers, which is why every architectural decision is recorded in docs/adr/ and every known
+gap is tracked rather than hidden.
 
 ## Stack
 
@@ -46,7 +53,8 @@ in the README. That branch is never merged.
 | 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done (#4) |
 | 5a | `feat(api)` — application layer, repositories, unit tests | done (#6) |
 | 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | done (#8) |
-| 6 | `feat(auth)` — authentication and authorization: cookie for Blazor, token for REST and SOAP; read-only demo account | |
+| 6a | `feat(auth)` — ASP.NET Core Identity, JWT with rotating refresh tokens, login/refresh/logout | |
+| 6b | `feat(auth)` — authorization policies, [Authorize] on every endpoint, Blazor cookie scheme, read-only demo account | |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
 Roadmap numbers and GitHub PR numbers are not the same. The status cell of a completed row
@@ -64,29 +72,26 @@ Everything after it ships continuously.
 | 9  | `feat(domain)` — costing strategies: moving average, then FIFO | |
 | 10 | `feat(web)` — stock screens, manual adjustment, movement history | |
 
-### Purchasing
+### Deferred (out of scope)
 
-| #  | Title | Status |
-|----|---|---|
-| 11 | `feat(purchasing)` — supplier, purchase order, state machine | |
-| 12 | `feat(purchasing)` — amount-threshold approval rules | |
-| 13 | `feat(purchasing)` — goods receipt to stock movement, partial receipt | |
+These were planned and cut. The architecture supports them: adding an aggregate means a
+repository, handlers, a controller and entries in the two error tables — the patterns are
+established in ADR 0005 and ADR 0006. They are listed so the boundary is visible as a choice,
+not an omission. The only real seam is the outbox: `IDomainEvent` and the event collection on
+`AggregateRoot` exist but no dispatcher does, and the first genuine domain event arrives with
+the stock ledger in PR 8 — that is where the question gets answered, not here.
 
-### Sales and invoicing
-
-| #  | Title | Status |
-|----|---|---|
-| 14 | `feat(sales)` — customer, sales order, stock reservation | |
-| 15 | `feat(sales)` — shipment, stock issue, cost of goods sold | |
-| 16 | `feat(invoicing)` — invoice, VAT rounding, numbering | |
-
-### Integration and operations
-
-| #  | Title | Status |
-|----|---|---|
-| 17 | `feat(soap)` — SOAP endpoint, supplier price feed import | |
-| 18 | `feat(worker)` — Windows Service, outbox dispatcher, nightly jobs | |
-| 19 | `feat(reporting)` — T-SQL views, inventory reports, README and diagrams | |
+| #  | Title |
+|----|---|
+| 11 | `feat(purchasing)` — supplier, purchase order, state machine |
+| 12 | `feat(purchasing)` — amount-threshold approval rules |
+| 13 | `feat(purchasing)` — goods receipt to stock movement, partial receipt |
+| 14 | `feat(sales)` — customer, sales order, stock reservation |
+| 15 | `feat(sales)` — shipment, stock issue, cost of goods sold |
+| 16 | `feat(invoicing)` — invoice, VAT rounding, numbering |
+| 17 | `feat(soap)` — SOAP endpoint, supplier price feed import |
+| 18 | `feat(worker)` — Windows Service, outbox dispatcher, nightly jobs |
+| 19 | `feat(reporting)` — T-SQL views, inventory reports, README and diagrams |
 
 ## Decisions carried forward
 
@@ -108,7 +113,7 @@ ADR.
 - **Grid datasource is a hardened surface.** Max page size, sort/group field allowlist, and a
   default `Take` ship with the endpoint in PR 5b, not later. The read DTO is flat, which makes the
   DTO itself the field allowlist.
-- **Auth precedes the public demo.** Authentication and authorization land in PR 6, before the
+- **Auth precedes the public demo.** Authentication and authorization land in PR 6a and 6b, before the
   first deploy in PR 7. The scheme mix — cookie for Blazor, token for the REST and SOAP surfaces —
   is decided in that PR's ADR.
 - **Warehouse waits for its consumer.** Warehouse has no application layer or endpoints until
@@ -118,6 +123,21 @@ ADR.
   (ADR 0003), so no aggregate exposes it. Update methods take it as a separate argument and
   Infrastructure sets it as the original value; read projections use `EF.Property` to surface it.
   An aggregate that grows a `RowVersion` field is a defect.
+- **The UI stays Blazor Server.** A separate SPA was considered and rejected: it would prove
+  frontend skill that is already proven elsewhere, add CORS, browser token storage and a second
+  build pipeline, and force the JWT into the browser where a cookie-based Blazor session does
+  not need it. Blazor also differentiates in the .NET market this project targets.
+- **Identity lives in its own DbContext.** ASP.NET Core Identity brings seven entities. Putting
+  them in `EnvanexDbContext` would run `AggregateRootConvention` and `MoneyComplexTypeConvention`
+  over them, since both are model-finalizing conventions. A separate `EnvanexIdentityDbContext`
+  in its own schema with its own migration chain removes the interaction; auth data never shares
+  a transaction with business data.
+- **Access tokens are short-lived JWTs; refresh tokens are opaque, hashed, rotated and
+  reuse-detected.** A long-lived JWT cannot be revoked. Rotation without reuse detection is half
+  a solution — the security value is in catching a stolen token.
+- **Authorization is policy-based, not role-based at the endpoint.** Endpoints require `CanRead`
+  or `CanWrite`; roles map to policies. Adding a role later must not mean touching every
+  controller.
 
 ## Known gaps
 
@@ -128,7 +148,7 @@ Tracked deliberately rather than hidden. Each one has a PR where it closes.
 | `MoneyComplexTypeConvention` only inspects complex properties one level deep | when a nested case appears             |
 | `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 8, when the ledger makes it fragile |
 | Warehouse has no application layer or endpoints | PR 8 |
-| No authentication or authorization on any endpoint | PR 6 |
+| No authentication or authorization on any endpoint | PR 6b |
 | UnitOfMeasure lookup list is unbounded and unordered | PR 7, when seed data makes it visible |
 | No index supports datasource sorting on Name, UnitOfMeasureName, ListPriceAmount or IsActive, nor the composite ORDER BY <field>, Code the tiebreaker produces | PR 7, with realistic seed data |
 | Datasource cannot sort or filter on ListPriceCurrency or ReorderPoint; value converters block translation | PR 7 |
@@ -161,6 +181,15 @@ Rules that were learned the hard way and are not negotiable:
   constructor on `Money` was removed — it was reported as required and was not.
 - **The human writes every ADR.** Agents may create the empty file. `docs/journal/` is the
   agent-written study material that feeds it; the reasoning has to be the human's own.
+- **Read raw command output, not the agent's summary of it.** The main agent routinely
+  summarises `git diff` and test output instead of showing it. For anything longer than a few
+  lines, have it write the output to a file and read the file.
+- **An unverified claim is not a finding.** Reviewers have no shell; several of their assertions
+  turned out to be wrong — `FixedWindowRateLimiter` does supply `RetryAfter` metadata, and a
+  closed known gap was reported as still open. Prove it before acting on it.
+- **A test that passes is not a test that protects.** Two tests in PR 5b asserted things that
+  stayed green when the behaviour they claimed to guard was removed. When a test exists to
+  prevent a regression, delete the code it guards and watch it go red.
 
 Agent models: `planner`, `plan-reviewer`, `coder`, `db-reviewer` and `explainer` run on Opus;
 `code-reviewer` on Sonnet; `researcher` and `tester` on Haiku.
