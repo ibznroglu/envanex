@@ -1,5 +1,15 @@
 # Research: Authentication infrastructure (PR 6a)
 
+## Provenance
+
+This file was not produced by the `researcher` subagent. The subagent was run against areas 1–5 and
+its output is incorporated here; areas 6–10, the external findings and the decisions section were
+assembled with the human in a separate session, reading the repository at `06fbba9` directly. Every
+line number and count below was checked against the working tree rather than reported second-hand.
+
+The decisions section records choices the human made and approved in that session. It is a
+constraint on the planner, not a proposal.
+
 ## Question
 
 What does the existing codebase require of an authentication layer built on ASP.NET Core Identity
@@ -305,11 +315,9 @@ strongest argument for giving the Identity context its own schema rather than sh
 **Not verified by experiment.** The first phase's validation step must actually run the migration
 command and paste its raw output, per the project's rule that an unverified claim is not a finding.
 
-## Proposals from the researcher — NOT reviewed by the human
+## Decisions taken before planning
 
-Written by the researcher agent. The human had not seen this file when these were written and has
-approved none of them. They are input to planning, not constraints on it: every item below is an
-open design decision that remains the human's to make.
+Settled by the human after reading the above. The planner treats these as constraints.
 
 1. **`AuthErrors` lives in `Envanex.Application`, and `ResultMappingTests` is widened to scan both
    `Envanex.Domain` and `Envanex.Application`.** Domain has no auth aggregate and will not get one;
@@ -343,6 +351,23 @@ open design decision that remains the human's to make.
    and entered in the known gaps table. A non-zero window should be set from a measurement against
    a real client, not guessed now.
 
+8. **`logout` revokes only the family of the refresh token presented.** Ending every session for a
+   user is a separate feature and is not in this PR. "Log out of this device" is what the endpoint
+   name promises.
+
+9. **The refresh token is returned in the response body, not as a cookie.** The consumer of PR 6a is
+   the REST surface, and the roadmap already splits the schemes: cookie for Blazor, token for REST
+   and SOAP. The cookie scheme arrives with PR 6b and makes its own decision there.
+
+10. **The Identity context lives in its own `auth` schema.** Beyond keeping auth data visibly
+    separate from business data, this is what cleanly separates the two migration history tables:
+    the second context declares `MigrationsHistoryTable("__EFMigrationsHistory", "auth")`, so
+    neither context can read the other's applied migrations as its own.
+
+11. **No endpoint in PR 6a creates a user.** Nothing is protected until PR 6b, so a public
+    registration endpoint would let anyone open an account on a wide-open API. Users exist through
+    test seeding only; the read-only demo account arrives in 6b.
+
 ## Risks and unknowns
 
 - Placement of `UseAuthentication`/`UseAuthorization` relative to `UseStatusCodePagesWithReExecute`
@@ -363,10 +388,15 @@ open design decision that remains the human's to make.
 
 ## Open questions for the human
 
-1. Does `logout` revoke only the presented refresh token's family, or every family for that user?
-2. Is the refresh token returned in the response body or set as an `HttpOnly` cookie? PR 6b adds a
-   Blazor cookie scheme, so this choice constrains that PR.
-3. Does the Identity context get its own SQL schema (for example `auth`), or does it share `dbo`
-   with a table prefix?
-4. Does 6a add any endpoint that creates a user, or do users exist only through test seeding until
-   the demo account arrives in 6b?
+The four questions this research originally raised — logout scope, refresh token transport, schema
+separation and user creation — are answered as decisions 8 to 11 above. What remains is genuinely
+undecided and belongs to the plan and the ADR rather than to research:
+
+1. Access token lifetime and refresh token lifetime, as concrete values. "Short-lived" is a
+   direction, not a number, and both numbers end up in configuration, in tests and in the ADR.
+2. Whether refresh token lifetime is absolute, sliding on each rotation, or both — an absolute cap
+   with a shorter idle window is the usual shape, and it changes the table.
+3. The hash algorithm for the stored refresh token. It is a high-entropy secret, not a password, so
+   a password hash is the wrong tool; the comparison must still be constant-time.
+4. Whether the login endpoint's stricter rate limit gets its own configuration switch or its own
+   test factory, given that `RateLimiting:Enabled` is `false` in the shared factory.
