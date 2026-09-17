@@ -156,6 +156,7 @@ Tracked deliberately rather than hidden. Each one has a PR where it closes.
 | `DataSourceGuard` can throw on a sort entry with no selector (`sort=[{"desc":true}]`), producing 500 where the guard intends 400 | PR 7 |
 | Grouped paging stability is untested; the group theory never combines with skip/take | PR 7 |
 | `DataSourceGuard` has no unit tests; its constructor invariant is unprotected | PR 7 |
+| `.gitattributes` declares `* text=auto eol=lf` and CLAUDE.md forbids committing CRLF, but every file at HEAD is CRLF, `.gitattributes` itself included — nothing has ever been renormalized. `dotnet format --verify-no-changes` passes on CRLF files, so the CI check this file credits with enforcing LF does not check line endings at all. The rule is written and unenforced. Pre-existing and repo-wide; not introduced by PR 6a | its own chore — `git add --renormalize .` plus a check that actually fails on CRLF. Deliberately not folded into an auth PR, where it would touch every file and drown the diff |
 
 ## How the work is run
 
