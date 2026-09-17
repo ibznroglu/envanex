@@ -18,7 +18,11 @@ public class EnvanexDbContext : DbContext
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         ArgumentNullException.ThrowIfNull(modelBuilder);
-        modelBuilder.ApplyConfigurationsFromAssembly(typeof(EnvanexDbContext).Assembly);
+        // Restricted to this namespace on purpose: the Identity context's configurations live in
+        // the same assembly, and an unfiltered scan would map them into dbo as well.
+        modelBuilder.ApplyConfigurationsFromAssembly(
+            typeof(EnvanexDbContext).Assembly,
+            type => type.Namespace == "Envanex.Infrastructure.Persistence.Configurations");
     }
 
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder)

@@ -44,16 +44,71 @@ public class ArchitectureTests
     [Fact]
     public void Application_ShouldNotReference_EntityFrameworkPackages()
     {
-        var solutionDir = FindSolutionDirectory();
-        var csprojPath = Path.Combine(solutionDir, "src", "Envanex.Application", "Envanex.Application.csproj");
-        var csprojContent = File.ReadAllText(csprojPath);
+        var csprojContent = ReadCsproj("Envanex.Application");
 
-        var efPackageReferences = System.Text.RegularExpressions.Regex
-            .Matches(csprojContent, @"<PackageReference\s+Include=""([^""]*Microsoft\.EntityFrameworkCore[^""]*)""")
-            .Select(m => m.Groups[1].Value)
-            .ToArray();
+        var efPackageReferences = MatchPackageReferences(csprojContent, @"Microsoft\.EntityFrameworkCore");
 
         efPackageReferences.ShouldBeEmpty();
+    }
+
+    [Theory]
+    [InlineData(@"Microsoft\.AspNetCore\.Identity")]
+    [InlineData(@"Microsoft\.AspNetCore\.Authentication")]
+    [InlineData(@"Microsoft\.IdentityModel")]
+    [InlineData(@"System\.IdentityModel")]
+    public void Application_ShouldNotReference_AuthenticationPackages(string packageNamePattern)
+    {
+        // The EntityFrameworkCore regex matches neither Microsoft.AspNetCore.Identity.EntityFrameworkCore
+        // nor Microsoft.AspNetCore.Authentication.JwtBearer, so auth packages need their own patterns.
+        var csprojContent = ReadCsproj("Envanex.Application");
+
+        var authPackageReferences = MatchPackageReferences(csprojContent, packageNamePattern);
+
+        authPackageReferences.ShouldBeEmpty();
+    }
+
+    [Fact]
+    public void ForbiddenPackageMatcher_ShouldMatch_RealAuthPackageNames()
+    {
+        // Without this, a broken matcher passes Application_ShouldNotReference_AuthenticationPackages
+        // by matching nothing at all.
+        const string SyntheticCsproj = """
+            <Project Sdk="Microsoft.NET.Sdk">
+              <ItemGroup>
+                <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
+                <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" />
+              </ItemGroup>
+            </Project>
+            """;
+
+        var identityMatches = MatchPackageReferences(SyntheticCsproj, @"Microsoft\.AspNetCore\.Identity");
+        var authenticationMatches = MatchPackageReferences(SyntheticCsproj, @"Microsoft\.AspNetCore\.Authentication");
+
+        identityMatches.ShouldBe(["Microsoft.AspNetCore.Identity.EntityFrameworkCore"]);
+        authenticationMatches.ShouldBe(["Microsoft.AspNetCore.Authentication.JwtBearer"]);
+    }
+
+    [Fact]
+    public void Infrastructure_ShouldReference_IdentityEntityFrameworkCore()
+    {
+        var csprojContent = ReadCsproj("Envanex.Infrastructure");
+
+        var matches = MatchPackageReferences(csprojContent, @"Microsoft\.AspNetCore\.Identity\.EntityFrameworkCore");
+
+        matches.ShouldBe(["Microsoft.AspNetCore.Identity.EntityFrameworkCore"]);
+    }
+
+    [Fact]
+    public void Web_ShouldReference_JwtBearerPackage()
+    {
+        // The JWT bearer scheme is validated in the host only. Keeping the package out of
+        // Application and Infrastructure is what keeps Infrastructure free of a
+        // Microsoft.AspNetCore.App framework reference.
+        var csprojContent = ReadCsproj("Envanex.Web");
+
+        var matches = MatchPackageReferences(csprojContent, @"Microsoft\.AspNetCore\.Authentication\.JwtBearer");
+
+        matches.ShouldBe(["Microsoft.AspNetCore.Authentication.JwtBearer"]);
     }
 
     [Fact]
@@ -90,6 +145,27 @@ public class ArchitectureTests
             "Positional records produce NewExpression which EF Core DataSourceLoader " +
             "cannot translate OrderBy over — query falls back to client evaluation. " +
             $"Violating files: {string.Join(", ", violatingFiles)}");
+    }
+
+    /// <summary>
+    /// The single package-name matcher. Extracted so the negative control
+    /// (<see cref="ForbiddenPackageMatcher_ShouldMatch_RealAuthPackageNames"/>) runs the same
+    /// regex the package rules run, rather than a copy of it.
+    /// </summary>
+    private static string[] MatchPackageReferences(string csprojContent, string packageNamePattern)
+    {
+        return System.Text.RegularExpressions.Regex
+            .Matches(csprojContent, $@"<PackageReference\s+Include=""([^""]*{packageNamePattern}[^""]*)""")
+            .Select(m => m.Groups[1].Value)
+            .ToArray();
+    }
+
+    private static string ReadCsproj(string projectName)
+    {
+        var solutionDir = FindSolutionDirectory();
+        var csprojPath = Path.Combine(solutionDir, "src", projectName, $"{projectName}.csproj");
+
+        return File.ReadAllText(csprojPath);
     }
 
     /// <summary>

@@ -17,6 +17,19 @@
     <PackageVersion Include="Microsoft.EntityFrameworkCore.Design" Version="10.0.11" />
     <PackageVersion Include="Microsoft.EntityFrameworkCore.SqlServer" Version="10.0.11" />
 
+    <!-- Identity / Auth -->
+    <PackageVersion Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.11" />
+    <PackageVersion Include="Microsoft.Extensions.Configuration.Binder" Version="10.0.11" />
+    <!-- Version read from the resolved graph of Envanex.Web (dotnet list package, transitive
+         included), not guessed: pinning lower than the version JwtBearer 10.0.11 resolves
+         produces NU1605. -->
+    <PackageVersion Include="Microsoft.IdentityModel.JsonWebTokens" Version="8.19.2" />
+    <!-- Ships from dotnet/extensions on its own version line, so it carries no NU1605 risk
+         against the ASP.NET Core 10.0.x family. -->
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="10.10.0" />
+
     <!-- SoapApi -->
     <PackageVersion Include="SoapCore" Version="1.2.1.14" />
 

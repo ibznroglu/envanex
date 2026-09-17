@@ -33,7 +33,13 @@ indent_size = 4
 dotnet_diagnostic.CA1716.severity = none
 
 # EF Core migrations: generated code, suppress null-check warnings
-[src/Envanex.Infrastructure/Migrations/*.cs]
+[src/Envanex.Infrastructure/Migrations/**.cs]
+dotnet_diagnostic.CA1062.severity = none
+
+# Redundant for the Roslyn build, load-bearing for the IDE: Rider's inspection engine does
+# not match the `**` glob above, so it still reports CA1062 here without this section.
+# Do not delete as redundant.
+[src/Envanex.Infrastructure/Migrations/Identity/*.cs]
 dotnet_diagnostic.CA1062.severity = none
 
 # Test projects: allow underscores in method names (standard test naming convention)
