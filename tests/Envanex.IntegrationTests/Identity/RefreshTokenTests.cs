@@ -146,6 +146,41 @@ public sealed class RefreshTokenTests
     }
 
     [Fact]
+    public void MarkRotated_OnAnAlreadyRotatedToken_ShouldThrowRatherThanReassignTheSuccessor()
+    {
+        // One row is consumed by exactly one successor. A second stamp would silently re-point
+        // ReplacedByTokenId at another child and cut the chain a replay is traced along, so the
+        // caller's bug is raised here instead of being persisted.
+        var token = CreateRoot();
+        var firstSuccessorId = Guid.NewGuid();
+        token.MarkRotated(Now.AddMinutes(5), firstSuccessorId);
+
+        Should.Throw<InvalidOperationException>(
+            () => token.MarkRotated(Now.AddMinutes(6), Guid.NewGuid()));
+
+        token.RotatedAt.ShouldBe(Now.AddMinutes(5));
+        token.ReplacedByTokenId.ShouldBe(firstSuccessorId);
+    }
+
+    [Fact]
+    public void Revoke_OnAnAlreadyRevokedToken_ShouldThrowRatherThanOverwriteTheFirstReason()
+    {
+        // Rotating and then revoking is the reuse-detection path and must stay legal, so the
+        // arrange does exactly that. What must not happen is the second revocation: it would
+        // re-stamp a row revoked for Reuse as a Logout and erase the only signal reuse detection
+        // produces.
+        var token = CreateRoot();
+        token.MarkRotated(Now.AddMinutes(1), Guid.NewGuid());
+        token.Revoke(Now.AddMinutes(5), RefreshTokenRevocationReason.Reuse);
+
+        Should.Throw<InvalidOperationException>(
+            () => token.Revoke(Now.AddMinutes(6), RefreshTokenRevocationReason.Logout));
+
+        token.RevokedAt.ShouldBe(Now.AddMinutes(5));
+        token.RevokedReason.ShouldBe("Reuse");
+    }
+
+    [Fact]
     public void Revoke_ShouldStoreTheReasonByName()
     {
         // The column is a name, not an ordinal: a row read directly in the database has to explain

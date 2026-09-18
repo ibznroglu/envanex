@@ -94,14 +94,48 @@ internal sealed class RefreshToken
         };
     }
 
+    /// <summary>
+    /// Stamps this row as consumed by <paramref name="replacedByTokenId"/>. Rotating twice is a
+    /// caller bug, not a business rule violation, so it throws: a second stamp would reassign
+    /// <see cref="ReplacedByTokenId"/> and break the family chain a replay is traced along.
+    /// </summary>
+    /// <remarks>
+    /// Independent of <see cref="Revoke"/>: a revoked row may still be stamped rotated, because
+    /// this guard reads only <see cref="RotatedAt"/>.
+    /// </remarks>
     public void MarkRotated(DateTimeOffset now, Guid replacedByTokenId)
     {
+        if (RotatedAt is not null)
+        {
+            throw new InvalidOperationException(
+                "This refresh token has already been rotated. " +
+                "Rotating it again would reassign ReplacedByTokenId and break the family chain.");
+        }
+
         RotatedAt = now;
         ReplacedByTokenId = replacedByTokenId;
     }
 
+    /// <summary>
+    /// Stamps this row revoked. Revoking twice is a caller bug, not a business rule violation, so
+    /// it throws: a second stamp would overwrite <see cref="RevokedAt"/> and
+    /// <see cref="RevokedReason"/>, letting a row revoked for <c>Reuse</c> be re-stamped
+    /// <c>Logout</c> — the only signal reuse detection produces.
+    /// </summary>
+    /// <remarks>
+    /// Independent of <see cref="MarkRotated"/>: revoking a rotated row is the normal path, since
+    /// reuse detection revokes rows that already carry <see cref="RotatedAt"/>.
+    /// </remarks>
     public void Revoke(DateTimeOffset now, RefreshTokenRevocationReason reason)
     {
+        if (RevokedAt is not null)
+        {
+            throw new InvalidOperationException(
+                "This refresh token has already been revoked. " +
+                "Revoking it again would overwrite RevokedAt and RevokedReason, so a row revoked " +
+                "for reuse could be re-stamped as a logout.");
+        }
+
         RevokedAt = now;
         RevokedReason = reason.ToString();
     }
