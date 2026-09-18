@@ -18,6 +18,20 @@ public static class ResultExtensions
         // 400 Bad Request - ValidationError
         ["Validation.Failed"] = StatusCodes.Status400BadRequest,
 
+        // 401 Unauthorized - Authentication
+        // All four answer the same thing to the caller: try again or log in again. A locked-out
+        // account is deliberately absent; it shares Auth.InvalidCredentials.
+        ["Auth.InvalidCredentials"] = StatusCodes.Status401Unauthorized,
+        ["Auth.InvalidRefreshToken"] = StatusCodes.Status401Unauthorized,
+        ["Auth.RefreshTokenExpired"] = StatusCodes.Status401Unauthorized,
+        ["Auth.RefreshTokenReused"] = StatusCodes.Status401Unauthorized,
+
+        // 400 Bad Request - Authentication validators
+        ["Auth.EmailRequired"] = StatusCodes.Status400BadRequest,
+        ["Auth.EmailInvalid"] = StatusCodes.Status400BadRequest,
+        ["Auth.PasswordRequired"] = StatusCodes.Status400BadRequest,
+        ["Auth.RefreshTokenRequired"] = StatusCodes.Status400BadRequest,
+
         // 404 Not Found
         ["Product.NotFound"] = StatusCodes.Status404NotFound,
         ["UnitOfMeasure.NotFound"] = StatusCodes.Status404NotFound,
@@ -158,6 +172,7 @@ public static class ResultExtensions
     private static string GetReasonPhrase(int statusCode) => statusCode switch
     {
         StatusCodes.Status400BadRequest => "Bad Request",
+        StatusCodes.Status401Unauthorized => "Unauthorized",
         StatusCodes.Status404NotFound => "Not Found",
         StatusCodes.Status409Conflict => "Conflict",
         StatusCodes.Status422UnprocessableEntity => "Unprocessable Entity",

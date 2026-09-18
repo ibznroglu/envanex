@@ -9,6 +9,19 @@ public static class TurkishErrorMessages
         // Validation
         ["Validation.Failed"] = "Bir veya daha fazla do\u011frulama hatas\u0131 olu\u015ftu.",
 
+        // Authentication
+        // The InvalidCredentials message is what a wrong password, an unknown e-mail address and
+        // a locked-out account all see. The aorist "kilitlenir" states the policy; "kilitlendi"
+        // would confirm this account's state and is what the tests forbid.
+        ["Auth.InvalidCredentials"] = "E-posta veya parola hatalı. Arka arkaya birkaç başarısız denemeden sonra hesap bir süreliğine kilitlenir.",
+        ["Auth.InvalidRefreshToken"] = "Oturum bilgisi geçersiz. Lütfen tekrar giriş yapın.",
+        ["Auth.RefreshTokenExpired"] = "Oturum süresi doldu. Lütfen tekrar giriş yapın.",
+        ["Auth.RefreshTokenReused"] = "Oturum güvenlik nedeniyle sonlandırıldı. Lütfen tekrar giriş yapın.",
+        ["Auth.EmailRequired"] = "E-posta adresi zorunludur.",
+        ["Auth.EmailInvalid"] = "Geçerli bir e-posta adresi giriniz.",
+        ["Auth.PasswordRequired"] = "Parola zorunludur.",
+        ["Auth.RefreshTokenRequired"] = "Yenileme anahtarı zorunludur.",
+
         // Product - domain
         ["Product.CodeRequired"] = "\u00dcr\u00fcn kodu zorunludur.",
         ["Product.NameRequired"] = "\u00dcr\u00fcn ad\u0131 zorunludur.",

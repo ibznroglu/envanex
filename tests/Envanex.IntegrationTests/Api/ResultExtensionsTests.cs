@@ -1,3 +1,5 @@
+using System.Reflection;
+using Envanex.Application.Authentication;
 using Envanex.Domain.Common;
 using Envanex.Web.Extensions;
 using Microsoft.AspNetCore.Mvc;
@@ -7,6 +9,28 @@ namespace Envanex.IntegrationTests.Api;
 
 public sealed class ResultExtensionsTests
 {
+    /// <summary>
+    /// Every error code declared by <see cref="AuthErrors"/>, discovered by reflection so a new
+    /// code is covered the moment it is added.
+    /// </summary>
+    public static TheoryData<string> AuthErrorCodes
+    {
+        get
+        {
+            var data = new TheoryData<string>();
+
+            foreach (var code in typeof(AuthErrors)
+                .GetFields(BindingFlags.Public | BindingFlags.Static)
+                .Where(f => f.IsInitOnly && f.FieldType == typeof(Error))
+                .Select(f => ((Error)f.GetValue(null)!).Code))
+            {
+                data.Add(code);
+            }
+
+            return data;
+        }
+    }
+
     [Fact]
     public void UnmappedErrorCode_ShouldFallBackTo400NotServerError()
     {
@@ -49,5 +73,72 @@ public sealed class ResultExtensionsTests
 
         // Should use the generic Turkish fallback, NOT the raw error code
         problemDetails.Errors["SomeField"].ShouldContain("Bu alan ge\u00e7ersiz.");
+    }
+
+    [Fact]
+    public void ToActionResult_AuthInvalidCredentials_ShouldReturn401WithTurkishDetail()
+    {
+        var failedResult = Result.Failure<Guid>(AuthErrors.InvalidCredentials);
+
+        var actionResult = failedResult.ToActionResult();
+
+        var objectResult = actionResult.ShouldBeOfType<ObjectResult>();
+        objectResult.StatusCode.ShouldBe(401);
+
+        var problemDetails = objectResult.Value.ShouldBeOfType<ProblemDetails>();
+        problemDetails.Status.ShouldBe(401);
+        problemDetails.Detail.ShouldBe(
+            TurkishErrorMessages.GetMessage(AuthErrors.InvalidCredentials.Code, "fallback"));
+        problemDetails.Detail.ShouldNotBe(
+            AuthErrors.InvalidCredentials.Message,
+            "The English Error.Message leaked instead of the Turkish translation.");
+    }
+
+    [Fact]
+    public void ToActionResult_AuthRefreshTokenReused_ShouldReturn401WithTurkishDetail()
+    {
+        var failedResult = Result.Failure<Guid>(AuthErrors.RefreshTokenReused);
+
+        var actionResult = failedResult.ToActionResult();
+
+        var objectResult = actionResult.ShouldBeOfType<ObjectResult>();
+        objectResult.StatusCode.ShouldBe(401);
+
+        var problemDetails = objectResult.Value.ShouldBeOfType<ProblemDetails>();
+        problemDetails.Status.ShouldBe(401);
+        problemDetails.Detail.ShouldBe(
+            TurkishErrorMessages.GetMessage(AuthErrors.RefreshTokenReused.Code, "fallback"));
+        problemDetails.Detail.ShouldNotBe(
+            AuthErrors.RefreshTokenReused.Message,
+            "The English Error.Message leaked instead of the Turkish translation.");
+    }
+
+    [Fact]
+    public void ToActionResult_Status401_ShouldHaveTitleUnauthorized()
+    {
+        var failedResult = Result.Failure<Guid>(AuthErrors.InvalidRefreshToken);
+
+        var actionResult = failedResult.ToActionResult();
+
+        var objectResult = actionResult.ShouldBeOfType<ObjectResult>();
+        var problemDetails = objectResult.Value.ShouldBeOfType<ProblemDetails>();
+
+        // Without the 401 arm in GetReasonPhrase the title would read "Error".
+        problemDetails.Title.ShouldBe("Unauthorized");
+    }
+
+    [Theory]
+    [MemberData(nameof(AuthErrorCodes))]
+    public void ToActionResult_EveryAuthErrorCode_ShouldMapTo400Or401(string errorCode)
+    {
+        var failedResult = Result.Failure<Guid>(new Error(errorCode, "English fallback message."));
+
+        var actionResult = failedResult.ToActionResult();
+
+        var objectResult = actionResult.ShouldBeOfType<ObjectResult>();
+
+        // 403 would tell the caller the credentials were understood but refused, which is exactly
+        // the distinction login must never make. No auth code maps to 403 in this PR.
+        objectResult.StatusCode.ShouldNotBeNull().ShouldBeOneOf(400, 401);
     }
 }
