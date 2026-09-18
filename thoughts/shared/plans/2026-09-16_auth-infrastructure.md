@@ -288,6 +288,8 @@ internal static class IdentityRowSeeder
 
 **Why this does not weaken research decision 6.** That decision exists so login tests exercise real password hashing and Identity's normalized columns — not to forbid a row that satisfies a foreign key. Phase 2's tests never authenticate; they assert index shape, column types and FK behaviour. The seeded row has no password hash, so it cannot be authenticated against and cannot hide a hashing defect. Everything from Phase 4 on uses `IdentitySeeder.CreateUserAsync` through `UserManager`. The exception is bounded by a test, not by a comment.
 
+**Carried forward from the Phase 1 re-review (db-reviewer, `d71f4f9`).** `auth.AspNetUsers.EmailIndex` is now a *unique* filtered index on `NormalizedEmail`, so `InsertBareUserRowAsync` — which bypasses `UserValidator` and writes `NormalizedEmail` directly — is the one path in the suite that can hit SQL Server error 2601 on a duplicate email. As specified this is safe: per-test `ResetIdentityAsync` (see "Tests to add") clears the table between tests. It becomes a hard `SqlException` if two calls in one test pass the same email, or if a caller skips the reset. Generating a unique email per call would make it safe unconditionally; that is a choice for whoever writes this phase, not a requirement recorded here.
+
 ### EF configuration — exact
 
 - `builder.ToTable("RefreshTokens", AuthSchema.Name)`
@@ -634,6 +636,8 @@ internal sealed class CountingUserManager : UserManager<EnvanexUser>
     public override Task<IdentityResult> ResetAccessFailedCountAsync(EnvanexUser user);
 }
 ```
+
+**Carried forward from the Phase 1 re-review (db-reviewer, `d71f4f9`).** `IdentitySeeder.CreateUserAsync` must check the `IdentityResult` that `UserManager.CreateAsync` returns and throw on failure. With `RequireUniqueEmail = true` and the now-unique `EmailIndex`, a duplicate email comes back as a failed `IdentityResult` with `DuplicateEmail` rather than as an exception. A seeder that discards the result creates no user and reports success, and the test that follows fails somewhere else with a confusing "user not found".
 
 `CountingUserManager` forwards the full `UserManager<TUser>` constructor list (`IUserStore<EnvanexUser>`, `IOptions<IdentityOptions>`, `IPasswordHasher<EnvanexUser>`, `IEnumerable<IUserValidator<EnvanexUser>>`, `IEnumerable<IPasswordValidator<EnvanexUser>>`, `ILookupNormalizer`, `IdentityErrorDescriber`, `IServiceProvider`, `ILogger<UserManager<EnvanexUser>>`) to `base`; each override records its name in `CallLog`, increments its counter, and delegates. Registered after `AddEnvanexIdentity` with `services.AddScoped<UserManager<EnvanexUser>, CountingUserManager>()`. `CountingUserManager` is test-only and is never referenced by production code — no seam is added to `src/` for any test in this plan.
 

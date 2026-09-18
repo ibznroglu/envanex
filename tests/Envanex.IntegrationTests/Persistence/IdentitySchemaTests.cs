@@ -72,22 +72,41 @@ public sealed class IdentitySchemaTests
     }
 
     [Fact]
-    public async Task EmailIndex_ShouldBeUnique()
+    public async Task EmailIndex_ShouldBeUniqueFilteredAndOnNormalizedEmail()
     {
         // Identity declares EmailIndex non-unique by default, so RequireUniqueEmail would be a
         // read-then-insert check with nothing behind it. Read sys.indexes rather than trust the
         // model: the constraint that matters is the one in the database.
-        var isUnique = await QueryStringsAsync(
+        //
+        // is_unique alone is not enough. Losing the filter narrows the schema from "any number of
+        // NULL-email users" to "at most one", and moving the index to another column removes the
+        // constraint entirely -- both leave is_unique = 1. Pin the filter and the key column too,
+        // or the regression surfaces much later as error 2601 far from its cause.
+        var index = await QueryStringsAsync(
             """
-            SELECT CAST(i.is_unique AS varchar(1))
+            SELECT CONCAT(
+                'unique=', CAST(i.is_unique AS varchar(1)),
+                ' filtered=', CAST(i.has_filter AS varchar(1)),
+                ' filter=', ISNULL(i.filter_definition, '(none)'),
+                ' column=', c.name)
             FROM sys.indexes AS i
             INNER JOIN sys.tables AS t ON t.object_id = i.object_id
             INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+            INNER JOIN sys.index_columns AS ic
+                ON ic.object_id = i.object_id AND ic.index_id = i.index_id AND ic.is_included_column = 0
+            INNER JOIN sys.columns AS c ON c.object_id = ic.object_id AND c.column_id = ic.column_id
             WHERE s.name = 'auth' AND t.name = 'AspNetUsers' AND i.name = @p0
+            ORDER BY ic.key_ordinal
             """,
             "EmailIndex");
 
-        isUnique.ShouldBe(["1"]);
+        // One row, so a second key column would fail here too.
+        index.ShouldBe(
+            ["unique=1 filtered=1 filter=([NormalizedEmail] IS NOT NULL) column=NormalizedEmail"],
+            $"auth.AspNetUsers.EmailIndex reports: {(index.Count == 0 ? "(no such index)" : string.Join(" | ", index))}. " +
+            "An empty result means the index is missing or was renamed; a differing line means it is " +
+            "non-unique, unfiltered, or moved to another column. Each of those drops the database " +
+            "constraint behind RequireUniqueEmail.");
     }
 
     [Fact]
