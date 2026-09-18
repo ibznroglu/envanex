@@ -58,6 +58,24 @@ public sealed class RefreshTokenSchemaTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task RefreshTokens_RevokedReason_ShouldBeNvarchar32()
+    {
+        // HasMaxLength(32) is the only thing standing between this column and nvarchar(max):
+        // dropping it changes no behaviour any other test can see, because the three reason names
+        // fit either way. CHARACTER_MAXIMUM_LENGTH is -1 for nvarchar(max), so that drift shows
+        // up here as "nvarchar(-1)".
+        var column = await QueryStringsAsync(
+            """
+            SELECT CONCAT(DATA_TYPE, '(', CHARACTER_MAXIMUM_LENGTH, ')')
+            FROM INFORMATION_SCHEMA.COLUMNS
+            WHERE TABLE_SCHEMA = 'auth' AND TABLE_NAME = 'RefreshTokens'
+              AND COLUMN_NAME = 'RevokedReason'
+            """);
+
+        column.ShouldBe(["nvarchar(32)"]);
+    }
+
+    [Fact]
     public async Task RefreshTokens_TokenHashIndex_ShouldBeUnique()
     {
         var index = await QueryIndexAsync("IX_RefreshTokens_TokenHash");
@@ -70,13 +88,14 @@ public sealed class RefreshTokenSchemaTests : IAsyncLifetime
     {
         // This index is half of the family lock. Losing IsUnique turns "at most one live token per
         // family" into a comment, and losing the filter makes every rotation a violation.
+        //
+        // The predicate is pinned as the exact string SQL Server normalised it to, not by naming
+        // the two columns: a drift from AND to OR, or from IS NULL to IS NOT NULL, keeps both
+        // column names and changes which rows the lock covers.
         var index = await QueryIndexAsync("IX_RefreshTokens_FamilyId_Live");
 
-        index.Count.ShouldBe(1, "IX_RefreshTokens_FamilyId_Live is missing, renamed, or has a second key column.");
-        index[0].ShouldStartWith("unique=1 filtered=1 ");
-        index[0].ShouldEndWith("column=FamilyId");
-        index[0].ShouldContain("RotatedAt");
-        index[0].ShouldContain("RevokedAt");
+        index.ShouldBe(
+            ["unique=1 filtered=1 filter=([RotatedAt] IS NULL AND [RevokedAt] IS NULL) column=FamilyId"]);
     }
 
     [Fact]

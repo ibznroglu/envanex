@@ -126,8 +126,23 @@ internal sealed class RefreshToken
     /// Independent of <see cref="MarkRotated"/>: revoking a rotated row is the normal path, since
     /// reuse detection revokes rows that already carry <see cref="RotatedAt"/>.
     /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="reason"/> is not a defined member of the enum. An undefined value is a
+    /// caller bug, not a business rule violation: <c>ToString()</c> on it yields the number, so
+    /// the column meant to explain why a session ended would persist "99".
+    /// </exception>
     public void Revoke(DateTimeOffset now, RefreshTokenRevocationReason reason)
     {
+        if (!Enum.IsDefined(reason))
+        {
+            throw new ArgumentOutOfRangeException(
+                nameof(reason),
+                reason,
+                "The revocation reason is not a defined RefreshTokenRevocationReason. " +
+                "RevokedReason is the only forensic signal reuse detection produces, so storing " +
+                "the numeric form of an undefined value would make that signal unreadable.");
+        }
+
         if (RevokedAt is not null)
         {
             throw new InvalidOperationException(

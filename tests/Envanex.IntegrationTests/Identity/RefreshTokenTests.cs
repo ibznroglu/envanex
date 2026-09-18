@@ -181,6 +181,33 @@ public sealed class RefreshTokenTests
     }
 
     [Fact]
+    public void Revoke_WithAnUndefinedReason_ShouldThrowRatherThanStampANumber()
+    {
+        // The enum is not a range check: a cast of any int compiles, and the reason is persisted
+        // through ToString(), so an undefined value would land in the column as "99". Nothing
+        // downstream can tell that apart from a reason that was removed later, so the caller's
+        // bug is raised here instead of being written to the only forensic column the table has.
+        var token = CreateRoot();
+
+        Should.Throw<ArgumentOutOfRangeException>(
+            () => token.Revoke(Now.AddMinutes(1), (RefreshTokenRevocationReason)99));
+
+        token.RevokedAt.ShouldBeNull();
+        token.RevokedReason.ShouldBeNull();
+    }
+
+    [Fact]
+    public void RefreshTokenRevocationReason_ShouldDeclareExactlyTheThreePinnedNames()
+    {
+        // The member names are the stored values, so a rename is a data migration disguised as a
+        // refactor: historic rows keep the old spelling while new rows get the new one, and every
+        // other test stays green because they all round-trip whatever the member is called.
+        // Order is ignored on purpose -- ordinals are never persisted, so reordering is harmless.
+        Enum.GetNames<RefreshTokenRevocationReason>()
+            .ShouldBe(["Logout", "Reuse", "Expired"], ignoreOrder: true);
+    }
+
+    [Fact]
     public void Revoke_ShouldStoreTheReasonByName()
     {
         // The column is a name, not an ordinal: a row read directly in the database has to explain
