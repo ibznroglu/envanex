@@ -95,7 +95,13 @@ public sealed class RefreshTokenSchemaTests : IAsyncLifetime
         var index = await QueryIndexAsync("IX_RefreshTokens_FamilyId_Live");
 
         index.ShouldBe(
-            ["unique=1 filtered=1 filter=([RotatedAt] IS NULL AND [RevokedAt] IS NULL) column=FamilyId"]);
+            ["unique=1 filtered=1 filter=([RotatedAt] IS NULL AND [RevokedAt] IS NULL) column=FamilyId"],
+            $"auth.RefreshTokens.IX_RefreshTokens_FamilyId_Live reports: " +
+            $"{(index.Count == 0 ? "(no such index)" : string.Join(" | ", index))}. " +
+            "An empty result means the index is missing or was renamed; a differing line means it " +
+            "is non-unique, its filter changed or was inverted, or it moved to another key column. " +
+            "Each of those drops the database-level \"at most one live token per family\" invariant " +
+            "that reuse detection rests on.");
     }
 
     [Fact]
