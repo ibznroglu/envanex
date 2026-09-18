@@ -12,7 +12,7 @@ using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 namespace Envanex.Infrastructure.Migrations.Identity
 {
     [DbContext(typeof(EnvanexIdentityDbContext))]
-    [Migration("20260917185740_InitialIdentitySchema")]
+    [Migration("20260918181955_InitialIdentitySchema")]
     partial class InitialIdentitySchema
     {
         /// <inheritdoc />
@@ -82,7 +82,9 @@ namespace Envanex.Infrastructure.Migrations.Identity
                     b.HasKey("Id");
 
                     b.HasIndex("NormalizedEmail")
-                        .HasDatabaseName("EmailIndex");
+                        .IsUnique()
+                        .HasDatabaseName("EmailIndex")
+                        .HasFilter("[NormalizedEmail] IS NOT NULL");
 
                     b.HasIndex("NormalizedUserName")
                         .IsUnique()

@@ -36,9 +36,9 @@ dotnet_diagnostic.CA1716.severity = none
 [src/Envanex.Infrastructure/Migrations/**.cs]
 dotnet_diagnostic.CA1062.severity = none
 
-# Redundant for the Roslyn build, load-bearing for the IDE: Rider's inspection engine does
-# not match the `**` glob above, so it still reports CA1062 here without this section.
-# Do not delete as redundant.
+# Duplicate of the section above, kept on purpose: the single-star form is matched consistently
+# by every engine, while the `**` form was observed not to be. Redundant for the Roslyn build
+# and kept for IDE consistency. Do not delete as redundant.
 [src/Envanex.Infrastructure/Migrations/Identity/*.cs]
 dotnet_diagnostic.CA1062.severity = none
 

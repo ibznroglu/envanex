@@ -1,7 +1,8 @@
+using System.Reflection;
 using Envanex.Domain.Aggregates.Products;
 using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.Domain.Aggregates.Warehouses;
-using Envanex.Infrastructure.Persistence.Constants;
+using Envanex.Infrastructure.Identity;
 using Envanex.IntegrationTests.Fixtures;
 using Shouldly;
 
@@ -15,15 +16,30 @@ public sealed class DbContextIsolationTests
     public DbContextIsolationTests(SqlServerFixture fixture) => _fixture = fixture;
 
     [Fact]
-    public void EnvanexDbContext_ShouldStillMapProductUnitOfMeasureAndWarehouse()
+    public void EnvanexDbContext_ShouldStillApplyProductUnitOfMeasureAndWarehouseConfigurations()
     {
-        // Negative control on the namespace predicate in ApplyConfigurationsFromAssembly:
-        // an over-narrow filter would silently unmap the business model instead of failing.
+        // Negative control on the namespace predicate in ApplyConfigurationsFromAssembly.
+        // Asserting that the three entity types are found would prove nothing about the
+        // predicate: EF discovers them from the DbSet<T> properties whatever the predicate
+        // returns. The max lengths and the unique index below come from the three
+        // IEntityTypeConfiguration classes and from nowhere else, so an over-narrow filter
+        // takes them with it.
         using var context = _fixture.CreateDbContext();
 
-        context.Model.FindEntityType(typeof(Product)).ShouldNotBeNull();
-        context.Model.FindEntityType(typeof(UnitOfMeasure)).ShouldNotBeNull();
-        context.Model.FindEntityType(typeof(Warehouse)).ShouldNotBeNull();
+        context.Model.FindEntityType(typeof(Product))!
+            .FindProperty(nameof(Product.Code))!.GetMaxLength().ShouldBe(50);
+        context.Model.FindEntityType(typeof(UnitOfMeasure))!
+            .FindProperty(nameof(UnitOfMeasure.Code))!.GetMaxLength().ShouldBe(20);
+        context.Model.FindEntityType(typeof(Warehouse))!
+            .FindProperty(nameof(Warehouse.Code))!.GetMaxLength().ShouldBe(20);
+
+        var warehouseCodeIndex = context.Model.FindEntityType(typeof(Warehouse))!
+            .GetIndexes()
+            .SingleOrDefault(index =>
+                index.Properties.Count == 1 && index.Properties[0].Name == nameof(Warehouse.Code));
+
+        warehouseCodeIndex.ShouldNotBeNull();
+        warehouseCodeIndex.IsUnique.ShouldBeTrue();
     }
 
     [Fact]
@@ -37,18 +53,19 @@ public sealed class DbContextIsolationTests
     }
 
     [Fact]
-    public void EnvanexIdentityDbContext_ShouldNotDeclareRowVersionShadowProperty()
+    public void EnvanexIdentityDbContext_ShouldNotOverrideConfigureConventions()
     {
-        // AggregateRootConvention is registered in EnvanexDbContext.ConfigureConventions only.
-        // This proves it did not follow the Identity context.
-        using var context = _fixture.CreateIdentityDbContext();
+        // AggregateRootConvention and MoneyComplexTypeConvention are registered in
+        // EnvanexDbContext.ConfigureConventions, and the Identity context stays clear of them by
+        // not overriding that method at all. Asserting instead that no Identity entity type
+        // carries a RowVersion shadow property could not regress: AggregateRootConvention only
+        // acts on types inheriting AggregateRoot<>, and no Identity entity does. This is the
+        // assertion the separation actually rests on.
+        var configureConventions = typeof(EnvanexIdentityDbContext).GetMethod(
+            "ConfigureConventions",
+            BindingFlags.Instance | BindingFlags.NonPublic);
 
-        var entityTypesWithRowVersion = context.Model
-            .GetEntityTypes()
-            .Where(e => e.FindProperty(ColumnNames.RowVersion) is not null)
-            .Select(e => e.Name)
-            .ToArray();
-
-        entityTypesWithRowVersion.ShouldBeEmpty();
+        configureConventions.ShouldNotBeNull();
+        configureConventions.DeclaringType.ShouldNotBe(typeof(EnvanexIdentityDbContext));
     }
 }

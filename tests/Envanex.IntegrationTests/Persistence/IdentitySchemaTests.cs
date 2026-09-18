@@ -72,6 +72,25 @@ public sealed class IdentitySchemaTests
     }
 
     [Fact]
+    public async Task EmailIndex_ShouldBeUnique()
+    {
+        // Identity declares EmailIndex non-unique by default, so RequireUniqueEmail would be a
+        // read-then-insert check with nothing behind it. Read sys.indexes rather than trust the
+        // model: the constraint that matters is the one in the database.
+        var isUnique = await QueryStringsAsync(
+            """
+            SELECT CAST(i.is_unique AS varchar(1))
+            FROM sys.indexes AS i
+            INNER JOIN sys.tables AS t ON t.object_id = i.object_id
+            INNER JOIN sys.schemas AS s ON s.schema_id = t.schema_id
+            WHERE s.name = 'auth' AND t.name = 'AspNetUsers' AND i.name = @p0
+            """,
+            "EmailIndex");
+
+        isUnique.ShouldBe(["1"]);
+    }
+
+    [Fact]
     public async Task IdentityMigrationsHistory_ShouldLiveInAuthSchema()
     {
         var schemas = await QueryStringsAsync(

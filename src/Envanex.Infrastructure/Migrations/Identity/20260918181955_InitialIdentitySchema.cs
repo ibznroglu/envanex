@@ -208,7 +208,9 @@ namespace Envanex.Infrastructure.Migrations.Identity
                 name: "EmailIndex",
                 schema: "auth",
                 table: "AspNetUsers",
-                column: "NormalizedEmail");
+                column: "NormalizedEmail",
+                unique: true,
+                filter: "[NormalizedEmail] IS NOT NULL");
 
             migrationBuilder.CreateIndex(
                 name: "UserNameIndex",

@@ -23,5 +23,13 @@ public class EnvanexIdentityDbContext : IdentityDbContext<EnvanexUser, IdentityR
         builder.HasDefaultSchema(AuthSchema.Name);
 
         base.OnModelCreating(builder);
+
+        // Identity declares EmailIndex non-unique, but the options set RequireUniqueEmail, which
+        // is only a read-then-insert check in the application. Email is the credential the login
+        // endpoint looks the user up by, so the uniqueness of that lookup is made a database
+        // constraint here, in the same shape Identity already uses for UserNameIndex.
+        builder.Entity<EnvanexUser>()
+            .HasIndex(user => user.NormalizedEmail)
+            .IsUnique();
     }
 }

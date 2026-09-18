@@ -14,6 +14,7 @@ internal static class IdentityDbContextOptionsExtensions
         string connectionString)
     {
         ArgumentNullException.ThrowIfNull(builder);
+        ArgumentNullException.ThrowIfNull(connectionString);
 
         // Without the explicit history table both contexts read dbo.__EFMigrationsHistory as their
         // own, and the failure is silent until a migration is skipped or re-applied.

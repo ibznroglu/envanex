@@ -141,7 +141,7 @@ ADR.
 
 ## Known gaps
 
-Tracked deliberately rather than hidden. Each one has a PR where it closes.
+Tracked deliberately rather than hidden. Each one names where it closes: a PR, or a chore of its own.
 
 | Gap | Closes in                              |
 |---|----------------------------------------|
