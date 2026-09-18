@@ -40,12 +40,12 @@ public sealed class IdentitySchemaTests
     }
 
     [Fact]
-    public async Task AuthSchema_ShouldContainExactlyTheSevenExpectedIdentityTablesAndNothingElse()
+    public async Task AuthSchema_ShouldContainExactlyTheEightExpectedAuthTablesAndNothingElse()
     {
-        // The per-table theory proves those seven live in auth; it cannot prove there are only
-        // seven. An eighth table (Identity gains one, or a configuration lands in the wrong
-        // context) would leave ResetIdentityAsync's seven deletes incomplete and leak state
-        // between test classes silently.
+        // The per-table theory proves the Identity tables live in auth; it cannot prove there are
+        // only eight. A ninth table (Identity gains one, or a configuration lands in the wrong
+        // context) would leave ResetIdentityAsync's deletes incomplete and leak state between test
+        // classes silently.
         var tables = await QueryStringsAsync(
             """
             SELECT TABLE_NAME
@@ -65,10 +65,12 @@ public sealed class IdentitySchemaTests
                 "AspNetUserRoles",
                 "AspNetUserTokens",
                 "AspNetUsers",
+                "RefreshTokens",
             ],
             ignoreOrder: true,
             $"auth holds: {string.Join(", ", tables)}. Every table here must also be deleted by " +
-            "SqlServerFixture.ResetIdentityAsync, directly or through a cascading foreign key.");
+            "SqlServerFixture.ResetIdentityAsync, directly or through a cascading foreign key. " +
+            "RefreshTokens is the cascade case: deleting auth.AspNetUsers takes it with it.");
     }
 
     [Fact]
@@ -129,7 +131,7 @@ public sealed class IdentitySchemaTests
         var applied = await context.Database.GetAppliedMigrationsAsync();
 
         applied.ShouldNotBeEmpty();
-        applied.ShouldAllBe(m => !m.Contains("Identity", StringComparison.Ordinal));
+        applied.ShouldAllBe(id => !IdentityMigrationIds().Contains(id));
     }
 
     [Fact]
@@ -140,7 +142,7 @@ public sealed class IdentitySchemaTests
         var applied = await context.Database.GetAppliedMigrationsAsync();
 
         applied.ShouldNotBeEmpty();
-        applied.ShouldAllBe(m => m.Contains("Identity", StringComparison.Ordinal));
+        applied.ShouldAllBe(id => !BusinessMigrationIds().Contains(id));
     }
 
     [Fact]
@@ -152,7 +154,26 @@ public sealed class IdentitySchemaTests
         var migrationIds = await QueryStringsAsync("SELECT MigrationId FROM dbo.__EFMigrationsHistory");
 
         migrationIds.ShouldNotBeEmpty();
-        migrationIds.ShouldAllBe(id => !id.Contains("Identity", StringComparison.Ordinal));
+        migrationIds.ShouldAllBe(id => !IdentityMigrationIds().Contains(id));
+    }
+
+    /// <summary>
+    /// The migration ids each context declares, read from the migrations assembly rather than
+    /// matched on a substring of the name. A name-based rule stops guarding the moment a migration
+    /// is called something that does not contain the word — <c>AddRefreshTokens</c>, for instance.
+    /// </summary>
+    private HashSet<string> IdentityMigrationIds()
+    {
+        using var context = _fixture.CreateIdentityDbContext();
+
+        return [.. context.Database.GetMigrations()];
+    }
+
+    private HashSet<string> BusinessMigrationIds()
+    {
+        using var context = _fixture.CreateDbContext();
+
+        return [.. context.Database.GetMigrations()];
     }
 
     private async Task<List<string>> QueryStringsAsync(string sql, string? parameter = null)

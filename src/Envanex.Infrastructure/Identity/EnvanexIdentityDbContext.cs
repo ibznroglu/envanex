@@ -13,6 +13,13 @@ public class EnvanexIdentityDbContext : IdentityDbContext<EnvanexUser, IdentityR
 {
     public EnvanexIdentityDbContext(DbContextOptions<EnvanexIdentityDbContext> options) : base(options) { }
 
+    /// <summary>
+    /// Refresh tokens live here rather than in the business context because they need a foreign
+    /// key to <c>auth.AspNetUsers</c>, which is not expressible across contexts. Internal because
+    /// <see cref="RefreshToken"/> is an infrastructure detail no other layer may name.
+    /// </summary>
+    internal DbSet<RefreshToken> RefreshTokens => Set<RefreshToken>();
+
     protected override void OnModelCreating(ModelBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
@@ -31,5 +38,9 @@ public class EnvanexIdentityDbContext : IdentityDbContext<EnvanexUser, IdentityR
         builder.Entity<EnvanexUser>()
             .HasIndex(user => user.NormalizedEmail)
             .IsUnique();
+
+        // Applied by hand, not by ApplyConfigurationsFromAssembly: this context must stay a
+        // closed set of entity types that cannot grow by someone adding a class to the assembly.
+        builder.ApplyConfiguration(new Configurations.RefreshTokenConfiguration());
     }
 }

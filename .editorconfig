@@ -35,12 +35,15 @@ dotnet_diagnostic.CA1716.severity = none
 # EF Core migrations: generated code, suppress null-check warnings
 [src/Envanex.Infrastructure/Migrations/**.cs]
 dotnet_diagnostic.CA1062.severity = none
+# A composite index makes the generator emit an inline `new[] { "A", "B" }` argument.
+dotnet_diagnostic.CA1861.severity = none
 
 # Duplicate of the section above, kept on purpose: the single-star form is matched consistently
 # by every engine, while the `**` form was observed not to be. Redundant for the Roslyn build
 # and kept for IDE consistency. Do not delete as redundant.
 [src/Envanex.Infrastructure/Migrations/Identity/*.cs]
 dotnet_diagnostic.CA1062.severity = none
+dotnet_diagnostic.CA1861.severity = none
 
 # Test projects: allow underscores in method names (standard test naming convention)
 [tests/**/*.cs]

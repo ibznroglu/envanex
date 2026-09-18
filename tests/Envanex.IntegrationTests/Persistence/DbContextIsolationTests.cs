@@ -4,6 +4,7 @@ using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.Domain.Aggregates.Warehouses;
 using Envanex.Infrastructure.Identity;
 using Envanex.IntegrationTests.Fixtures;
+using Microsoft.EntityFrameworkCore;
 using Shouldly;
 
 namespace Envanex.IntegrationTests.Persistence;
@@ -50,6 +51,31 @@ public sealed class DbContextIsolationTests
         context.Model.FindEntityType(typeof(Product)).ShouldBeNull();
         context.Model.FindEntityType(typeof(UnitOfMeasure)).ShouldBeNull();
         context.Model.FindEntityType(typeof(Warehouse)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void EnvanexDbContext_ShouldNotMapRefreshToken()
+    {
+        // The guard the namespace predicate exists for. RefreshTokenConfiguration is an
+        // IEntityTypeConfiguration<RefreshToken> in the same assembly, and internal configurations
+        // are demonstrably discovered -- ProductConfiguration is internal sealed and Products is
+        // mapped -- so deleting the predicate creates a second dbo.RefreshTokens and turns this red.
+        using var context = _fixture.CreateDbContext();
+
+        context.Model.FindEntityType(typeof(RefreshToken)).ShouldBeNull();
+    }
+
+    [Fact]
+    public void EnvanexIdentityDbContext_ShouldMapRefreshToken()
+    {
+        // Positive control: without it, a mis-namespaced or unregistered configuration that maps
+        // the entity into no context at all would pass the test above.
+        using var context = _fixture.CreateIdentityDbContext();
+
+        var entityType = context.Model.FindEntityType(typeof(RefreshToken));
+
+        entityType.ShouldNotBeNull();
+        entityType.GetSchema().ShouldBe("auth");
     }
 
     [Fact]
