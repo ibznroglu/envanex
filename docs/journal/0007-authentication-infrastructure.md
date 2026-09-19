@@ -4,42 +4,6 @@
 
 Bu PR sisteme kimlik dogrulamayi getirdi: ASP.NET Core Identity kendi `DbContext`'i ve kendi `auth` sematinde, 15 dakikalik JWT access token, ve donduruler (rotated) opak refresh token'lar. `POST /api/auth/login`, `/refresh` ve `/logout` uc noktalari calisiyor. Onceki PR'larda sistemin hicbir yerinde "kullanici" diye bir kavram yoktu; simdi `auth.AspNetUsers` ve `auth.RefreshTokens` tablolari, `IIdentityService` / `IRefreshTokenService` / `IAccessTokenIssuer` soyutlamalari ve bu soyutlamalari kullanan uc command handler var. Bir sey bilerek yapilmadi: hicbir uc nokta hala korumali degil -- `[Authorize]`, yetkilendirme politikalari ve Blazor cookie semasi PR 6b'ye birakildi. Yani bu PR "kim oldugunu dogrulama" isini kurdu, "neye izin verilecegi" isini degil. Test sayisi 299'dan (113 Domain + 79 Application + 107 Integration) 562'ye cikti (120 + 126 + 316); entegrasyon suiti son olcumde 44 saniye surdu.
 
-## Yeni giren teknolojiler
-
-### ASP.NET Core Identity
-
-- **Ne ise yarar:** Kullanici deposu, parola hash'leme, normalize edilmis e-posta sutunlari, hesap kilitleme ve token uretimi gibi isleri hazir veren kutuphane. `UserManager<TUser>` bu islerin API'sidir: `FindByEmailAsync`, `CheckPasswordAsync`, `AccessFailedAsync`. Parolalari kendisi PBKDF2 ile hash'ler; ne algoritmayi ne salt'i elle yonetirsin.
-- **Bu projede nerede:** `src/Envanex.Infrastructure/Identity/` -- `EnvanexUser`, `EnvanexIdentityDbContext`, `AddEnvanexIdentity`. Identity yalnizca burada konusulur; `UserManager` Application veya Web katmanina hic girmez.
-- **Alternatifi neydi:** Kullanici tablosunu ve parola hash'lemeyi elle yazmak -- yanlis yapilmasi kolay, pahaliya patlayan bir is. Ikinci alternatif Auth0 / Entra ID gibi disaridan bir saglayici; proje Azure ucretsiz katmaninda tek deployment olarak yasayacagi icin secilmedi.
-- **Nerede okunur:** https://learn.microsoft.com/en-us/aspnet/core/security/authentication/identity
-
-`AddIdentity` degil `AddIdentityCore` cagriliyor. Fark: `AddIdentity` cookie semalarini ve `SignInManager`'i da kurar, `SignInManager` ise paylasilan framework'te yasar ve bir sinif kutuphanesine `Microsoft.AspNetCore.App` framework referansi eklemeyi zorlar. Giris akisi zaten elle yazildigi icin ona ihtiyac yok.
-
-### JWT ve `Microsoft.AspNetCore.Authentication.JwtBearer`
-
-- **Ne ise yarar:** JWT, icinde talepler (claims) tasiyan ve bir imza ile muhurlenmis bir metin parcasidir: `header.payload.signature`. Sunucu tokeni saklamaz; imzayi dogrulayabildigi icin icindekine guvenir. `JwtBearer` paketi `Authorization: Bearer <token>` basligini okuyup imzayi, issuer'i, audience'i ve son kullanma tarihini dogrular.
-- **Bu projede nerede:** Imzalama `JwtAccessTokenIssuer.cs` (HS256, `sub` / `email` / `jti`), dogrulama `src/Envanex.Web/Extensions/JwtAuthenticationExtensions.cs`. Ikisi de ayni `JwtOptions` bildirimini okur.
-- **Alternatifi neydi:** Sunucuda tutulan oturum kimligi -- her istekte bir veritabani okumasi, ama iptali aninda. JWT'nin bedeli tam da bu: imzali bir token suresi dolana kadar iptal edilemez. Bu yuzden access token 15 dakika yasiyor; iptal edilebilirlik refresh token'a yuklendi.
-- **Nerede okunur:** https://learn.microsoft.com/en-us/aspnet/core/security/authentication/configure-jwt-bearer-authentication
-
-Paket surumleri tahmin edilmedi: Identity ve JwtBearer `10.0.11` (solution'daki diger ASP.NET Core ve EF Core paketleriyle ayni satir), `Microsoft.IdentityModel.JsonWebTokens` ise `dotnet list ... --include-transitive` ciktisindan okunup `8.19.2` olarak pinlendi. Ailenin bolunmesi NU1605 uretir, `TreatWarningsAsErrors` da onu build hatasina cevirir.
-
-### `TimeProvider` ve `FakeTimeProvider`
-
-- **Ne ise yarar:** .NET 8 ile gelen "simdi" soyutlamasi. `DateTimeOffset.UtcNow` yerine `timeProvider.GetUtcNow()` yazarsan testte sahte bir saat verip zamani ileri sarabilirsin. `FakeTimeProvider`'a `Advance(TimeSpan.FromDays(8))` dersin, sekiz gun gecmis olur -- hicbir test uyumaz.
-- **Bu projede nerede:** `IdentityService`, `RefreshTokenService` ve `JwtAccessTokenIssuer` constructor'larinda; kayit `AddEnvanexIdentity` icinde `TryAddSingleton(TimeProvider.System)`.
-- **Alternatifi neydi:** Elle yazilmis bir `IClock` -- .NET 8 oncesinin standardi, ama BCL'de bir tip varken ikinci bir kavram uretmenin anlami yok. Diger alternatif testte `Thread.Sleep`: yavas ve kirilgan.
-- **Nerede okunur:** https://learn.microsoft.com/en-us/dotnet/api/system.timeprovider
-
-Arastirma dosyasinin tespiti: bu PR'dan once `src/` altinda `TimeProvider`, `ISystemClock`, `IClock`, `DateTime.` veya `DateTimeOffset.` gecen tek bir satir yoktu. Yani bu, sistemin "simdi" kavramiyla ilk tanistigi PR.
-
-### Kaynak uretimli loglama (`[LoggerMessage]`)
-
-- **Ne ise yarar:** Log cagrisini elle yazmak yerine partial bir metodu oznitelikle isaretlersin, derleyici metodu uretir. Kazanc: sablon ile parametreler derleme zamaninda eslesir, boxing ve string ayristirma calisma zamaninda olmaz, her mesajin sabit bir `EventId`'si olur.
-- **Bu projede nerede:** `IdentityService` ve `RefreshTokenService`, ikisi de `internal sealed partial`. Ornegin `LogReuseDetected(Guid familyId)`.
-- **Alternatifi neydi:** Duz `ILogger` uzanti metodlari; fonksiyonel olarak ayni, farki performans ve derleyici kontrolu.
-- **Nerede okunur:** https://learn.microsoft.com/en-us/dotnet/core/extensions/logger-message-generator
-
 ## Kavramlar
 
 ### Access token ve opak refresh token ikilisi
@@ -57,6 +21,10 @@ Tuketilen satiri silmek tespiti bir kusaktan sonra oldurur: r1'in satiri silinmi
 ### Idle window ve absolute cap
 
 Iki son kullanma tarihi var. `ExpiresAt` bos durma penceresidir, her rotation'da `now + 7 gun` olarak yeniden hesaplanir. `FamilyExpiresAt` ailenin mutlak tavanidir: ilk giriste `now + 30 gun` konur ve her cocuga **degismeden** kopyalanir. Tavanin kopyalanmasi dogrulamayi tek satirlik bir okuma olarak tutar; aksi halde her kontrolde ailenin kokunu bulman gerekirdi. Anlami: aktif kullanici 7 gunde bir yeniledigi surece oturumda kalir, ama en fazla 30 gun.
+
+### Sistemin ilk "simdi" kavrami
+
+Bu PR'dan once `src/` altinda `TimeProvider`, `ISystemClock`, `IClock`, `DateTime.` veya `DateTimeOffset.` gecen tek bir satir yoktu: access token suresi, bos durma penceresi ve mutlak tavan, hepsi sisteme "simdi" kavramini bu PR'da soktu. Zaman `TimeProvider` uzerinden aliniyor ve testte `FakeTimeProvider` ileri sariliyor, boylece sekiz gunluk bir sona erme testi uyumadan calisiyor. Elle bir `IClock` yazilmadi -- BCL'de tip varken ikinci bir kavram uretmenin anlami yok.
 
 ### Refresh token neden SHA-256 ile hash'leniyor, parola gibi degil
 
@@ -92,9 +60,12 @@ Iki `DbContext` yuzunden `dotnet ef` komutlari artik `--context` istiyor, ve Ide
 Hata vermesi beklenerek calistirildi: "More than one DbContext was found". Planin notu netti -- bu komut beklenmedik sekilde basarili olursa iki-context varsayimi yanlis demektir ve durup bildirilmelidir. Bir varsayimi kanitlamak icin basarisiz olmasi beklenen komutu calistirmak, bu projede standart bir dogrulama bicimi.
 
 ### `dotnet list ... package --include-transitive`
-Dogrudan ve **transitif** paketleri cozulmus surumleriyle listeler; `Microsoft.IdentityModel.JsonWebTokens` surumu tahmin edilmeyip buradan okundu, cunku cozulen surumden dusuk pinlemek NU1605 uretirdi.
+Dogrudan ve **transitif** paketleri cozulmus surumleriyle listeler; `Microsoft.IdentityModel.JsonWebTokens` surumu tahmin edilmeyip buradan okundu, cunku cozulen surumden dusuk pinlemek NU1605 uretirdi. Identity ve JwtBearer `10.0.11` olarak pinlendi -- solution'daki diger ASP.NET Core ve EF Core paketleriyle ayni satir; `Microsoft.IdentityModel.JsonWebTokens` ise `8.19.2`. Ailenin bolunmesi NU1605 uretir ve `TreatWarningsAsErrors` onu build hatasina cevirir.
 
 ## Dikkat edilen tuzaklar
+
+### `AddIdentity` bir sinif kutuphanesine framework referansi zorluyor
+`AddIdentity` cookie semalarini ve `SignInManager`'i da kurar; `SignInManager` paylasilan ASP.NET Core framework'unde yasadigi icin `Envanex.Infrastructure` gibi bir sinif kutuphanesine `Microsoft.AspNetCore.App` framework referansi eklemeyi zorlar. Giris akisi zaten elle yazildigi icin `AddIdentityCore` yeterli oldu.
 
 ### `ApplyConfigurationsFromAssembly`'nin fazla genis olmasi
 `EnvanexDbContext` kendi assembly'sindeki tum konfigurasyonlari otomatik uyguluyordu; `RefreshTokenConfiguration` ayni assembly'ye girince is context'i de onu bulur ve bir sonraki is migration'inda ikinci bir `dbo.RefreshTokens` uretirdi. Cozum iki tarafli: tarama bir namespace yuklemine daraltildi, konfigurasyon da bilerek o yuklemin disina kondu. Gercek bekci `EnvanexDbContext_ShouldNotMapRefreshToken` testidir.

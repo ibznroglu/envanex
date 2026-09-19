@@ -42,3 +42,9 @@ Thumbs.db
 
 # Claude Code local state
 .claude/settings.local.json
+
+# Flattened Windows paths created by an accidental shell redirection. Git Bash
+# does not expand "C:\Users\...\out.txt", so a redirect to one writes a literal
+# file of that name into the working directory. The pattern requires the whole
+# AppData/Local/Temp shape so it cannot hide a real file.
+/[A-Za-z]*Users*AppData*Local*Temp*
