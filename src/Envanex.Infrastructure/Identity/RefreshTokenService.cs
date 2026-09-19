@@ -209,8 +209,10 @@ internal sealed partial class RefreshTokenService : IRefreshTokenService
 
     /// <summary>
     /// Revokes every live row of a family, tolerating a concurrent writer. Returns
-    /// <see langword="false"/> only when a live row survives <see cref="RevocationRetryLimit"/>
-    /// attempts, which is logged at <c>Error</c> before the method returns.
+    /// <see langword="false"/> only when a live row is still there after
+    /// <see cref="RevocationRetryLimit"/> attempts <em>and</em> a final re-read, which is logged at
+    /// <c>Error</c> before the method returns. The verdict is always the database's, never this
+    /// method's own write having failed.
     /// </summary>
     /// <remarks>
     /// Every caller reaches this method from a path whose contract is <c>Result</c>, so a
@@ -238,11 +240,7 @@ internal sealed partial class RefreshTokenService : IRefreshTokenService
                 continue;
             }
 
-            var stillLive = await _context.RefreshTokens
-                .AsNoTracking()
-                .AnyAsync(token => token.FamilyId == familyId && token.RevokedAt == null, ct);
-
-            if (!stillLive)
+            if (!await HasLiveFamilyRowAsync(familyId, ct))
             {
                 return true;
             }
@@ -250,10 +248,29 @@ internal sealed partial class RefreshTokenService : IRefreshTokenService
             _context.ChangeTracker.Clear();
         }
 
+        // A concurrency failure on the final attempt skips the in-loop check above, so the loop
+        // can end without this method ever having looked at the family after the writer that won
+        // that race committed. That winner may have revoked what was left, in which case the
+        // family is dead and there is nothing to alarm about: look once more before saying
+        // otherwise, because the Error below is a line an operator gets paged on.
+        if (!await HasLiveFamilyRowAsync(familyId, ct))
+        {
+            return true;
+        }
+
         LogFamilyRevocationExhausted(familyId, RevocationRetryLimit);
 
         return false;
     }
+
+    /// <summary>
+    /// Whether any row of the family is still unrevoked. Read with no tracking: it decides control
+    /// flow and must never resurrect entities the caller has just discarded.
+    /// </summary>
+    private Task<bool> HasLiveFamilyRowAsync(Guid familyId, CancellationToken ct)
+        => _context.RefreshTokens
+            .AsNoTracking()
+            .AnyAsync(token => token.FamilyId == familyId && token.RevokedAt == null, ct);
 
     /// <summary>
     /// The family query: an equality seek on <c>IX_RefreshTokens_FamilyId</c> with the handful of
