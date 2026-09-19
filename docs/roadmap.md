@@ -165,6 +165,8 @@ Tracked deliberately rather than hidden. Each one names where it closes: a PR, o
 | Grouped paging stability is untested; the group theory never combines with skip/take | PR 7 |
 | `DataSourceGuard` has no unit tests; its constructor invariant is unprotected | PR 7 |
 | `.gitattributes` declares `* text=auto eol=lf` and CLAUDE.md forbids committing CRLF, but every file at HEAD is CRLF, `.gitattributes` itself included — nothing has ever been renormalized. `dotnet format --verify-no-changes` passes on CRLF files, so the CI check this file credits with enforcing LF does not check line endings at all. The rule is written and unenforced. Pre-existing and repo-wide; not introduced by PR 6a | its own chore — `git add --renormalize .` plus a check that actually fails on CRLF. Deliberately not folded into an auth PR, where it would touch every file and drown the diff |
+| README.md still describes the project as "inventory, purchasing and sales" and lists purchase and sales order state machines, SoapCore and a Windows Service in its stack — all of them in the deferred section above. It reads as an unfinished promise where it should state the scope as a finished boundary | PR 7, when the project first becomes publicly visible |
+| Dangling PR triggers in the ADRs: ADR 0006 names PR 17 as the trigger for revisiting the error-mapping table, and ADR 0005 and the **Outbox** line under "Decisions carried forward" both point at PR 18. Both PRs sit in the deferred section and will not happen. The ADRs are historical records and are not being rewritten, so the triggers are recorded here rather than left silently waiting | **needs an owner** — nothing carries either trigger once PR 17 and PR 18 are cut |
 
 ## How the work is run
 

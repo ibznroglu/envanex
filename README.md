@@ -24,7 +24,8 @@ integration surface for legacy clients.
 
 ```bash
 docker compose up -d
-dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web
+dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web --context EnvanexDbContext
+dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web --context EnvanexIdentityDbContext
 dotnet run --project src/Envanex.Web
 ```
 
