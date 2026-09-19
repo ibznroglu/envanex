@@ -33,11 +33,21 @@ public sealed class LoginRateLimitPartitionTests
     [Fact]
     public void GetKey_ShouldIgnoreXForwardedForUntilPr7()
     {
-        // PR 7 TRIPWIRE. This test records a deliberate gap, not a desired behaviour: behind a
-        // reverse proxy every client collapses into the proxy's partition. PR 7 configures
-        // UseForwardedHeaders with real KnownProxies and DELETES this test. Do not "fix" the
-        // partition key by reading the header here — an unvalidated X-Forwarded-For is
-        // attacker-controlled and makes the limiter worthless.
+        // PR 7 TRIPWIRE -- AND A WEAK ONE. Read the limitation before relying on it.
+        //
+        // This test records a deliberate gap, not a desired behaviour: behind a reverse proxy
+        // every client collapses into the proxy's partition. PR 7 configures UseForwardedHeaders
+        // with real KnownProxies and DELETES this test.
+        //
+        // What this test does NOT do: it calls GetKey directly against a hand-built
+        // DefaultHttpContext, so it only catches a fix that changes GetKey itself. The natural
+        // way to use UseForwardedHeaders is to let the middleware rewrite
+        // Connection.RemoteIpAddress upstream, and against such a fix GetKey never changes, this
+        // assertion stays true, and the test stays green forever. PR 7 must therefore delete it
+        // deliberately -- a red build will not announce that the gap is closed.
+        //
+        // Do not "fix" the partition key by reading the header here -- an unvalidated
+        // X-Forwarded-For is attacker-controlled and makes the limiter worthless.
         var context = new DefaultHttpContext();
         context.Connection.RemoteIpAddress = IPAddress.Parse("10.0.0.1");
         context.Request.Headers["X-Forwarded-For"] = "203.0.113.7";
