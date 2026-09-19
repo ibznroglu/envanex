@@ -2,6 +2,8 @@ using Envanex.Application;
 using Envanex.Application.Abstractions.Authentication;
 using Envanex.Application.Abstractions.Messaging;
 using Envanex.Application.Abstractions.Persistence;
+using Envanex.Application.Authentication.Commands;
+using Envanex.Application.Authentication.DTOs;
 using Envanex.Application.Behaviors;
 using Envanex.Application.Products.Commands;
 using Envanex.Application.Products.DTOs;
@@ -75,6 +77,9 @@ public sealed class DependencyInjectionTests
         sp.GetRequiredService<ICommandHandler<ActivateProductCommand, Guid>>().ShouldNotBeNull();
         sp.GetRequiredService<ICommandHandler<DeactivateProductCommand, Guid>>().ShouldNotBeNull();
         sp.GetRequiredService<ICommandHandler<CreateUnitOfMeasureCommand, Guid>>().ShouldNotBeNull();
+        sp.GetRequiredService<ICommandHandler<LoginCommand, AuthenticationResponse>>().ShouldNotBeNull();
+        sp.GetRequiredService<ICommandHandler<RefreshTokenCommand, AuthenticationResponse>>().ShouldNotBeNull();
+        sp.GetRequiredService<ICommandHandler<LogoutCommand, bool>>().ShouldNotBeNull();
         sp.GetRequiredService<IQueryHandler<GetProductByIdQuery, ProductDetailDto>>().ShouldNotBeNull();
         sp.GetRequiredService<IQueryHandler<GetUnitOfMeasureByIdQuery, UnitOfMeasureDetailDto>>().ShouldNotBeNull();
     }
@@ -115,6 +120,18 @@ public sealed class DependencyInjectionTests
         {
             typeof(ICommandHandler<CreateUnitOfMeasureCommand, Guid>),
             typeof(ValidationDecorator<CreateUnitOfMeasureCommand, Guid>)
+        },
+        {
+            typeof(ICommandHandler<LoginCommand, AuthenticationResponse>),
+            typeof(ValidationDecorator<LoginCommand, AuthenticationResponse>)
+        },
+        {
+            typeof(ICommandHandler<RefreshTokenCommand, AuthenticationResponse>),
+            typeof(ValidationDecorator<RefreshTokenCommand, AuthenticationResponse>)
+        },
+        {
+            typeof(ICommandHandler<LogoutCommand, bool>),
+            typeof(ValidationDecorator<LogoutCommand, bool>)
         },
     };
 }

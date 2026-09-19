@@ -1,4 +1,7 @@
 using Envanex.Application.Abstractions.Messaging;
+using Envanex.Application.Authentication.Commands;
+using Envanex.Application.Authentication.DTOs;
+using Envanex.Application.Authentication.Validators;
 using Envanex.Application.Behaviors;
 using Envanex.Application.Products.Commands;
 using Envanex.Application.Products.DTOs;
@@ -25,6 +28,9 @@ public static class DependencyInjection
         services.AddSingleton<IValidator<ActivateProductCommand>, ActivateProductCommandValidator>();
         services.AddSingleton<IValidator<DeactivateProductCommand>, DeactivateProductCommandValidator>();
         services.AddSingleton<IValidator<CreateUnitOfMeasureCommand>, CreateUnitOfMeasureCommandValidator>();
+        services.AddSingleton<IValidator<LoginCommand>, LoginCommandValidator>();
+        services.AddSingleton<IValidator<RefreshTokenCommand>, RefreshTokenCommandValidator>();
+        services.AddSingleton<IValidator<LogoutCommand>, LogoutCommandValidator>();
 
         // Inner handlers (concrete types)
         services.AddScoped<CreateProductCommandHandler>();
@@ -32,6 +38,9 @@ public static class DependencyInjection
         services.AddScoped<ActivateProductCommandHandler>();
         services.AddScoped<DeactivateProductCommandHandler>();
         services.AddScoped<CreateUnitOfMeasureCommandHandler>();
+        services.AddScoped<LoginCommandHandler>();
+        services.AddScoped<RefreshTokenCommandHandler>();
+        services.AddScoped<LogoutCommandHandler>();
 
         // Decorated command handlers
         services.AddScoped<ICommandHandler<CreateProductCommand, Guid>>(sp =>
@@ -58,6 +67,21 @@ public static class DependencyInjection
             new ValidationDecorator<CreateUnitOfMeasureCommand, Guid>(
                 sp.GetRequiredService<CreateUnitOfMeasureCommandHandler>(),
                 sp.GetServices<IValidator<CreateUnitOfMeasureCommand>>()));
+
+        services.AddScoped<ICommandHandler<LoginCommand, AuthenticationResponse>>(sp =>
+            new ValidationDecorator<LoginCommand, AuthenticationResponse>(
+                sp.GetRequiredService<LoginCommandHandler>(),
+                sp.GetServices<IValidator<LoginCommand>>()));
+
+        services.AddScoped<ICommandHandler<RefreshTokenCommand, AuthenticationResponse>>(sp =>
+            new ValidationDecorator<RefreshTokenCommand, AuthenticationResponse>(
+                sp.GetRequiredService<RefreshTokenCommandHandler>(),
+                sp.GetServices<IValidator<RefreshTokenCommand>>()));
+
+        services.AddScoped<ICommandHandler<LogoutCommand, bool>>(sp =>
+            new ValidationDecorator<LogoutCommand, bool>(
+                sp.GetRequiredService<LogoutCommandHandler>(),
+                sp.GetServices<IValidator<LogoutCommand>>()));
 
         // Query handlers
         services.AddScoped<IQueryHandler<GetProductByIdQuery, ProductDetailDto>,
