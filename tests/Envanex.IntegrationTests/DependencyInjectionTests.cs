@@ -1,4 +1,5 @@
 using Envanex.Application;
+using Envanex.Application.Abstractions.Authentication;
 using Envanex.Application.Abstractions.Messaging;
 using Envanex.Application.Abstractions.Persistence;
 using Envanex.Application.Behaviors;
@@ -29,10 +30,25 @@ public sealed class DependencyInjectionTests
             .AddInMemoryCollection(new Dictionary<string, string?>
             {
                 ["ConnectionStrings:EnvanexDb"] = _fixture.ConnectionString,
+
+                // AddEnvanexIdentity validates the whole section at registration time, so without
+                // these six keys every test in this class would fail on the guard rather than on
+                // what it is about.
+                ["Jwt:Issuer"] = "https://envanex.local",
+                ["Jwt:Audience"] = "envanex-api",
+                ["Jwt:SigningKey"] = EnvanexWebApplicationFactory.TestSigningKey,
+                ["Jwt:AccessTokenMinutes"] = "15",
+                ["Jwt:RefreshTokenIdleDays"] = "7",
+                ["Jwt:RefreshTokenAbsoluteDays"] = "30",
             })
             .Build();
 
         var services = new ServiceCollection();
+
+        // IdentityService and RefreshTokenService take an ILogger<T>. AddIdentityCore happens to
+        // call AddLogging() itself, but relying on that would make this container depend on a
+        // framework implementation detail; the call is idempotent.
+        services.AddLogging();
         services.AddApplication();
         services.AddInfrastructure(configuration);
 
@@ -51,6 +67,9 @@ public sealed class DependencyInjectionTests
         sp.GetRequiredService<IUnitOfMeasureRepository>().ShouldNotBeNull();
         sp.GetRequiredService<IUnitOfMeasureReadRepository>().ShouldNotBeNull();
         sp.GetRequiredService<IUnitOfWork>().ShouldNotBeNull();
+        sp.GetRequiredService<IIdentityService>().ShouldNotBeNull();
+        sp.GetRequiredService<IRefreshTokenService>().ShouldNotBeNull();
+        sp.GetRequiredService<IAccessTokenIssuer>().ShouldNotBeNull();
         sp.GetRequiredService<ICommandHandler<CreateProductCommand, Guid>>().ShouldNotBeNull();
         sp.GetRequiredService<ICommandHandler<UpdateProductCommand, Guid>>().ShouldNotBeNull();
         sp.GetRequiredService<ICommandHandler<ActivateProductCommand, Guid>>().ShouldNotBeNull();

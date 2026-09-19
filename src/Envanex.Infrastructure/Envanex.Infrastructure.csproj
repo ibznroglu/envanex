@@ -13,5 +13,13 @@
     </PackageReference>
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.SqlServer" />
+    <!-- Signing lives here, so the JWT handler is referenced here and never by Application. -->
+    <PackageReference Include="Microsoft.IdentityModel.JsonWebTokens" />
+    <!-- services.Configure<JwtOptions>(section) and section.Get<JwtOptions>() are declared by
+         these two. Both already arrive transitively through EF Core, so the references are
+         belt and braces at the same version: no NU1605, and the build no longer depends on
+         another package's dependency graph continuing to carry them. -->
+    <PackageReference Include="Microsoft.Extensions.Options.ConfigurationExtensions" />
+    <PackageReference Include="Microsoft.Extensions.Configuration.Binder" />
   </ItemGroup>
 </Project>

@@ -29,5 +29,14 @@ public sealed class RateLimitedWebApplicationFactory : WebApplicationFactory<Pro
         builder.UseSetting("RateLimiting:Enabled", "true");
         builder.UseSetting("RateLimiting:PermitLimit", "2");
         builder.UseSetting("RateLimiting:WindowSeconds", "60");
+
+        // AddEnvanexIdentity validates the Jwt section at startup and appsettings.json ships an
+        // empty signing key, so this host needs the section too.
+        builder.UseSetting("Jwt:Issuer", "https://envanex.local");
+        builder.UseSetting("Jwt:Audience", "envanex-api");
+        builder.UseSetting("Jwt:SigningKey", EnvanexWebApplicationFactory.TestSigningKey);
+        builder.UseSetting("Jwt:AccessTokenMinutes", "15");
+        builder.UseSetting("Jwt:RefreshTokenIdleDays", "7");
+        builder.UseSetting("Jwt:RefreshTokenAbsoluteDays", "30");
     }
 }

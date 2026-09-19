@@ -40,6 +40,8 @@ public static class DependencyInjection
         services.AddScoped<IUnitOfMeasureReadRepository, UnitOfMeasureReadRepository>();
         services.AddScoped<IUnitOfWork, UnitOfWork>();
 
+        services.AddEnvanexIdentity(configuration);
+
         return services;
     }
 }
