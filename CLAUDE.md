@@ -18,11 +18,17 @@ docker compose up -d                          # SQL Server 2022 on localhost:143
 dotnet build -warnaserror                     # build (warnings are errors)
 dotnet test                                   # all tests
 dotnet format --verify-no-changes             # style check
-dotnet ef migrations add <Name> -p src/Envanex.Infrastructure -s src/Envanex.Web
-dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web
+dotnet ef migrations add <Name> -p src/Envanex.Infrastructure -s src/Envanex.Web --context EnvanexDbContext
+dotnet ef migrations add <Name> -p src/Envanex.Infrastructure -s src/Envanex.Web --context EnvanexIdentityDbContext --output-dir Migrations/Identity
+dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web --context EnvanexDbContext
+dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web --context EnvanexIdentityDbContext
 dotnet run --project src/Envanex.Web          # Blazor UI + REST API + Scalar + SOAP
 dotnet run --project src/Envanex.Worker       # background worker (console mode)
 ```
+
+After every `migrations add`, normalize the generated files to LF with no BOM. `dotnet ef` emits
+CRLF with a UTF-8 BOM, which violates the LF rule in `.gitattributes` and fails
+`dotnet format --verify-no-changes`. It is an encoding fix only — never touch the DDL.
 
 ## Architecture
 

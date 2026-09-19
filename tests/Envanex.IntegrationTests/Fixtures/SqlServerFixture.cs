@@ -1,3 +1,4 @@
+using Envanex.Infrastructure.Identity;
 using Envanex.Infrastructure.Persistence;
 using Microsoft.EntityFrameworkCore;
 using Testcontainers.MsSql;
@@ -21,6 +22,16 @@ public sealed class SqlServerFixture : IAsyncLifetime
         return new EnvanexDbContext(options);
     }
 
+    public EnvanexIdentityDbContext CreateIdentityDbContext()
+    {
+        // Two steps on purpose: UseEnvanexIdentitySqlServer returns the non-generic builder,
+        // whose Options property is not DbContextOptions<EnvanexIdentityDbContext>.
+        var optionsBuilder = new DbContextOptionsBuilder<EnvanexIdentityDbContext>();
+        optionsBuilder.UseEnvanexIdentitySqlServer(ConnectionString);
+
+        return new EnvanexIdentityDbContext(optionsBuilder.Options);
+    }
+
     public async Task ResetAsync()
     {
         await using var context = CreateDbContext();
@@ -33,12 +44,34 @@ public sealed class SqlServerFixture : IAsyncLifetime
         await context.Database.ExecuteSqlRawAsync("DELETE FROM Warehouses");
     }
 
+    /// <summary>
+    /// Resets the Identity context only. Deliberately separate from <see cref="ResetAsync"/>:
+    /// the auth tables are a different context with a different FK graph, and mixing the two
+    /// lists is what makes a hand-maintained delete order rot.
+    /// </summary>
+    public async Task ResetIdentityAsync()
+    {
+        await using var context = CreateIdentityDbContext();
+
+        // Deletes follow FK dependency order: children before parents.
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM auth.AspNetUserTokens");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM auth.AspNetUserLogins");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM auth.AspNetUserClaims");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM auth.AspNetUserRoles");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM auth.AspNetRoleClaims");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM auth.AspNetRoles");
+        await context.Database.ExecuteSqlRawAsync("DELETE FROM auth.AspNetUsers");
+    }
+
     public async Task InitializeAsync()
     {
         await _container.StartAsync();
 
         await using var context = CreateDbContext();
         await context.Database.MigrateAsync();
+
+        await using var identityContext = CreateIdentityDbContext();
+        await identityContext.Database.MigrateAsync();
 
         WebApplicationFactory = new EnvanexWebApplicationFactory(ConnectionString);
     }

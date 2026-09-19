@@ -53,7 +53,7 @@ in the README. That branch is never merged.
 | 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done (#4) |
 | 5a | `feat(api)` — application layer, repositories, unit tests | done (#6) |
 | 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | done (#8) |
-| 6a | `feat(auth)` — ASP.NET Core Identity, JWT with rotating refresh tokens, login/refresh/logout | |
+| 6a | `feat(auth)` — ASP.NET Core Identity, JWT with rotating refresh tokens, login/refresh/logout | done |
 | 6b | `feat(auth)` — authorization policies, [Authorize] on every endpoint, Blazor cookie scheme, read-only demo account | |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
@@ -141,12 +141,20 @@ ADR.
 
 ## Known gaps
 
-Tracked deliberately rather than hidden. Each one has a PR where it closes.
+Tracked deliberately rather than hidden. Each one names where it closes: a PR, or a chore of its own.
 
 | Gap | Closes in                              |
 |---|----------------------------------------|
+| **BLOCKER — login rate-limit partition key behind a reverse proxy.** `LoginRateLimitPartition.GetKey` reads `Connection.RemoteIpAddress`, which on Azure App Service is the front end's address for every request; all users collapse into one partition and 5 per 5 minutes becomes global — login stops working for everyone after three sign-ins. Closes by configuring `UseForwardedHeaders` with the real `KnownProxies`/`KnownNetworks` and deleting `LoginRateLimitPartitionTests.GetKey_ShouldIgnoreXForwardedForUntilPr7`. **Must be closed before the first public deploy.** The tripwire test is weaker than it looks: it calls `GetKey` directly, so it only catches a fix that changes `GetKey` itself. A fix applied upstream through `UseForwardedHeaders` leaves it green, so PR 7 must delete it by hand rather than wait for a red build to point at it. | PR 7 — **blocker on the deploy** |
 | `MoneyComplexTypeConvention` only inspects complex properties one level deep | when a nested case appears             |
-| `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 8, when the ledger makes it fragile |
+| `ResetAsync` in the test fixture deletes tables in a hand-maintained order. PR 6a handled the auth half with a separate `ResetIdentityAsync`; the business half is unchanged | PR 8, when the ledger makes it fragile |
+| Login timing side channel, unknown-email half: `FindByEmailAsync` returns null and no password hash is verified, so an unknown address answers measurably faster than a wrong password. Deliberate in PR 6a (Decision 6); `IdentityServiceTimingOrderTests.ValidateCredentialsAsync_UnknownEmail_ShouldNotCallCheckPasswordAsync` asserts the gap, so closing it means inverting a named test | its own chore, when a dummy-hash cost is judged worth paying |
+| Login timing side channel, residual write: a wrong password performs one `AccessFailedAsync` `UPDATE` that a locked-out attempt does not — roughly 1 ms against the ~100 ms of PBKDF2 both pay | its own chore, with the entry above |
+| Reuse-detection grace period is zero: a client that retries a refresh after a dropped response has its whole family revoked | when a measurement against a real client gives a number to set |
+| No `JwtBearerEvents.OnChallenge` body. No endpoint is `[Authorize]` in PR 6a, so no challenge is reachable; the first one would be a bodiless 401 re-executed as the not-found page | PR 6b, with the first `[Authorize]` |
+| No refresh-token pruning job. `auth.RefreshTokens` is append-only and grows without bound | **needs an owner** — recorded against PR 18, which sits in the deferred section and will not happen; the active plan ends at PR 10 |
+| The 2601/2627 unique-violation path in `RotateAsync` is unreachable by construction and has no test that reaches it. It shares the concurrency failure's branch so that a change to save ordering cannot turn it into an unhandled exception; `IX_RefreshTokens_FamilyId_Live` is kept as a database-level invariant | not scheduled — deliberate |
+| Passkeys | not scheduled |
 | Warehouse has no application layer or endpoints | PR 8 |
 | No authentication or authorization on any endpoint | PR 6b |
 | UnitOfMeasure lookup list is unbounded and unordered | PR 7, when seed data makes it visible |
@@ -156,6 +164,14 @@ Tracked deliberately rather than hidden. Each one has a PR where it closes.
 | `DataSourceGuard` can throw on a sort entry with no selector (`sort=[{"desc":true}]`), producing 500 where the guard intends 400 | PR 7 |
 | Grouped paging stability is untested; the group theory never combines with skip/take | PR 7 |
 | `DataSourceGuard` has no unit tests; its constructor invariant is unprotected | PR 7 |
+| `.gitattributes` declares `* text=auto eol=lf` and CLAUDE.md forbids committing CRLF, but every file at HEAD is CRLF, `.gitattributes` itself included — nothing has ever been renormalized. `dotnet format --verify-no-changes` passes on CRLF files, so the CI check this file credits with enforcing LF does not check line endings at all. The rule is written and unenforced. Pre-existing and repo-wide; not introduced by PR 6a | its own chore — `git add --renormalize .` plus a check that actually fails on CRLF. Deliberately not folded into an auth PR, where it would touch every file and drown the diff |
+| README.md still describes the project as "inventory, purchasing and sales" and lists purchase and sales order state machines, SoapCore and a Windows Service in its stack — all of them in the deferred section above. It reads as an unfinished promise where it should state the scope as a finished boundary | PR 7, when the project first becomes publicly visible |
+| Dangling PR triggers in the ADRs: ADR 0006 names PR 17 as the trigger for revisiting the error-mapping table, and ADR 0005 and the **Outbox** line under "Decisions carried forward" both point at PR 18. Both PRs sit in the deferred section and will not happen. The ADRs are historical records and are not being rewritten, so the triggers are recorded here rather than left silently waiting | **needs an owner** — nothing carries either trigger once PR 17 and PR 18 are cut |
+| `Envanex.SoapApi` and `Envanex.Worker` are empty shell projects. Their scope was cut, but a reader opening the repository sees two empty projects and reads "did not finish" rather than "chose not to build". They cannot simply be deleted: `ArchitectureTests` pins `Envanex.SoapApi` in the Web project's expected references, so removing them means updating that test. Either resolution is acceptable — delete both and update the architecture test, or state in README that the scaffolding is kept deliberately | PR 7, where the project first becomes publicly visible |
+| A locked-out account has no recovery path. Login deliberately refuses to tell a user that their account is locked, which is the right security decision and is recorded in ADR 0007. What is missing is not a more informative error but a safe way for the account owner — through a channel they have already proven they control — to learn what happened and regain access | **needs an owner** |
+| The manual smoke steps in the PR 6a plan that require a signed-in user were never run: PR 6a deliberately ships no user-creating surface outside the test project. `AuthApiTests` covers the same scenarios end to end against real SQL Server, but those steps exist because the real host started with `dotnet run` can behave differently from the test factory | PR 6b, where the read-only demo account makes them runnable |
+| The JWT signing key exists only in local user-secrets. The first deploy needs it in App Service configuration. `AddEnvanexIdentity` runs `JwtOptionsGuard.ThrowIfInvalid` at startup, so a deploy without the key fails loudly at boot rather than generating one silently — which is intended, and is why this is a deployment step rather than a code gap | PR 7 |
+| `TimeProvider` is injected in the auth code but does not reach `Envanex.Domain`. PR 6a deliberately kept it at the auth boundary rather than deciding how domain code reads the clock. The stock ledger is the first domain code that needs a notion of now, and that is where the question gets answered | PR 8 |
 
 ## How the work is run
 

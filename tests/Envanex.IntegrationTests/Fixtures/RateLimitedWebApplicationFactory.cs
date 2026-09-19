@@ -29,5 +29,19 @@ public sealed class RateLimitedWebApplicationFactory : WebApplicationFactory<Pro
         builder.UseSetting("RateLimiting:Enabled", "true");
         builder.UseSetting("RateLimiting:PermitLimit", "2");
         builder.UseSetting("RateLimiting:WindowSeconds", "60");
+
+        // Enabling the global limiter must never silently enable the login policy too: every login
+        // in this factory lands in the single "unknown" partition, so a real 5/300 s budget would
+        // be consumed across this class's tests.
+        builder.UseSetting("RateLimiting:Login:Enabled", "false");
+
+        // AddEnvanexIdentity validates the Jwt section at startup and appsettings.json ships an
+        // empty signing key, so this host needs the section too.
+        builder.UseSetting("Jwt:Issuer", "https://envanex.local");
+        builder.UseSetting("Jwt:Audience", "envanex-api");
+        builder.UseSetting("Jwt:SigningKey", EnvanexWebApplicationFactory.TestSigningKey);
+        builder.UseSetting("Jwt:AccessTokenMinutes", "15");
+        builder.UseSetting("Jwt:RefreshTokenIdleDays", "7");
+        builder.UseSetting("Jwt:RefreshTokenAbsoluteDays", "30");
     }
 }

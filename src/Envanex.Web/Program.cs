@@ -3,8 +3,11 @@ using System.Threading.RateLimiting;
 using Envanex.Application;
 using Envanex.Infrastructure;
 using Envanex.Web.Components;
+using Envanex.Web.Controllers;
 using Envanex.Web.DataSource;
+using Envanex.Web.Extensions;
 using Envanex.Web.Middleware;
+using Envanex.Web.RateLimiting;
 using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;
 
@@ -21,52 +24,78 @@ builder.Services.AddControllers(options =>
 
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
+builder.Services.AddEnvanexJwtBearer(builder.Configuration);
+builder.Services.AddAuthorization();
 
 var rateLimitingSection = builder.Configuration.GetSection("RateLimiting");
 bool rateLimitingEnabled = rateLimitingSection.GetValue("Enabled", true);
+int permitLimit = rateLimitingSection.GetValue("PermitLimit", 100);
+int windowSeconds = rateLimitingSection.GetValue("WindowSeconds", 60);
 
-if (rateLimitingEnabled)
+var loginRateLimitingSection = rateLimitingSection.GetSection("Login");
+bool loginRateLimitingEnabled = loginRateLimitingSection.GetValue("Enabled", true);
+int loginPermitLimit = loginRateLimitingSection.GetValue("PermitLimit", 5);
+int loginWindowSeconds = loginRateLimitingSection.GetValue("WindowSeconds", 300);
+
+// AddRateLimiter is unconditional even when rate limiting is switched off: only the assignment of
+// GlobalLimiter is conditional. The login policy has to be registered whatever the switches say,
+// because [EnableRateLimiting("login")] naming a policy the middleware never sees throws at
+// endpoint build time and takes down every endpoint in the application.
+builder.Services.AddRateLimiter(options =>
 {
-    int permitLimit = rateLimitingSection.GetValue("PermitLimit", 100);
-    int windowSeconds = rateLimitingSection.GetValue("WindowSeconds", 60);
+    options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
 
-    builder.Services.AddRateLimiter(options =>
+    options.OnRejected = async (context, cancellationToken) =>
     {
-        options.RejectionStatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
+        context.HttpContext.Response.ContentType = "application/problem+json";
 
-        options.OnRejected = async (context, cancellationToken) =>
+        if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
         {
-            context.HttpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
-            context.HttpContext.Response.ContentType = "application/problem+json";
+            context.HttpContext.Response.Headers.RetryAfter =
+                ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
+        }
 
-            if (context.Lease.TryGetMetadata(MetadataName.RetryAfter, out var retryAfter))
-            {
-                context.HttpContext.Response.Headers.RetryAfter =
-                    ((int)Math.Ceiling(retryAfter.TotalSeconds)).ToString(System.Globalization.CultureInfo.InvariantCulture);
-            }
-
-            var problemDetails = new ProblemDetails
-            {
-                Status = StatusCodes.Status429TooManyRequests,
-                Title = "Çok fazla istek gönderildi.",
-                Detail = "İstek sınırı aşıldı. Lütfen bir süre bekleyip tekrar deneyin.",
-                Type = "https://httpstatuses.io/429",
-            };
-
-            await JsonSerializer.SerializeAsync(
-                context.HttpContext.Response.Body,
-                problemDetails,
-                cancellationToken: cancellationToken);
+        var problemDetails = new ProblemDetails
+        {
+            Status = StatusCodes.Status429TooManyRequests,
+            Title = "Çok fazla istek gönderildi.",
+            Detail = "İstek sınırı aşıldı. Lütfen bir süre bekleyip tekrar deneyin.",
+            Type = "https://httpstatuses.io/429",
         };
 
+        await JsonSerializer.SerializeAsync(
+            context.HttpContext.Response.Body,
+            problemDetails,
+            cancellationToken: cancellationToken);
+    };
+
+    if (rateLimitingEnabled)
+    {
         options.GlobalLimiter = PartitionedRateLimiter.Create<HttpContext, string>(_ =>
             RateLimitPartition.GetFixedWindowLimiter("global", _ => new FixedWindowRateLimiterOptions
             {
                 PermitLimit = permitLimit,
                 Window = TimeSpan.FromSeconds(windowSeconds),
             }));
+    }
+
+    options.AddPolicy<string>(AuthController.LoginRateLimitPolicy, context =>
+    {
+        string partitionKey = LoginRateLimitPartition.GetKey(context);
+
+        if (!loginRateLimitingEnabled)
+        {
+            return RateLimitPartition.GetNoLimiter(partitionKey);
+        }
+
+        return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions
+        {
+            PermitLimit = loginPermitLimit,
+            Window = TimeSpan.FromSeconds(loginWindowSeconds),
+        });
     });
-}
+});
 
 if (builder.Environment.IsDevelopment())
 {
@@ -91,13 +120,24 @@ if (app.Environment.IsDevelopment())
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
 
-if (rateLimitingEnabled)
-{
-    app.UseRateLimiter();
-}
+// Unconditional: the middleware is what makes the named "login" policy resolvable, so leaving it
+// out when the global limiter is off would break every endpoint rather than only the login one.
+app.UseRateLimiter();
 
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 app.UseHttpsRedirection();
+
+// After UseHttpsRedirection: there is no point authenticating a request about to be 307'd, and a
+// bearer token should not be parsed off a plaintext request. Before UseAntiforgery and the endpoint
+// mappings: antiforgery, routing, the Blazor circuit and the MVC filters all read HttpContext.User.
+//
+// This sits inside the UseStatusCodePagesWithReExecute wrapper, so a bodiless 401 would be
+// re-executed as the not-found page. None is reachable in PR 6a: every 401 originates from
+// ResultExtensions with a ProblemDetails body, and no endpoint is [Authorize], so the bearer
+// handler never issues a challenge. AuthPipelineTests locks that in. The bodiless challenge 401
+// becomes reachable in PR 6b, together with the OnChallenge body that answers it.
+app.UseAuthentication();
+app.UseAuthorization();
 
 app.UseAntiforgery();
 
