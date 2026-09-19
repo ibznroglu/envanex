@@ -72,7 +72,13 @@ public sealed class RefreshTokenRevocationRetryTests : IAsyncLifetime
         liveRows.ShouldBeEmpty();
 
         // The Error line is what an operator gets paged on, so a dead family must not produce one.
-        CapturedLogs.ShouldNotContain(record => record.Level == LogLevel.Error);
+        // Filtered to this service's category on purpose: asserting "no Error anywhere" would also
+        // be asserting how EF Core logs a DbUpdateConcurrencyException out of SaveChangesAsync,
+        // which it does below Error today. An EF Core bump could flip that and turn this red for a
+        // reason that has nothing to do with the revocation path under test.
+        CapturedLogs.ShouldNotContain(record =>
+            record.Category == typeof(RefreshTokenService).FullName
+            && record.Level == LogLevel.Error);
     }
 
     [Fact]
