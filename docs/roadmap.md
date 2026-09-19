@@ -152,7 +152,7 @@ Tracked deliberately rather than hidden. Each one names where it closes: a PR, o
 | Login timing side channel, residual write: a wrong password performs one `AccessFailedAsync` `UPDATE` that a locked-out attempt does not — roughly 1 ms against the ~100 ms of PBKDF2 both pay | its own chore, with the entry above |
 | Reuse-detection grace period is zero: a client that retries a refresh after a dropped response has its whole family revoked | when a measurement against a real client gives a number to set |
 | No `JwtBearerEvents.OnChallenge` body. No endpoint is `[Authorize]` in PR 6a, so no challenge is reachable; the first one would be a bodiless 401 re-executed as the not-found page | PR 6b, with the first `[Authorize]` |
-| No refresh-token pruning job. `auth.RefreshTokens` is append-only and grows without bound | PR 18, with the worker's nightly jobs |
+| No refresh-token pruning job. `auth.RefreshTokens` is append-only and grows without bound | **needs an owner** — recorded against PR 18, which sits in the deferred section and will not happen; the active plan ends at PR 10 |
 | The 2601/2627 unique-violation path in `RotateAsync` is unreachable by construction and has no test that reaches it. It shares the concurrency failure's branch so that a change to save ordering cannot turn it into an unhandled exception; `IX_RefreshTokens_FamilyId_Live` is kept as a database-level invariant | not scheduled — deliberate |
 | Passkeys | not scheduled |
 | Warehouse has no application layer or endpoints | PR 8 |
