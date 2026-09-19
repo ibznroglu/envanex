@@ -53,7 +53,7 @@ in the README. That branch is never merged.
 | 4 | `feat(domain)` — `UnitOfMeasure`, `Warehouse`, `Product`, first migration | done (#4) |
 | 5a | `feat(api)` — application layer, repositories, unit tests | done (#6) |
 | 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | done (#8) |
-| 6a | `feat(auth)` — ASP.NET Core Identity, JWT with rotating refresh tokens, login/refresh/logout | |
+| 6a | `feat(auth)` — ASP.NET Core Identity, JWT with rotating refresh tokens, login/refresh/logout | done |
 | 6b | `feat(auth)` — authorization policies, [Authorize] on every endpoint, Blazor cookie scheme, read-only demo account | |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
@@ -145,8 +145,16 @@ Tracked deliberately rather than hidden. Each one names where it closes: a PR, o
 
 | Gap | Closes in                              |
 |---|----------------------------------------|
+| **BLOCKER — login rate-limit partition key behind a reverse proxy.** `LoginRateLimitPartition.GetKey` reads `Connection.RemoteIpAddress`, which on Azure App Service is the front end's address for every request; all users collapse into one partition and 5 per 5 minutes becomes global — login stops working for everyone after three sign-ins. Closes by configuring `UseForwardedHeaders` with the real `KnownProxies`/`KnownNetworks` and deleting `LoginRateLimitPartitionTests.GetKey_ShouldIgnoreXForwardedForUntilPr7`. **Must be closed before the first public deploy.** | PR 7 — **blocker on the deploy** |
 | `MoneyComplexTypeConvention` only inspects complex properties one level deep | when a nested case appears             |
-| `ResetAsync` in the test fixture deletes tables in a hand-maintained order | PR 8, when the ledger makes it fragile |
+| `ResetAsync` in the test fixture deletes tables in a hand-maintained order. PR 6a handled the auth half with a separate `ResetIdentityAsync`; the business half is unchanged | PR 8, when the ledger makes it fragile |
+| Login timing side channel, unknown-email half: `FindByEmailAsync` returns null and no password hash is verified, so an unknown address answers measurably faster than a wrong password. Deliberate in PR 6a (Decision 6); `IdentityServiceTimingOrderTests.ValidateCredentialsAsync_UnknownEmail_ShouldNotCallCheckPasswordAsync` asserts the gap, so closing it means inverting a named test | its own chore, when a dummy-hash cost is judged worth paying |
+| Login timing side channel, residual write: a wrong password performs one `AccessFailedAsync` `UPDATE` that a locked-out attempt does not — roughly 1 ms against the ~100 ms of PBKDF2 both pay | its own chore, with the entry above |
+| Reuse-detection grace period is zero: a client that retries a refresh after a dropped response has its whole family revoked | when a measurement against a real client gives a number to set |
+| No `JwtBearerEvents.OnChallenge` body. No endpoint is `[Authorize]` in PR 6a, so no challenge is reachable; the first one would be a bodiless 401 re-executed as the not-found page | PR 6b, with the first `[Authorize]` |
+| No refresh-token pruning job. `auth.RefreshTokens` is append-only and grows without bound | PR 18, with the worker's nightly jobs |
+| The 2601/2627 unique-violation path in `RotateAsync` is unreachable by construction and has no test that reaches it. It shares the concurrency failure's branch so that a change to save ordering cannot turn it into an unhandled exception; `IX_RefreshTokens_FamilyId_Live` is kept as a database-level invariant | not scheduled — deliberate |
+| Passkeys | not scheduled |
 | Warehouse has no application layer or endpoints | PR 8 |
 | No authentication or authorization on any endpoint | PR 6b |
 | UnitOfMeasure lookup list is unbounded and unordered | PR 7, when seed data makes it visible |

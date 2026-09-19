@@ -1,6 +1,10 @@
 <Project Sdk="Microsoft.NET.Sdk.Web">
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Envanex.IntegrationTests" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\Envanex.Application\Envanex.Application.csproj" />
     <ProjectReference Include="..\Envanex.Infrastructure\Envanex.Infrastructure.csproj" />
     <ProjectReference Include="..\Envanex.SoapApi\Envanex.SoapApi.csproj" />

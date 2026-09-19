@@ -109,6 +109,23 @@ public static class ResultExtensions
         return ToErrorActionResult(result.Error);
     }
 
+    /// <summary>
+    /// Maps a successful result to 204 No Content, discarding the value. Used by logout, whose
+    /// success carries nothing a caller can act on; a failure still maps to the usual
+    /// ProblemDetails.
+    /// </summary>
+    public static IActionResult ToNoContentActionResult<T>(this Result<T> result)
+    {
+        ArgumentNullException.ThrowIfNull(result);
+
+        if (result.IsSuccess)
+        {
+            return new NoContentResult();
+        }
+
+        return ToErrorActionResult(result.Error);
+    }
+
     public static IReadOnlySet<string> MappedErrorCodes { get; } = StatusCodeMap.Keys.ToFrozenSet();
 
     private static ObjectResult ToErrorActionResult(Error error)

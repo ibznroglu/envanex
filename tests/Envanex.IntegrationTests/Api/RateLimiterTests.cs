@@ -4,6 +4,9 @@ using System.Net.Http.Json;
 using System.Text.Json;
 using Envanex.Application.UnitOfMeasures.Commands;
 using Envanex.IntegrationTests.Fixtures;
+using Microsoft.AspNetCore.RateLimiting;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Shouldly;
 
 namespace Envanex.IntegrationTests.Api;
@@ -102,5 +105,35 @@ public sealed class RateLimiterTests : IAsyncLifetime
         var response = await _client.PostAsJsonAsync("/api/unit-of-measures", command);
 
         response.StatusCode.ShouldBe(HttpStatusCode.Created);
+    }
+
+    [Fact]
+    public void SharedFactory_WithGlobalLimiterDisabled_ShouldNotRegisterAGlobalLimiter()
+    {
+        // AddRateLimiter is unconditional so that the named "login" policy always exists; only the
+        // GlobalLimiter assignment stays behind RateLimiting:Enabled. This proves that guard
+        // survived the move out of the if block.
+        var options = _fixture.WebApplicationFactory.Services
+            .GetRequiredService<IOptions<RateLimiterOptions>>();
+
+        options.Value.GlobalLimiter.ShouldBeNull();
+    }
+
+    [Fact]
+    public async Task SharedFactory_WithGlobalLimiterDisabled_ShouldNotReject150ConsecutiveRequestsToTheUnitOfMeasuresList()
+    {
+        // 150 exceeds the production PermitLimit of 100, so an accidentally active global limiter
+        // fails this test. A read endpoint on purpose: it writes no rows and does not collide with
+        // the collection's reset semantics.
+        using var client = _fixture.WebApplicationFactory.CreateClient();
+
+        for (int request = 0; request < 150; request++)
+        {
+            var response = await client.GetAsync("/api/unit-of-measures");
+
+            response.StatusCode.ShouldBe(
+                HttpStatusCode.OK,
+                $"Request {request + 1} was not answered with 200; the global limiter is active on the shared factory.");
+        }
     }
 }

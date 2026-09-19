@@ -24,6 +24,11 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
         // does not exceed the limit and cause random 429 responses.
         builder.UseSetting("RateLimiting:Enabled", "false");
 
+        // The login policy has its own switch and must be turned off here too. This factory lives
+        // for the whole collection and every login lands in the single "unknown" partition, so a
+        // real 5/300 s budget would be consumed across classes and produce flaky 429s.
+        builder.UseSetting("RateLimiting:Login:Enabled", "false");
+
         // appsettings.json ships an empty Jwt:SigningKey on purpose, and AddEnvanexIdentity
         // refuses to start without one. The host under test therefore has to be given the whole
         // section here; the values mirror the shipped numbers so the factory cannot quietly

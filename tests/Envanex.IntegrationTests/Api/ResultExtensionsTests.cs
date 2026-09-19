@@ -127,6 +127,40 @@ public sealed class ResultExtensionsTests
         problemDetails.Title.ShouldBe("Unauthorized");
     }
 
+    [Fact]
+    public void ToNoContentActionResult_Success_ShouldReturn204()
+    {
+        var result = Result.Success(true);
+
+        var actionResult = result.ToNoContentActionResult();
+
+        actionResult.ShouldBeOfType<NoContentResult>().StatusCode.ShouldBe(204);
+    }
+
+    [Fact]
+    public void ToNoContentActionResult_Failure_ShouldReturnTheMappedProblemDetails()
+    {
+        var result = Result.Failure<bool>(AuthErrors.InvalidRefreshToken);
+
+        var actionResult = result.ToNoContentActionResult();
+
+        var objectResult = actionResult.ShouldBeOfType<ObjectResult>();
+        objectResult.StatusCode.ShouldBe(401);
+
+        var problemDetails = objectResult.Value.ShouldBeOfType<ProblemDetails>();
+        problemDetails.Status.ShouldBe(401);
+        problemDetails.Detail.ShouldBe(
+            TurkishErrorMessages.GetMessage(AuthErrors.InvalidRefreshToken.Code, "fallback"));
+    }
+
+    [Fact]
+    public void ToNoContentActionResult_NullResult_ShouldThrowArgumentNullException()
+    {
+        Result<bool> result = null!;
+
+        Should.Throw<ArgumentNullException>(() => result.ToNoContentActionResult());
+    }
+
     [Theory]
     [MemberData(nameof(AuthErrorCodes))]
     public void ToActionResult_EveryAuthErrorCode_ShouldMapTo400Or401(string errorCode)
