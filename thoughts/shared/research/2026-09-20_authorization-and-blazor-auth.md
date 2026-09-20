@@ -159,6 +159,15 @@ attribute:
 `POST /api/unit-of-measures`. `ProductsDatasourceTests` alone is more than half the blast radius,
 and most of its count is `InlineData` expansion, which is why an attribute count understates it.
 
+`AuthPipelineTests` contributes four more, for a total blast radius of **76**. They are not in the
+table because they do not break — they **change meaning**. Four of its five cases assert today that
+an open endpoint answers 200 with no credentials, with a malformed bearer token, with an expired
+one and with a valid one; once the gate closes, each of those four states a different fact about
+the same request. They are handled in the phase that closes the gate rather than in the phase that
+switches clients over, because they are the gate's own guard rather than collateral: inverting them
+is how the gate is proved, and moving them earlier would leave the gate untested at the moment it
+lands.
+
 ### 5. The Blazor surface
 
 `App.razor` renders `<Routes />` at line 18. `Routes.razor` line 1 declares the router with
@@ -445,5 +454,5 @@ Settled by the human. The planner treats these as constraints.
   client path, and a factory left out is a surface left untested rather than unprotected.
 - The status-code-pages interaction is now live for 403 as well as 401, and the existing proof only
   covers 401.
-- Seventy-two tests changing at once is the largest mechanical change in this PR and belongs in its
+- Seventy-six tests changing at once is the largest mechanical change in this PR and belongs in its
   own phase, not folded into the phase that adds the attributes.
