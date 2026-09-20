@@ -119,6 +119,57 @@ Expected observation: the third request in each sequence answers 429 with
     `LoginPageTests` case names change from `PostLoginForm_*` to `PostLoginEndpoint_*`. The test
     **count** is unchanged, so the Phase 3 total below holds either way.
 
+### Spike C — are the Blazor framework script and the `/_blazor` endpoints reachable anonymously under a fallback policy?
+
+`App.razor` loads `_framework/blazor.web.js` on every page, and `MapRazorComponents<App>()
+.AddInteractiveServerRenderMode()` maps the `/_blazor` endpoints. Neither carries authorization
+metadata of its own, so the fallback policy added in Phase 4 applies to both unless something
+exempts them. The planner missed this entirely.
+
+**Why this is a spike and not a note.** If the script answers 401 under the fallback policy, the
+login page — the one page an anonymous visitor must be able to use — loses enhanced navigation
+immediately, and any interactive component added to it later cannot establish a circuit at all.
+That is a broken front door discovered in production rather than in a phase, which is why it has to
+be observed before Phase 4 is written.
+
+**Two separate questions.** They are mapped by different calls and may carry different metadata, so
+one observation does not settle both. Answer each on its own and do not generalise from one to the
+other.
+
+Action: temporarily add the Phase 4 fallback policy to `Program.cs` and nothing else — no
+`AllowAnonymous()` anywhere — then, signed out:
+
+1. `curl -i -s -o /dev/null -w "%{http_code}" http://localhost:5000/_framework/blazor.web.js`
+2. `curl -i -s -o /dev/null -w "%{http_code}" http://localhost:5000/login`
+3. `curl -i "http://localhost:5000/_blazor/negotiate?negotiateVersion=1" -X POST`
+4. Repeat 1 and 3 with `app.MapStaticAssets().AllowAnonymous();` in place, to find out whether the
+   asset manifest already covers the script.
+
+**Paste the raw response code for every one of these into the spike note** — not a summary of them.
+
+Record, for each of the two endpoints separately, **which mechanism grants it**:
+
+- **C1 — the script.** Does `MapStaticAssets().AllowAnonymous()` already cover
+  `_framework/blazor.web.js` through the asset manifest, or is the script served by a different
+  endpoint that needs its own exemption? The answer decides whether exemption row 11 is a
+  consequence of row 8 or a line of its own.
+- **C2 — the `/_blazor` endpoints.** Does the interactive-server render mode's endpoint carry
+  metadata that `.AllowAnonymous()` on the `MapRazorComponents` builder reaches, or does it need
+  `app.MapBlazorHub()`-style handling of its own? If `MapRazorComponents<App>().AllowAnonymous()`
+  would exempt **every page** as a side effect, that is the wrong mechanism and the note must say
+  so — Decision 1's whole point is that pages are closed by default.
+
+Outcomes:
+
+- **C-a — both already anonymous** (whether by the manifest or by framework-supplied metadata).
+  Rows 11 and 12 in Phase 4's exemption table are documentation plus a regression test each; no
+  production line is added.
+- **C-b — one or both answer 401.** Phase 4 adds the specific exemption the note names, scoped so
+  that it does not exempt page components. Rows 11 and 12 name that mechanism.
+
+Under either outcome Phase 4 keeps both proving tests: they are what stops a later change to the
+static-asset or render-mode wiring from silently closing the login page's script.
+
 ### Tests to add
 
 None. This phase writes no test.
@@ -301,6 +352,13 @@ Stated concretely, because this is the trap:
    re-performed only after a class that calls `ResetIdentityAsync` has run. Expected added wall
    clock: a handful of PBKDF2 pairs, not seventy-two. Per-test login was rejected for that reason —
    it would add roughly 14 s to a 44 s suite and push it past the 60 s line ADR 0007 set.
+6. **The cache is a ruling, not a shortcut.** Decision 6 says "log in for real", not "log in once
+   per test". A cached token was minted by a real `POST /api/auth/login` against the real endpoint
+   with real PBKDF2, and it passes full issuer, audience, lifetime and signature validation on
+   **every** use — that is the property the decision exists to protect, and caching does not touch
+   it. What a test-only authentication handler would have skipped is exactly what the cached token
+   still performs. Fourteen seconds would cross the 60-second line ADR 0007 set as a decision
+   point, for no gain in what is proved.
 
 ### How each of the five classes obtains an authenticated client
 
@@ -500,6 +558,10 @@ services.AddAuthentication(options =>
     {
         // Path prefix, never header presence. A browser holding a cookie and sending no
         // Authorization header to /api/* must get 401, not a 302 to the login page.
+        //
+        // The cookie is therefore never read on /api/*, which makes CSRF on the REST surface
+        // structurally impossible rather than merely mitigated: the controllers carry no
+        // antiforgery, and SameSite=Lax reduces that exposure without removing it.
         options.ForwardDefaultSelector = context =>
             context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
                 ? JwtBearerDefaults.AuthenticationScheme
@@ -661,9 +723,18 @@ builder.Services.AddAuthorization(options =>
 | 8 | static assets | `app.MapStaticAssets().AllowAnonymous()` | `StaticAsset_WithoutAuthentication_ShouldReturn200` (`GET /favicon.png`, referenced unfingerprinted in `App.razor`) |
 | 9 | `/openapi/v1.json`, Development only | `app.MapOpenApi().AllowAnonymous()` | `OpenApiDocument_InDevelopment_WithoutAuthentication_ShouldReturn200` |
 | 10 | Scalar reference, Development only | `app.MapScalarApiReference().AllowAnonymous()` | `ScalarReference_InDevelopment_WithoutAuthentication_ShouldReturn200` |
+| 11 | `_framework/blazor.web.js` (**missed by the planner**) | **Spike C1 decides**: either already covered by row 8's `MapStaticAssets().AllowAnonymous()` through the asset manifest, or its own exemption named in the spike note | `BlazorFrameworkScript_WithoutAuthentication_ShouldReturn200` |
+| 12 | the `/_blazor` endpoints (**missed by the planner**) | **Spike C2 decides**; the mechanism must not exempt page components as a side effect | `BlazorHubNegotiate_WithoutAuthentication_ShouldNotReturn401` |
 
 Rows 9 and 10 need a host running as `Development`; that is the second constructor added to
 `EnvanexWebApplicationFactory` in Phase 2, not a fourth factory type.
+
+Rows 11 and 12 exist because `App.razor` loads the framework script on **every** page and
+`MapRazorComponents<App>().AddInteractiveServerRenderMode()` maps `/_blazor`, and neither carries
+authorization metadata — so the fallback policy reaches both. If the script answers 401, the login
+page loses enhanced navigation immediately and no interactive component can ever establish a
+circuit there. Spike C settles the two separately, because they are mapped by different calls and
+one observation does not settle both. **Do not write this phase before the spike note exists.**
 
 ### Tests to add and change
 
@@ -695,8 +766,14 @@ count them.
 - **`ApiPath_WithASessionCookieAndNoBearerToken_ShouldReturn401AndNotARedirect`** — Decision 4's
   end-to-end proof: the exact case a header-presence selector would have got wrong.
 
-`tests/Envanex.IntegrationTests/Api/AnonymousExemptionTests.cs` (**created, +8**) — rows 1–8 of the
-table above, method names as listed there.
+`tests/Envanex.IntegrationTests/Api/AnonymousExemptionTests.cs` (**created, +10**) — rows 1–8 of the
+table above, method names as listed there, plus rows 11 and 12:
+- `BlazorFrameworkScript_WithoutAuthentication_ShouldReturn200` — `GET /_framework/blazor.web.js`
+  signed out. The regression this guards is the login page losing enhanced navigation.
+- `BlazorHubNegotiate_WithoutAuthentication_ShouldNotReturn401` — `POST
+  /_blazor/negotiate?negotiateVersion=1` signed out. Asserted as "not 401" rather than a specific
+  success code: the negotiate response shape is framework-owned and Spike C records what it
+  actually answers, but a 401 is the failure this test exists to catch.
 
 `tests/Envanex.IntegrationTests/Api/DevelopmentEndpointExemptionTests.cs` (**created, +3**)
 - `OpenApiDocument_InDevelopment_WithoutAuthentication_ShouldReturn200`
@@ -734,7 +811,8 @@ dotnet test tests\Envanex.IntegrationTests --filter "FullyQualifiedName~AuthPipe
 dotnet run --project src\Envanex.Web   # manual: /api/products/datasource in a browser answers 401 JSON, not the login page
 ```
 
-Expected test count at end: **613** (120 + 126 + **367**).
+Expected test count at end: **615** (120 + 126 + **369**) — two more than the planner's 613, from
+exemption rows 11 and 12.
 **No schema, no migration, no query — db-reviewer not required for this phase.**
 
 ---
@@ -819,7 +897,7 @@ dotnet user-secrets set "Demo:Password" "<a local value, never committed>" --pro
 dotnet run --project src\Envanex.Web   # manual: sign in at /login as the demo account, confirm read-only
 ```
 
-Expected test count at end: **620** (120 + 126 + **374**).
+Expected test count at end: **622** (120 + 126 + **376**).
 
 **Run db-reviewer on this phase** — the seeder writes `auth.AspNetRoles`, `auth.AspNetUsers` and
 `auth.AspNetUserRoles` at host startup, in production.
@@ -835,8 +913,8 @@ Expected test count at end: **620** (120 + 126 + **374**).
 | 1 role claim | 120 | 126 | 326 | **572** |
 | 2 authenticated clients | 120 | 126 | 330 | **576** |
 | 3 cookie + Blazor | 120 | 126 | 345 | **591** (590 under the Spike B sub-outcome) |
-| 4 close the gate | 120 | 126 | 367 | **613** |
-| 5 demo account | 120 | 126 | 374 | **620** |
+| 4 close the gate | 120 | 126 | 369 | **615** |
+| 5 demo account | 120 | 126 | 376 | **622** |
 
 Watch the integration suite's wall clock. ADR 0007 set 60 seconds as the point where it becomes a
 decision. The lazy per-collection token cache is what keeps this PR's addition to a handful of
@@ -858,9 +936,20 @@ PBKDF2 pairs; if the suite crosses 60 s, the cause to check first is a class cal
 ## Known gaps this PR opens, for the roadmap table
 
 - `/api/*` is bearer-only by construction (Decision 4). A browser holding a session cookie cannot
-  call the REST surface, including `/api/products/datasource`. Closes in PR 7 only if the grid ever
-  needs a browser-side data call; the Blazor grid calls the Application layer directly, so it does
-  not today.
+  call the REST surface, including `/api/products/datasource`. This is the deliberate price of
+  making CSRF structurally impossible there rather than mitigated. Nothing needs it today: the
+  Radzen grid runs in the Blazor Server circuit and calls the Application layer directly per
+  Decision 10. **It reopens on `showcase/devexpress`** — a DevExpress Blazor client rebuilt against
+  the same `DevExtreme.AspNet.Data` protocol would have to hold a bearer token in the browser,
+  which is the browser-token question the cookie scheme was chosen to avoid. That branch is never
+  merged, so the question is recorded rather than answered.
+- The browser access-denied experience is a bare 403 body, not a page: Decision 3 requires a
+  body-carrying 403, and writing that body from `OnRedirectToAccessDenied` means the markup is a
+  string literal in an events class rather than a `.razor` file — the one place in this codebase
+  where user-facing markup escapes Razor. The shape that gives both a correct status and a real
+  page is `UseStatusCodePagesWithReExecute("/status/{0}")`, re-executing an `/access-denied`
+  component while keeping the 403. Adopt it in PR 7, when the UI gets its second screen and the
+  machinery pays for itself.
 - The roadmap row "No `JwtBearerEvents.OnChallenge` body" closes in Phase 4 and should be struck.
 - The roadmap row "No authentication or authorization on any endpoint" closes in Phase 4.
 - The roadmap row about PR 6a's unrun manual smoke steps closes in Phase 3/Phase 5.
@@ -888,6 +977,21 @@ question the cookie scheme was chosen to avoid. The cost of my alternative is th
 `HttpContext.User` no longer answers which door opened it — the external findings' stated cost, and
 a cheaper one than an unreachable API surface.
 
+**RULING — rejected. Path-prefix forwarding stands.** The reason is one the planner did not give:
+if the cookie never authenticates `/api/*`, CSRF on the REST surface is **structurally impossible**
+rather than merely mitigated. A browser cannot be induced to make an authenticated cross-site call
+to an endpoint that does not read its cookie, whatever the request looks like. The controllers
+carry no antiforgery of their own — `UseAntiforgery` guards the Blazor endpoints, not
+`MapControllers` — and `SameSite=Lax` reduces that exposure without removing it. The multi-scheme
+alternative would make every write endpoint reachable with an ambient cookie and no token, which is
+the classic CSRF shape, and would then need antiforgery added across the REST surface to be safe.
+Removing the attack beats defending against it.
+
+The DevExpress concern is real but has no consumer today: the Radzen grid runs inside the Blazor
+Server circuit and calls the Application layer directly per Decision 10, so nothing in this
+repository makes a browser-side call to `/api/*`. The consequence is recorded in the known-gaps
+list above, naming `showcase/devexpress` as the branch where the question reopens.
+
 ## Disagreement 2 — Decision 3's cookie-side 403 puts a Turkish user-facing string in C#
 
 Requiring a body-carrying 403 from `OnRedirectToAccessDenied` means the access-denied page for a
@@ -897,6 +1001,11 @@ framework offers and gives a real page, at the cost of a 302 instead of a 403. I
 resolution is a 403 that *re-executes* an `/access-denied` component, which gives both, but it is
 more machinery than this PR should carry. Planned as written; I would revisit it in PR 7 when the
 UI gets its second screen.
+
+**RULING — planned as written, gap named precisely.** The known-gaps list above now records that
+the browser access-denied experience is a bare 403 body rather than a page, and names
+`UseStatusCodePagesWithReExecute("/status/{0}")` as the shape that gives both a correct status and
+a real Razor page, to be adopted in PR 7.
 
 ## Disagreement 3 — Decision 6, as implemented, is "one real login per class", not "per test"
 
@@ -909,6 +1018,11 @@ to a 44-second suite, which crosses the 60-second line ADR 0007 set as a decisio
 cache is right and the cache-invalidation test
 (`AuthenticatedClientTests.AccessToken_AfterResetIdentityAsync_ShouldBeReissuedRatherThanReused`)
 is what makes it safe, but the deviation should be a choice rather than something noticed in review.
+
+**RULING — rejected. The cache stands.** The decision was "log in for real", not "log in once per
+test". A cached real token still passes full issuer, audience, lifetime and signature validation on
+every use, which is the property the decision exists to protect; fourteen seconds would cross the
+60-second line. Recorded beside the cache in Phase 2 as point 6 so it reads as a ruling.
 
 ## Correction 1 — the blast radius is 76 executed tests, not 72 (not a disagreement)
 
