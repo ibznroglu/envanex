@@ -176,8 +176,11 @@ authentication usings.
 ### 6. Antiforgery
 
 `app.UseAntiforgery()` at line 142, after authentication and authorization and before every
-endpoint mapping. There is **no explicit `AddAntiforgery` call anywhere in the repository**;
-antiforgery services arrive through `AddRazorComponents()` with framework defaults.
+endpoint mapping. There is **no explicit `AddAntiforgery` call anywhere in the repository** — a
+repo-wide search returns zero matches, so nothing here configures antiforgery options. Which
+registration supplies the antiforgery services, and with what defaults, is framework behaviour that
+cannot be established from this repository; it is recorded under "Not verified" rather than
+asserted here.
 
 There is no `<EditForm>`, no `<form>`, no `<input>` and no `[SupplyParameterFromForm]` in the
 codebase. Nothing posts a form today.
@@ -261,6 +264,11 @@ with `AddPolicyScheme` and a `ForwardDefaultSelector` chooses a scheme per reque
 inspecting whether an `Authorization` header is present. A third, narrower option is naming schemes
 on individual `[Authorize]` attributes.
 
+Header presence is the common key for that selector and is rejected here. A browser holding a
+session cookie and sending no `Authorization` header to an `/api/*` path would be forwarded to the
+cookie scheme and answered with a 302 to the login page, which is exactly what Decision 4 forbids.
+Selection keys on the path prefix instead.
+
 The current registration names `"Bearer"` as both the default authenticate and default challenge
 scheme, so adding a cookie scheme forces an explicit decision about what the defaults become rather
 than leaving it implicit.
@@ -296,6 +304,16 @@ How a statically-rendered Blazor form obtains and submits its antiforgery token 
 experiment and is not asserted here. The first phase that builds the login form must establish it
 by running the form, not by assuming it.
 
+Which registration supplies the antiforgery services is likewise unestablished. The repository
+contains no `AddAntiforgery` call; that `AddRazorComponents()` is what registers them, and with
+which defaults, is framework behaviour and was not verified here.
+
+Whether `[EnableRateLimiting]` on a statically-rendered Blazor page component reaches endpoint
+metadata where `UseRateLimiter` can see it is not established in this repository. The attribute is
+proven to work as an MVC attribute on `AuthController.Login` and nowhere else; a Blazor form posts
+to a component endpoint from `MapRazorComponents`, not to a controller. Decision 9 depends on this
+and must be settled by experiment before its mechanism is chosen.
+
 ## Decisions taken before planning
 
 Settled by the human. The planner treats these as constraints.
@@ -312,8 +330,21 @@ Settled by the human. The planner treats these as constraints.
 2. **Policies are `CanRead` and `CanWrite`, and two roles are seeded.** Roles map to policies;
    endpoints never name a role. Adding a role later must not mean editing a controller.
 
-3. **An authenticated user who fails a policy gets 403, and both rejection paths carry a body.**
-   `OnChallenge` and `OnForbidden` both write ProblemDetails. `GetReasonPhrase` gains a 403 arm.
+3. **An authenticated user who fails a policy gets 403, and every rejection path carries a body —
+   in both schemes.** `OnChallenge` and `OnForbidden` are `JwtBearerEvents` and cover the bearer
+   scheme only; a request rejected by the cookie scheme never passes through them. A cookie
+   handler's forbid produces a bodiless 403 unless `AccessDeniedPath` is set or
+   `CookieAuthenticationEvents.OnRedirectToAccessDenied` is overridden, and a bodiless 4xx is
+   precisely what `UseStatusCodePagesWithReExecute` re-executes as the not-found page. Scoping this
+   decision to the bearer events alone would leave that failure alive on the Blazor side only,
+   which is the half least likely to be noticed. Both schemes are therefore in scope: bearer
+   through its events, cookie through `AccessDeniedPath` or `OnRedirectToAccessDenied`. The test
+   must prove a body-carrying 403 for each scheme separately rather than for one.
+
+   `GetReasonPhrase` gains a 403 arm; without it a 403 would carry the title `"Error"`. This does
+   not orphan `ResultMappingTests`: that test pairs status-map entries with error codes, and a
+   middleware-produced 403 adds no entry to the status map, so its fourth fact stays green.
+
    This is the decision that retires PR 6a's argument for the middleware's position inside the
    status-code-pages wrapper, and a test must prove a 403 is not re-executed as the not-found page,
    exactly as `AuthPipelineTests` proves it today for 401.
@@ -321,7 +352,10 @@ Settled by the human. The planner treats these as constraints.
 4. **The cookie scheme never redirects an API path to a login page.** A cookie handler's default
    behaviour on an unauthenticated request is a 302 to `LoginPath`; on `/api/*` that turns a 401
    into a redirect and breaks every API client. API paths answer 401 regardless of which scheme
-   authenticated them.
+   authenticated them. This constrains how the scheme is selected: selection keys on the **path
+   prefix**, not on the presence of an `Authorization` header. Header presence is the shape the
+   external findings name as typical, and it fails this decision — a browser holding a cookie and
+   sending no header to `/api/*` would be forwarded to the cookie scheme and redirected.
 
 5. **The access token carries a role claim, and the bearer handler is told how to read it.**
    Cookie-authenticated users get their roles from Identity's principal automatically; bearer
@@ -347,11 +381,17 @@ Settled by the human. The planner treats these as constraints.
    `AuthorizeRouteView` with a `NotAuthorized` template.** Forced by the signing-in constraint
    above, and the Radzen collision is recorded rather than worked around.
 
-9. **The Blazor login path carries the same named rate limit policy as the REST login endpoint.**
-   `[EnableRateLimiting("login")]` currently sits on `AuthController.Login` only. A Blazor form
-   posts to its own component endpoint, not to `/api/auth/login`, so without this the brute-force
-   protection built in PR 6a is bypassable the moment a login form exists. A test must prove the
-   Blazor path is limited.
+9. **The Blazor login path is rate-limited by the same named policy as the REST login endpoint;
+   the mechanism is experiment-first.** `[EnableRateLimiting("login")]` currently sits on
+   `AuthController.Login` only. A Blazor form posts to its own component endpoint, not to
+   `/api/auth/login`, so without this the brute-force protection built in PR 6a is bypassable the
+   moment a login form exists. That the path must be limited is settled; *how* is not. Whether the
+   attribute on a statically-rendered page component reaches endpoint metadata where
+   `UseRateLimiter` can see it is unestablished in this repository and is recorded under "Not
+   verified" — it is proven only as an MVC attribute on a controller action. The phase that builds
+   the form establishes it by running it. If the attribute does not reach metadata, the fallback is
+   a dedicated endpoint or a middleware, which reshapes Decision 8. A test must prove the Blazor
+   path is limited whichever mechanism carries it.
 
 10. **Blazor components call the Application layer directly.** They inject `ICommandHandler` and
     `IQueryHandler` rather than calling the REST surface over HTTP. They run in the same process,
@@ -367,9 +407,15 @@ Settled by the human. The planner treats these as constraints.
 - The antiforgery mechanics of a statically-rendered login form are unmapped and must be settled by
   running the form, not by reasoning.
 - `AddIdentityCore` was chosen in PR 6a specifically to avoid pulling `SignInManager` and a shared
-  framework reference into `Envanex.Infrastructure`. The cookie scheme needs sign-in, and where
-  that capability is registered without reopening that decision is an open design question for the
-  plan.
+  framework reference into `Envanex.Infrastructure`. The cookie scheme needs sign-in, but PR 6a's
+  decision does not have to be reopened to get it: `AddIdentityCore` already registers
+  `IUserClaimsPrincipalFactory<EnvanexUser>`, and `SignInAsync` is an extension on
+  `Microsoft.AspNetCore.Authentication` — both reachable from `Envanex.Web`. Sign-in can therefore
+  be hand-rolled in the host, building the principal from the factory and calling
+  `HttpContext.SignInAsync`, with no `SignInManager` and no framework reference entering
+  `Envanex.Infrastructure`. Decision 11's revalidation runs on `UserManager.GetSecurityStampAsync`
+  and needs nothing further. What remains is where in `Envanex.Web` that code sits, which is a
+  placement question rather than a design one.
 - Closing the gate changes what the three factories mean. Every one of them needs an authenticated
   client path, and a factory left out is a surface left untested rather than unprotected.
 - The status-code-pages interaction is now live for 403 as well as 401, and the existing proof only
