@@ -402,6 +402,31 @@ Settled by the human. The planner treats these as constraints.
     after the user is locked out or deleted, which would leave PR 6a's lockout ineffective in the
     UI.
 
+12. **The two seeded roles are `Administrator` and `Viewer`, and the demo account is a `Viewer`.**
+    Names that need explaining were rejected. A role name is read by people who will never open the
+    policy table, and a name whose meaning has to be looked up is a name that gets guessed at
+    instead. These two say what they are.
+
+13. **Read-only is expressed as a role, not as a separate claim.** `Viewer` maps to `CanRead` and
+    not to `CanWrite`. A claim checked by the policy was rejected because it adds a third concept
+    to a model that already has two: not being able to write is exactly what a role already says,
+    and the roadmap's recorded decision is that roles map to policies. A claim would put the same
+    fact in two places and invite them to disagree.
+
+14. **`/api/auth/logout` stays anonymous under the fallback policy.** It takes a refresh token, not
+    an access token, so a client whose access token has expired must still be able to end its
+    session. Requiring authentication was rejected because it would leave a user holding a valid
+    refresh token unable to log out, and the token family alive until it expires on its own —
+    the case where logging out matters most. It is exempted with `[AllowAnonymous]`, and the reason
+    is recorded in ADR 0008: an exemption on an auth endpoint reads as an oversight unless
+    something says it was chosen.
+
+15. **The Blazor UI in this PR is a login page, a sign-out control and the current user in
+    `NavMenu`, and the existing Home page is protected rather than public.** Leaving Home anonymous
+    was rejected because it would mean writing a deliberate `[AllowAnonymous]` exemption for it,
+    and there is no case for an ERP's landing page being open to anonymous callers. An anonymous
+    visitor sees the login page.
+
 ## Risks and unknowns
 
 - The antiforgery mechanics of a statically-rendered login form are unmapped and must be settled by
@@ -422,13 +447,3 @@ Settled by the human. The planner treats these as constraints.
   covers 401.
 - Seventy-two tests changing at once is the largest mechanical change in this PR and belongs in its
   own phase, not folded into the phase that adds the attributes.
-
-## Open questions for the human
-
-1. Which two role names are seeded, and which one the demo account receives.
-2. Whether the read-only demo account is expressed as a role without `CanWrite`, or as a separate
-   claim checked by the policy.
-3. Whether `/api/auth/logout` stays anonymous under the fallback policy, given it takes a refresh
-   token rather than an access token.
-4. Whether the Blazor UI in this PR shows anything beyond a login page, a sign-out control and the
-   current user, and whether the existing Home page becomes protected or stays public.
