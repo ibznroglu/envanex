@@ -705,9 +705,213 @@ Phase 5 is as written — `await app.SeedIdentityAsync();` sits between `Build()
 | B | B1 **with** the GET guard | 0 — `BlazorLoginPage_RepeatedGets_ShouldNotSpendLoginPermits` is kept |
 | C1 | C-a | 0 |
 | C2 | C-b | 0 — row 12 names a scoped mechanism instead of "documentation only" |
-| C3 | unresolved | unknown until the human rules |
+| C3 | unresolved at first pass; **C3-a** after the re-run below | 0 |
 | D | D1 | 0 — no `BlazorPageAuthorizationConventionTests` case |
 | E | E1 | 0 |
 
-Every count from Phase 3 onward stands as the plan wrote it, **except** whatever follows from the
-C3 ruling.
+Every count from Phase 3 onward stands as the plan wrote it.
+
+---
+
+# C3 re-run — the same question, asked of Phase 4's configuration
+
+Added 2026-09-21, after the first pass. Everything above this line is left exactly as it was
+recorded; it remains the honest record of what Phase 0's configuration answers.
+
+## Why it was re-run
+
+Ruled by the human. Spike C as the plan specified it carried the Phase 4 fallback policy **and
+nothing else**, which leaves bearer as the default scheme. Phase 4 does not run that way: it ships
+the selector policy scheme introduced in Phase 3, and the selector forwards every non-`/api/*`
+path to the cookie scheme, whose `OnRedirectToLogin` answers 302. The first pass measured a
+configuration that cannot produce C3-a, so C3-a's absence said nothing about Phase 4. The
+observation was real; the question was wrong.
+
+## Configuration of the re-run
+
+`Program.cs` temporarily carried the fallback policy **plus** Phase 3's scheme registration, copied
+from the plan's Phase 3 Signatures section, and nothing else — no login page, no
+`CookieSignInService`, no events class:
+
+```csharp
+builder.Services.AddAuthentication(options =>
+    {
+        options.DefaultScheme             = "Envanex";
+        options.DefaultAuthenticateScheme = "Envanex";
+        options.DefaultChallengeScheme    = "Envanex";
+        options.DefaultForbidScheme       = "Envanex";
+        options.DefaultSignInScheme       = "Envanex.Cookie";
+        options.DefaultSignOutScheme      = "Envanex.Cookie";
+    })
+    .AddPolicyScheme("Envanex", displayName: null, options =>
+    {
+        options.ForwardDefaultSelector = context =>
+            context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase)
+                ? JwtBearerDefaults.AuthenticationScheme
+                : "Envanex.Cookie";
+    })
+    .AddCookie("Envanex.Cookie", cookie =>
+    {
+        cookie.LoginPath = "/login";
+    });
+
+builder.Services.AddAuthorization(options =>
+{
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+});
+```
+
+Control that the selector was live: `GET /` answered `302` in this run, where it answered `401` in
+the first pass.
+
+`/login` still does not exist, so the redirect target is an unmatched path. That does not affect
+what is being measured — the question is what the *denial* answers, not what the target renders.
+
+## Probe 6 — `GET /gibberish-unmatched-path`, non-`/api/*`, `/not-found` still closed
+
+```
+curl_status=302 size=0
+HTTP/1.1 302 Found
+Content-Length: 0
+Date: Sun, 20 Sep 2026 22:59:48 GMT
+Server: Kestrel
+Location: http://localhost:5216/login?ReturnUrl=%2Fgibberish-unmatched-path
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+```
+
+## Probe 7 — `GET /api/auth/register`, under `/api/*`, `/not-found` still closed
+
+```
+curl_status=302 size=0
+HTTP/1.1 302 Found
+Content-Length: 0
+Date: Sun, 20 Sep 2026 22:59:48 GMT
+Server: Kestrel
+Location: http://localhost:5216/login?ReturnUrl=%2Fnot-found
+WWW-Authenticate: Bearer
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+```
+
+Read that `Location` carefully: `ReturnUrl=%2Fnot-found`, not `%2Fapi%2Fauth%2Fregister`. The
+bearer handler challenged the original `/api/*` request with a bodiless 401 — the
+`WWW-Authenticate: Bearer` survivor proves it — and that 401 was re-executed as `/not-found`.
+`/not-found` is **not** under `/api/*`, so the selector forwarded the re-executed request to the
+**cookie** scheme, which redirected it. The redirect overwrote the 401.
+
+## New probe — `GET /gibberish-unmatched-path` with `/not-found` exempted
+
+`@attribute [AllowAnonymous]`-equivalent metadata attached to the `/not-found` endpoint only, so
+the re-execution can actually render:
+
+```
+curl_status=302 size=0
+HTTP/1.1 302 Found
+Content-Length: 0
+Date: Sun, 20 Sep 2026 23:00:08 GMT
+Server: Kestrel
+Location: http://localhost:5216/login?ReturnUrl=%2Fgibberish-unmatched-path
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+```
+
+Byte-for-byte the same answer as probe 6, bar the clock. Exempting `/not-found` changes nothing
+here, and the reason is the point: `UseStatusCodePagesWithReExecute` handles 4xx and 5xx only, and
+a 302 is neither. The re-execution never fires on this path at all.
+
+Two companions from the same run:
+
+```
+=== GET /api/auth/register, /not-found exempt ===
+curl_status=401 size=4485
+HTTP/1.1 401 Unauthorized
+Content-Type: text/html; charset=utf-8
+Date: Sun, 20 Sep 2026 23:00:08 GMT
+Server: Kestrel
+Transfer-Encoding: chunked
+WWW-Authenticate: Bearer
+X-Content-Type-Options: nosniff
+X-Frame-Options: DENY
+Referrer-Policy: strict-origin-when-cross-origin
+Content-Security-Policy: frame-ancestors 'self'
+
+body marker: Sorry, the content you are looking for does not exist.
+
+=== GET /not-found directly === 200
+```
+
+## Branch: **C3-a**
+
+**C3-a — the anonymous unmatched non-`/api/*` path answers 302 to `/login`.** Confirmed under the
+configuration Phase 4 actually ships, with and without the `/not-found` exemption.
+
+Phase 4's row 5 therefore reads as C3-a specifies:
+
+- mechanism column: "none is possible — the challenge precedes the 404, so the 404 re-execution
+  path is only reachable for an authenticated caller";
+- the two cases are `UnknownPath_WithoutAuthentication_ShouldRedirectToTheLoginPage` and
+  `UnknownPath_WhileSignedIn_ShouldReturn404AndRenderTheNotFoundPage`.
+
+The observed `Location` is `/login?ReturnUrl=%2F<original path>`, so the first case may assert the
+`ReturnUrl` too.
+
+## Probe 7 restated — what `AuthApiTests.Register_ShouldReturn404` becomes
+
+The re-run **does not** hand Phase 4 a finished answer here, and that is worth being blunt about.
+Three configurations, three different answers to the same request:
+
+| Configuration | Answer to `GET /api/auth/register` |
+|---|---|
+| fallback policy only, bearer default (first pass) | bodiless `401` |
+| fallback + selector + cookie, `/not-found` closed | **`302` to `/login?ReturnUrl=%2Fnot-found`** |
+| fallback + selector + cookie, `/not-found` exempt | `401` carrying the not-found HTML page |
+
+None of these is Phase 4's answer, because Phase 4 adds the bearer `OnChallenge` that writes a
+ProblemDetails body and calls `HandleResponse()`. **Writing the body starts the response, and a
+started response is never re-executed** — that is what collapses the table above to a single
+`application/problem+json` 401. So the expected new status of
+`AuthApiTests.Register_ShouldReturn404` is **401**, with a problem+json body, and the rename should
+say 401 rather than 404.
+
+**The 302 row is the finding Phase 4 must not lose.** An unmatched `/api/*` path answering a
+redirect to an HTML login page is exactly what Decision 4 forbids, and it happens by accident, via
+the re-execution target crossing the selector's `/api` boundary. The bearer `OnChallenge` is
+therefore not a nicety about response bodies — it is the only thing standing between `/api/*` and a
+login-page redirect. Phase 4 should carry a test that says so, asserting that an unmatched `/api/*`
+path answers 401 and that its `Location` header is absent.
+
+## Standing observation: the re-executed request can overwrite the original status
+
+The plan says `UseStatusCodePagesWithReExecute` "re-executes 4xx and 5xx only, never a 302, so
+these two are mutually exclusive". The first half is right and the conclusion is wrong, and the
+correction is not the one that was expected either — so it is stated here plainly, with the
+observations that force it, rather than reasoned from the source.
+
+`UseStatusCodePagesWithReExecute` restores the **original** status code *before* running the
+re-executed request, and then the re-executed request runs through the whole pipeline and may set
+a status of its own. Which one the client sees depends entirely on what the re-execution does:
+
+| Original | What `/not-found` did on re-execution | Client saw | Observed in |
+|---|---|---|---|
+| `401` bearer challenge | denied, challenged again | `401`, bodiless, `WWW-Authenticate` **twice** | first pass, probes 3–7 |
+| `401` bearer challenge | rendered (exempt) | `401` + the not-found page | first pass, with `/not-found` exempt |
+| `400` from `/_blazor/disconnect` | denied, challenged | **`401`** — the 400 was lost | first pass, C2 |
+| `401` bearer challenge | denied, **redirected** by the cookie scheme | **`302` to `/login`** — the 401 was lost | re-run, probe 7 |
+| `302` cookie redirect | never ran — 302 is not 4xx/5xx | `302` | re-run, probes 6 and the new probe |
+
+So: **it is not true that the final status is always the original denial's.** The original survives
+only when the re-executed page renders normally. Whenever the re-execution terminates with a status
+of its own — a challenge, a forbid, or a redirect — that status wins and the original is lost. Two
+of the five rows above are cases where it was lost, and one of them silently converts an API 401
+into a browser redirect.
+
+Phase 4 must not be written against "mutually exclusive", and must not be written against "the
+original status always wins" either. The rule that actually holds is narrower: **once a response
+has started, no re-execution happens at all** — which is why every rejection path in this PR is
+required to carry a body, and why exemption row 4 on `/not-found` matters.
