@@ -16,6 +16,12 @@ namespace Envanex.IntegrationTests.Identity;
 [Collection(DatabaseCollection.Name)]
 public sealed class IdentityRoleSeederTests : IAsyncLifetime
 {
+    /// <summary>
+    /// How many times the two-host race is run. A single pass proves nothing about an interleaving
+    /// nobody controls. Kept as a constant so the number is turned in one place.
+    /// </summary>
+    private const int ConcurrencyIterations = 20;
+
     private readonly SqlServerFixture _fixture;
     private ServiceProvider _provider = null!;
 
@@ -45,6 +51,40 @@ public sealed class IdentityRoleSeederTests : IAsyncLifetime
         await IdentityRoleSeeder.EnsureRolesAsync(_provider);
 
         (await ReadRoleNamesAsync()).ShouldBe([EnvanexRoles.Administrator, EnvanexRoles.Viewer]);
+    }
+
+    [Fact]
+    public async Task EnsureRolesAsync_RunByTwoHostsAtOnce_ShouldNotThrowAndShouldLeaveExactlyTwoRoles()
+    {
+        for (var iteration = 0; iteration < ConcurrencyIterations; iteration++)
+        {
+            // Every iteration starts from the state a cold host sees, which is the only state in
+            // which the insert can be raced at all.
+            await _fixture.ResetIdentityAsync();
+
+            // Nothing here is orchestrated by a barrier, a hook or a seam: the two racers are the
+            // production method, unmodified, so only what holds under every interleaving is
+            // asserted. Whether they serialize or truly overlap is not this test's to decide.
+            await Should.NotThrowAsync(async () =>
+            {
+                var first = SeedInOwnScopeAsync();
+                var second = SeedInOwnScopeAsync();
+
+                await Task.WhenAll(first, second);
+            });
+
+            (await ReadRoleNamesAsync()).ShouldBe(
+                [EnvanexRoles.Administrator, EnvanexRoles.Viewer],
+                $"Iteration {iteration} did not leave exactly the two seeded roles.");
+        }
+    }
+
+    private Task SeedInOwnScopeAsync()
+    {
+        // Task.Run so the two racers really are on different threads rather than interleaved by
+        // the await points of a single one. EnsureRolesAsync opens its own scope, and therefore its
+        // own RoleManager and DbContext, per call.
+        return Task.Run(() => IdentityRoleSeeder.EnsureRolesAsync(_provider));
     }
 
     private async Task<IReadOnlyList<string>> ReadRoleNamesAsync()

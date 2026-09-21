@@ -1,5 +1,7 @@
 using Envanex.Application.Authentication;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.Data.SqlClient;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Envanex.Infrastructure.Identity;
@@ -25,6 +27,8 @@ public static class IdentityRoleSeeder
 
         foreach (var role in EnvanexRoles.All)
         {
+            // RoleManager's API takes no CancellationToken, so this is the one place the caller's
+            // token can be honoured at all: between roles, never inside the work on one.
             ct.ThrowIfCancellationRequested();
 
             if (await roleManager.RoleExistsAsync(role))
@@ -32,16 +36,35 @@ public static class IdentityRoleSeeder
                 continue;
             }
 
-            var result = await roleManager.CreateAsync(new IdentityRole<Guid>(role));
+            IdentityResult result;
+
+            try
+            {
+                result = await roleManager.CreateAsync(new IdentityRole<Guid>(role));
+            }
+            catch (Exception exception) when (IsLostSeedRace(exception))
+            {
+                // The other half of the race, and the half RoleValidator cannot see. Its duplicate
+                // check reads the store before the insert, so when both hosts read before either
+                // commits, both validators pass and the loser's INSERT is what
+                // auth.AspNetRoles.RoleNameIndex rejects. The role the loser wanted exists, so this
+                // is an outcome rather than a failure — the same terms as DuplicateRoleName below.
+                //
+                // Unlike the unique-violation clause in RotateAsync, this one is reached rather
+                // than merely defensive: deleting it turns
+                // EnsureRolesAsync_RunByTwoHostsAtOnce_ShouldNotThrowAndShouldLeaveExactlyTwoRoles
+                // red on the first iteration, with the DbUpdateException escaping host startup.
+                continue;
+            }
 
             if (result.Succeeded)
             {
                 continue;
             }
 
-            // Two hosts starting at once can both pass the check above and race the insert. The
-            // loser is told the name is taken, and the role it wanted is there either way, so that
-            // is an outcome rather than a failure.
+            // The interleaving RoleValidator does see: the winner had already committed by the time
+            // this host's validator read the store, so the insert never runs and Identity reports
+            // the name as taken instead. The role is there either way.
             if (result.Errors.Any(error =>
                 string.Equals(error.Code, roleManager.ErrorDescriber.DuplicateRoleName(role).Code, StringComparison.Ordinal)))
             {
@@ -55,4 +78,11 @@ public static class IdentityRoleSeeder
             throw new InvalidOperationException($"Failed to create the role '{role}'. Identity reported: {errors}");
         }
     }
+
+    /// <summary>
+    /// A 2601/2627 on <c>auth.AspNetRoles.RoleNameIndex</c>: another host inserted this role name
+    /// between this host's validator reading the store and its own INSERT reaching it.
+    /// </summary>
+    private static bool IsLostSeedRace(Exception exception)
+        => exception is DbUpdateException { InnerException: SqlException { Number: 2601 or 2627 } };
 }
