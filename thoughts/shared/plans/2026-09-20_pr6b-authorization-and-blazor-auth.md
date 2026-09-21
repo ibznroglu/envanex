@@ -51,6 +51,31 @@ mere authentication; and the `Demo:Enabled` gate.
 
 # Phase 0: Spikes — throwaway code, one committed note
 
+**DONE.** Run on 2026-09-21; the note is
+`thoughts/shared/debug/2026-09-20_pr6b-blazor-auth-spikes.md`. All seven questions are answered and
+every branch below is settled:
+
+| Question | Branch | Consequence for the later phases |
+|---|---|---|
+| A — antiforgery in a statically rendered `EditForm` | **A1** | Phase 3 as written; `EditForm` emits both hidden fields, `__RequestVerificationToken` and `_handler` |
+| B — `[EnableRateLimiting]` on a page component | **B1, and a GET spends a permit** | Phase 3 keeps the POST-only guard **and** `BlazorLoginPage_RepeatedGets_ShouldNotSpendLoginPermits`; no count falls |
+| C1 — the framework script | **C-a** | Exemption row 11 is a consequence of row 8; no production line |
+| C2 — the three `/_blazor` endpoints | **C-b** | Exemption row 12 gets its own scoped mechanism, named in the note |
+| C3 — the unmatched non-`/api/*` path | **C3-a** | Row 5's mechanism column and its two case names, below |
+| D — an authorization attribute on a `.razor` page | **D1** | `@attribute` on `.razor` files; `BlazorPageAuthorizationConvention` is **not** created; no count rises |
+| E — code between `app.Build()` and `app.Run()` | **E1** | Phase 5 keeps `await app.SeedIdentityAsync();` in that position |
+
+C3 took two runs. The first measured the configuration Spike C specifies — the fallback policy and
+nothing else, which leaves bearer as the default scheme — where neither C3-a's 302 nor C3-b's 404 is
+reachable, because the cookie scheme that owns `OnRedirectToLogin` does not land until Phase 3. The
+re-run carried Phase 3's scheme registration as well, which is how Phase 4 actually ships, and
+answered C3-a. Both runs are in the note; the first is kept because it is what settles C2's
+second-order finding about `/not-found`.
+
+The rest of this phase is left as it was written. It is the record of the questions as they were
+asked, and the note is only readable against it — but nothing below is still open, and no later
+phase branches on any of it.
+
 **Seven questions, carried by five spikes (A, B, C with C1–C3, D, E), must be answered by running
 something before Phases 3, 4 and 5 can be implemented as written.** This phase produces **no
 committed source**. Its single deliverable is a committed debug note.
@@ -664,9 +689,11 @@ query — db-reviewer not required.**
 
 # Phase 3: The cookie scheme, the login page, sign-out, and revalidation
 
-Decisions 3 (cookie half), 4, 8, 9, 10, 11, 15. Assumes Spike outcomes **A1 or A2**, **B1** and
-**D1**. Under **A3/B2** the files change as spelled out in Spike B; under **D2** the page metadata
-moves into `BlazorPageAuthorizationConvention` as spelled out in Spike D.
+Decisions 3 (cookie half), 4, 8, 9, 10, 11, 15. Phase 0 settled every question this phase depended
+on: **A1**, **B1 with a GET spending a permit**, and **D1**. So `Login.razor` is an `<EditForm>`
+with no `<AntiforgeryToken />` child, the `"login"` policy delegate gains a POST-only guard, page
+permissions are written as `@attribute` lines in the `.razor` files, and
+`BlazorPageAuthorizationConvention` is not created. Nothing here is conditional any more.
 
 The `/api/*` gate is still open at the end of this phase. One page is not: **`Home.razor` carries
 `@attribute [Authorize(Policy = EnvanexPolicies.CanRead)]`**. An ERP landing page shows inventory
@@ -709,8 +736,12 @@ merely authenticated. Three consequences follow and are honoured below:
   selector. It reads `Auth:Cookie:SecurePolicy` through `CookieSecurePolicyResolver`.
 - `src/Envanex.Web/Program.cs` — **modified** — `AddCascadingAuthenticationState()`, the
   `AuthenticationStateProvider` registration, `CookieSignInService` registration, the two
-  `AddPolicy` calls inside the existing `AddAuthorization` at line 28, and (if Spike B showed GETs
-  spending permits) the POST-only guard in the `"login"` policy delegate.
+  `AddPolicy` calls inside the existing `AddAuthorization` at line 28, and **the POST-only guard in
+  the `"login"` policy delegate** — `return RateLimitPartition.GetNoLimiter(partitionKey)` when
+  `context.Request.Method` is not `POST`. The guard is required, not optional: Spike B observed the
+  third consecutive **GET** of the attributed page answer 429, because a component endpoint serves
+  GET and POST from one endpoint. Without it, five reloads of `/login` lock login out for five
+  minutes in production.
 - `src/Envanex.Web/Components/Routes.razor` — **modified** — `RouteView` → `AuthorizeRouteView` with
   a `NotAuthorized` template carrying the Turkish "Bu sayfayı görüntüleme yetkiniz yok." and, for an
   anonymous user, a link to `/login`, plus the comment recording that under static SSR the endpoint
@@ -751,8 +782,14 @@ merely authenticated. Three consequences follow and are honoured below:
   signs in through the login form. Without it, "signs in through the login form" gets written four
   different ways across `LoginPageTests`, `SignOutPageTests`, `AuthenticatedShellTests`,
   `CookieAuthPipelineTests` and Phase 5's demo test.
-- `src/Envanex.Web/Authorization/BlazorPageAuthorizationConvention.cs` — **created under Spike
-  outcome D2 only**; see Spike D for its contents and its one extra test.
+- `src/Envanex.Web/Authorization/BlazorPageAuthorizationConvention.cs` — **not created.** Spike D
+  landed on D1: `@attribute [Authorize]` and `@attribute [AllowAnonymous]` in a `.razor` file both
+  reach endpoint metadata, so the attributes in the files above are the mechanism and there is no
+  convention class and no
+  `BlazorPageAuthorizationConventionTests.EveryRoutablePageEndpoint_ShouldCarryEitherAPolicyOrAllowAnonymous`.
+  (A route-pattern convention on the same builder is still used in Phase 4, for the `/_blazor`
+  endpoints, which carry no attributes of their own. That is a different mechanism for a different
+  surface; it does not bring this file back.)
 
 ### Signatures
 
@@ -946,9 +983,10 @@ half of Decision 3, and the cookie half of the two-claim-type equivalence Phase 
 
 `tests/Envanex.IntegrationTests/Api/LoginRateLimiterTests.cs` (**+2**, Decision 9)
 - `BlazorLoginForm_ExceedingTheLoginRateLimit_ShouldReturn429`
-- `BlazorLoginPage_RepeatedGets_ShouldNotSpendLoginPermits` — **drop this case and the guard it
-  covers if Spike B showed GETs do not consume permits**; every count from this phase onward falls
-  by one.
+- `BlazorLoginPage_RepeatedGets_ShouldNotSpendLoginPermits` — **kept.** Spike B observed a bare GET
+  of the attributed page spending a login permit, so this case is the guard's proof: delete the
+  POST-only guard from the `"login"` policy delegate and it goes red on the third `GET /login`. No
+  count falls.
 
 ### Validation
 
@@ -968,8 +1006,8 @@ and spike step in this PR, and it only works because `appsettings.Development.js
 the sign-in appears to fail with no error: the browser discards the `Secure` cookie and the
 redirect to `/` bounces back to `/login`.
 
-Expected test count at end: **598** (120 + 126 + **352**). See the outcome deltas under the count
-table for the Spike B and Spike D variants.
+Expected test count at end: **598** (120 + 126 + **352**). Settled, not provisional: B1 keeps the
+GET case and D1 adds none, so neither of the deltas the plan used to carry applies.
 
 **Run db-reviewer on this phase** — two new production reads: a `FindByIdAsync` per cookie sign-in,
 and a recurring security-stamp read from `RevalidatingIdentityAuthenticationStateProvider`, once
@@ -988,9 +1026,26 @@ so nothing in this phase repairs a break it caused.
 
 - `src/Envanex.Web/Program.cs` — **modified** — the existing `AddAuthorization` call gains the
   fallback policy; `app.MapStaticAssets().AllowAnonymous();`, `app.MapOpenApi().AllowAnonymous();`,
-  `app.MapScalarApiReference().AllowAnonymous();`, plus whatever Spike C selected for rows 11 and 12.
-  The comment block at lines 130–138 is rewritten: the bodiless-challenge argument it makes has now
-  expired and the events that replace it must be named there.
+  `app.MapScalarApiReference().AllowAnonymous();`, and — for row 12 — a route-pattern convention on
+  the builder `MapRazorComponents<App>()` returns, exactly as Spike C2 verified it:
+
+  ```csharp
+  app.MapRazorComponents<App>()
+      .AddInteractiveServerRenderMode()
+      .Add(endpointBuilder =>
+      {
+          string? pattern = (endpointBuilder as RouteEndpointBuilder)?.RoutePattern.RawText;
+
+          if (pattern is not null && pattern.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase))
+          {
+              endpointBuilder.Metadata.Add(new AllowAnonymousAttribute());
+          }
+      });
+  ```
+
+  Nothing is added for row 11 — Spike C1 landed on C-a. The comment block at lines 130–138 is
+  rewritten: the bodiless-challenge argument it makes has now expired and the events that replace it
+  must be named there.
 - `src/Envanex.Web/Authentication/EnvanexAuthenticationEvents.cs` — **modified** — gains the bearer
   half: `JwtBearerEvents.OnChallenge` and `OnForbidden` writing `application/problem+json`. The
   cookie half shipped in Phase 3.
@@ -1009,7 +1064,7 @@ so nothing in this phase repairs a break it caused.
 - `src/Envanex.Web/Controllers/UnitOfMeasuresController.cs` — **modified** —
   `CanRead` on `GetById` and `List`; `CanWrite` on `Create`.
 - `src/Envanex.Web/Components/Pages/NotFound.razor` — **modified** — `@attribute [AllowAnonymous]`
-  (D1) or a line in `BlazorPageAuthorizationConvention` (D2).
+  (Spike D landed on D1, so the attribute is the mechanism).
 - `src/Envanex.Web/Components/Pages/Error.razor` — **modified** — same mechanism.
 - `src/Envanex.Web/Components/Pages/Login.razor` — already exempt from Phase 3.
 - `src/Envanex.Web/Components/Pages/Home.razor` — already `CanRead` from Phase 3; unchanged here.
@@ -1046,6 +1101,27 @@ row 2's test is rewritten because of it, see below. The challenge body is a Prob
 Turkish title "Kimlik doğrulaması gerekli."; the forbid body's title is "Bu işlem için yetkiniz
 yok."; both take their reason phrase from `GetReasonPhrase`.
 
+**The rule these bodies exist to satisfy: once a response has started, no re-execution happens at
+all.** That is the whole of it, and it is narrower than either sentence the plan previously carried.
+"4xx and 5xx are re-executed, a 302 is not, so a challenge and a 404 are mutually exclusive" is
+wrong, and so is the repair that was first proposed for it — "the final status is always the
+original denial's". `UseStatusCodePagesWithReExecute` restores the original status *before* it runs
+the re-executed request, and that request then runs through the **whole** pipeline and can set a
+status of its own. Spike C's five-row table records two cases where it did: a `400` from
+`/_blazor/disconnect` came back to the client as a bodiless `401` because the re-executed
+`/not-found` was itself denied, and a bearer `401` on an unmatched `/api/*` path came back as a
+`302` to `/login?ReturnUrl=%2Fnot-found` because `/not-found` is not under `/api/*`, so the selector
+forwarded the re-executed request to the cookie scheme. The original status survives only when the
+re-executed page renders normally.
+
+Writing a body is what takes the request out of that machinery entirely, which is why **every**
+rejection path in this PR carries one — `OnChallenge` and `OnForbidden` on the bearer side,
+`OnRedirectToAccessDenied` on the cookie side (Phase 3) — and why **exemption row 4 on `/not-found`
+is load-bearing rather than cosmetic**: for as long as the re-execution target is closed, any 4xx
+produced anywhere in the application is silently rewritten into whatever denying `/not-found`
+produces. Both facts were observed, not reasoned: see the spike note's "Standing observation" and
+the disconnect finding under C2.
+
 ### The complete `[AllowAnonymous]` exemption list
 
 | # | Exemption | Mechanism | Proving test |
@@ -1053,16 +1129,16 @@ yok."; both take their reason phrase from `GetReasonPhrase`.
 | 1 | `POST /api/auth/login` | `[AllowAnonymous]` on `AuthController` | `Login_WithoutAuthentication_ShouldReturn200` |
 | 2 | `POST /api/auth/refresh` | same attribute | `Refresh_WithoutAuthentication_ShouldReturn401CarryingTheInvalidRefreshTokenDetail` |
 | 3 | `POST /api/auth/logout` (Decision 14) | same attribute | `Logout_WithoutAuthentication_ShouldReturn204` |
-| 4 | `/not-found` | **Spike D decides**: `@attribute [AllowAnonymous]` (D1) or `BlazorPageAuthorizationConvention` (D2) | `NotFoundPage_WithoutAuthentication_ShouldReturn200` |
-| 5 | the 404 re-execution path | **Spike C3 decides** and names it: "none is possible, the challenge precedes the 404" (C3-a) or "row 4 covers the re-executed request" (C3-b) | two cases, named under C3-a / C3-b in Phase 0 |
-| 6 | `/Error` | Spike D, as row 4 | `ErrorPage_WithoutAuthentication_ShouldReturn200` |
-| 7 | `/login` (**extends Decision 1's enumeration**; required by Decision 15) | Spike D, as row 4 | `LoginPage_WithoutAuthentication_ShouldReturn200` |
+| 4 | `/not-found` | `@attribute [AllowAnonymous]` (Spike D → D1) | `NotFoundPage_WithoutAuthentication_ShouldReturn200` |
+| 5 | the 404 re-execution path | **none is possible — the challenge precedes the 404, so the 404 re-execution path is only reachable for an authenticated caller** (Spike C3 → C3-a) | `UnknownPath_WithoutAuthentication_ShouldRedirectToTheLoginPage` and `UnknownPath_WhileSignedIn_ShouldReturn404AndRenderTheNotFoundPage` |
+| 6 | `/Error` | `@attribute [AllowAnonymous]`, as row 4 | `ErrorPage_WithoutAuthentication_ShouldReturn200` |
+| 7 | `/login` (**extends Decision 1's enumeration**; required by Decision 15) | `@attribute [AllowAnonymous]`, as row 4 | `LoginPage_WithoutAuthentication_ShouldReturn200` |
 | 8 | static assets | `app.MapStaticAssets().AllowAnonymous()` | `StaticAsset_WithoutAuthentication_ShouldReturn200` (`GET /favicon.png`, referenced unfingerprinted in `App.razor`) |
 | 9 | `/openapi/v1.json`, Development only | `app.MapOpenApi().AllowAnonymous()` | `OpenApiDocument_InDevelopment_WithoutAuthentication_ShouldReturn200` |
 | 10 | Scalar reference, Development only | `app.MapScalarApiReference().AllowAnonymous()` | `ScalarReference_InDevelopment_WithoutAuthentication_ShouldReturn200` |
-| 11 | `_framework/blazor.web.js` | **Spike C1 decides**: either already covered by row 8's `MapStaticAssets().AllowAnonymous()` through the asset manifest, or its own exemption named in the spike note | `BlazorFrameworkScript_WithoutAuthentication_ShouldReturn200` |
-| 12 | the `/_blazor` endpoints — **negotiate, the transport endpoint and disconnect, all three** | **Spike C2 decides**; the mechanism must not exempt page components as a side effect | `BlazorHubEndpoints_WithoutAuthentication_ShouldNotReturn401`, a `[Theory]` with one `[InlineData]` per endpoint |
-| 13 | unmatched `/api/*` paths | none — the selector forwards to bearer, so the answer is a 401 with a body rather than a redirect. Listed because it is a behaviour change, not an exemption | `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndNotARedirect` |
+| 11 | `_framework/blazor.web.js` | **a consequence of row 8** — the script is served out of the asset manifest and flips from 401 to 200 the moment `MapStaticAssets()` carries `.AllowAnonymous()` (Spike C1 → C-a). No production line of its own | `BlazorFrameworkScript_WithoutAuthentication_ShouldReturn200` |
+| 12 | the `/_blazor` endpoints — **negotiate, the transport endpoint and disconnect, all three** | **its own mechanism** (Spike C2 → C-b): the route-pattern convention in the Files list above. `MapRazorComponents<App>().AllowAnonymous()` is the wrong one — the spike observed it opening `/` and every other page as a side effect | `BlazorHubEndpoints_WithoutAuthentication_ShouldNotReturn401`, a `[Theory]` with one `[InlineData]` per endpoint |
+| 13 | unmatched `/api/*` paths | none — the selector forwards to bearer, so the answer is a 401 with a body rather than a redirect. Listed because it is a behaviour change, not an exemption | `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` |
 
 Row 2's test no longer asserts the absence of `WWW-Authenticate`, because `OnChallenge` calls
 `HandleResponse()` and no 401 in this application carries that header — the assertion would stay
@@ -1082,13 +1158,42 @@ Rows 11 and 12 exist because `App.razor` loads the framework script on **every**
 `MapRazorComponents<App>().AddInteractiveServerRenderMode()` maps `/_blazor`, and neither carries
 authorization metadata — so the fallback policy reaches both. If the script answers 401, the login
 page loses enhanced navigation immediately and no interactive component can ever establish a
-circuit there. Spike C settles them separately, and row 12 probes all three hub endpoints, because
-an exemption scoped to negotiate alone still breaks a circuit while a negotiate-only test stays
-green. **Do not write this phase before the spike note exists.**
+circuit there. Spike C settled them separately, and they landed on different answers.
+
+**Row 11 is free.** `_framework/blazor.web.js` came back 401 under the fallback policy and 200 the
+moment row 8's `.AllowAnonymous()` was added, with the manifest's fingerprint `ETag` and
+`Last-Modified` — the same response shape as `/app.css`. It is served by the static-asset endpoint,
+so row 8 already covers it and row 11 adds documentation plus its regression test.
+
+**Row 12 costs a mechanism.** None of the three hub endpoints is in the asset manifest and none
+carries framework-supplied anonymous metadata; all three still answered a bodiless 401 after row 8.
+`MapRazorComponents<App>().AddInteractiveServerRenderMode().AllowAnonymous()` does open them — and
+opens `/` and `/spike-form` with them, which defeats Decision 1 outright. The route-pattern
+convention in the Files list is what the spike verified instead: it opened negotiate (200), the
+transport endpoint (404, no such circuit — authorization passed) and disconnect, and left `/` and
+the spike page at 401. Row 12 probes all three, because an exemption scoped to negotiate alone still
+breaks a circuit while a negotiate-only test stays green.
+
+Two things the spike recorded that this phase has to carry:
+
+- **Disconnect needs row 4.** Once anonymous, `POST /_blazor/disconnect` answers `400` (no circuit
+  id), and while `/not-found` was still closed that 400 came back as a bodiless 401 — the
+  re-execution rule above, in miniature. Exempting `/not-found` restored the 400. Row 12's test and
+  row 4's exemption are not independent.
+- **The convention sees nine route patterns**, and they are the exact surface `MapRazorComponents<App>()`
+  maps: `/_framework/opaque-redirect`, `/Error`, `/`, `/not-found`, `/spike-form` (the throwaway
+  spike page, which will be `/login` and `/sign-out` here), `/_blazor/negotiate`, `/_blazor`,
+  `/_blazor/disconnect/` and `/_blazor/initializers/`. Note the trailing slashes, which is why the
+  filter is a `StartsWith("/_blazor")` prefix rather than a set of literals. Note also that
+  `/_framework/opaque-redirect` is a **razor-components** endpoint, not a static asset, so row 8
+  does not reach it and the `/_blazor` prefix does not either: it stays closed, and nothing in this
+  PR requests it.
+
+**Do not write this phase without the spike note open beside it.**
 
 ### Tests to add and change
 
-`tests/Envanex.IntegrationTests/Api/AuthPipelineTests.cs` — **modified, 5 cases → 6** (**+1**).
+`tests/Envanex.IntegrationTests/Api/AuthPipelineTests.cs` — **modified, 5 cases → 7** (**+2**).
 Four of the five existing cases change.
 - `Refresh_WithUnknownToken_ShouldReturn401ProblemJsonAndNotTheNotFoundPage` — **unchanged**.
 - `OpenEndpoint_WithNoAuthorizationHeader_ShouldStillReturn200` → renamed and inverted to
@@ -1104,22 +1209,60 @@ Four of the five existing cases change.
 - **added:** `ProtectedEndpoint_WithAValidBearerTokenCarryingTheAdministratorRole_ShouldReturn200` —
   the positive control. The private `CreateToken(bool expired)` helper gains a
   `params string[] roles` parameter.
+- **added:** `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader`
+  — an anonymous `GET /api/auth/register`, asserting 401, `application/problem+json`, and that the
+  response carries **no `Location` header**. See "Why the no-`Location` case exists" below; it is
+  here rather than in `AnonymousExemptionTests` because it guards the events this class is about.
 - The class doc comment is rewritten: it no longer says "no endpoint is `[Authorize]`".
+
+#### Why the no-`Location` case exists
+
+It looks like a restatement of exemption row 13 and is not one, so the reason is written here rather
+than left to be re-derived.
+
+Spike C3's probe 7, run against the configuration Phase 4 actually ships **minus** the bearer
+events, observed `GET /api/auth/register` answer **`302 Found`, `Location:
+/login?ReturnUrl=%2Fnot-found`** — an unmatched API path redirecting a client to an HTML login page,
+which is precisely what Decision 4 forbids. It happens by accident and through a route nobody
+designed: the bearer handler challenges with a bodiless 401, the response has therefore not started,
+`UseStatusCodePagesWithReExecute` re-executes the request as `/not-found`, `/not-found` is **not**
+under `/api/*`, so the selector forwards the re-executed request to the **cookie** scheme, and the
+cookie scheme redirects. The redirect overwrites the 401.
+
+`OnChallenge` is the only thing that stops it: it writes a body, the response starts, and a started
+response is never re-executed. **So `OnChallenge` is load-bearing for `/api/*` 404 handling, not a
+nicety about response bodies** — and that is a claim about a mechanism, which is what this case
+pins. Row 13's case asserts the *behaviour* an operator reads off the exemption table (an unmatched
+API path answers 401 with a problem+json body, not 404); this case asserts the *absence of the
+redirect*, names probe 7 in its comment, and is the one that fails if a later change drops the body
+from `OnChallenge` or removes its `HandleResponse()`. Row 13's assertion was narrowed to status and
+content type so the two do not overlap.
 
 `tests/Envanex.IntegrationTests/Api/AuthApiTests.cs` — **modified, no count change.**
 `Register_ShouldReturn404` (`AuthApiTests.cs:365-378`) is an anonymous GET of an unmatched `/api/*`
 path. Once the gate closes it answers **401**, not 404 — `[AllowAnonymous]` on `AuthController`
-cannot reach it because no action matches, and whichever of the two paths applies (the Blazor
-catch-all endpoint, or no endpoint at all) the fallback policy denies before routing can report the
-miss. Spike C3's probe 7 records which. The fix keeps the fact the test exists to prove:
-- The case switches to an **authenticated** client — `using var client = await
-  _fixture.CreateAdministratorClientAsync();` — and keeps asserting **404**. An authenticated caller
-  satisfies the fallback policy, so routing reports the miss exactly as it does today, and a
-  registration endpoint that existed would answer 405 or 200/400 rather than 404.
-- The comment is rewritten. The GET-not-POST paragraph stays (it is still true), and a second
-  paragraph replaces the old reasoning: since PR 6b the anonymous answer to this path is a 401 from
-  the fallback policy, which proves nothing about routing, so non-routability is now probed with
-  credentials; the anonymous 401 is asserted separately by exemption row 13.
+cannot reach it because no action matches, and the fallback policy denies before routing can report
+the miss. Spike C3's probe 7 observed exactly that.
+- **The case stays anonymous and its expected status becomes 401 with an `application/problem+json`
+  body.** It is renamed to say so: `Register_ShouldReturn401`. Keeping it anonymous and rewriting
+  the expectation is the ruling; the alternative the plan previously carried — switch to an
+  administrator client and keep asserting 404 — is dropped.
+- **What it stops proving, stated rather than left to be noticed.** Non-routability is no longer
+  observable to an anonymous caller: after PR 6b, `/api/auth/register` and any other unmatched
+  `/api/*` path are indistinguishable from each other and from a real endpoint that rejects
+  anonymous callers. That is the gate working as designed, and the closure of "no registration
+  endpoint exists" now rests on the absence of an action in `AuthController` rather than on this
+  test. No replacement authenticated case is added; if PR 8 ever wants routing probed again, it
+  probes with credentials.
+- The comment is rewritten. The GET-not-POST paragraph stays (it is still true, and it is still why
+  the probe is a GET: an unmatched `POST /api/*` falls through to the Blazor catch-all and is
+  rejected by antiforgery with 400 before routing reports a miss). A second paragraph replaces the
+  old reasoning and names the three anonymous probes of this path that now exist and why each is
+  distinct: this one (the path itself is closed), exemption row 13's
+  `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` (the exemption table is
+  complete: it is 401, not 404), and `AuthPipelineTests`'
+  `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader` (the
+  mechanism: `OnChallenge`'s body is what keeps it from being a 302).
 
 `tests/Envanex.IntegrationTests/Blazor/CookieAuthPipelineTests.cs` (**modified, +1**)
 - **`ApiPath_WithASessionCookieAndNoBearerToken_ShouldReturn401AndNotARedirect`** — Decision 4's
@@ -1131,16 +1274,28 @@ deliberately **not** added: it is the same HTTP request as
 `AuthenticatedShellTests.GetHome_WhileSignedOut_ShouldRedirectToTheLoginPage`, which already exists.
 
 `tests/Envanex.IntegrationTests/Api/AnonymousExemptionTests.cs` (**created, +14**) — rows 1–8, 11, 12
-and 13 of the table above, method names as listed there. Row 5 contributes two cases (the anonymous
-unknown path, whose expected status Spike C3 selects, and
-`UnknownPath_WhileSignedIn_ShouldReturn404AndRenderTheNotFoundPage`, which is what makes row 4's
-exemption matter). Row 12 contributes three, one `[InlineData]` per hub endpoint. Notable bodies:
+and 13 of the table above, method names as listed there. Row 5 contributes two cases and row 12
+three, one `[InlineData]` per hub endpoint. Notable bodies:
+- `UnknownPath_WithoutAuthentication_ShouldRedirectToTheLoginPage` — row 5's anonymous half, settled
+  by Spike C3's re-run as **302**, not 404: the cookie scheme challenges a non-`/api/*` path before
+  routing can report a miss, and a 302 is not a 4xx, so `UseStatusCodePagesWithReExecute` never
+  fires. The observed `Location` is `/login?ReturnUrl=%2F<original path>`, so the case may assert
+  the `ReturnUrl` as well as the status — worth doing, because it is what proves the redirect
+  targets the login page rather than merely being a redirect.
+- `UnknownPath_WhileSignedIn_ShouldReturn404AndRenderTheNotFoundPage` — row 5's other half, and the
+  case that makes row 4's exemption matter: for an authenticated caller the challenge does not
+  happen, routing reports the miss, and the 404 re-execution path is reachable at last.
 - `BlazorFrameworkScript_WithoutAuthentication_ShouldReturn200` — `GET /_framework/blazor.web.js`
   signed out. The regression this guards is the login page losing enhanced navigation.
 - `BlazorHubEndpoints_WithoutAuthentication_ShouldNotReturn401` — `POST
   /_blazor/negotiate?negotiateVersion=1`, `GET /_blazor?id=…` and `POST /_blazor/disconnect`, signed
-  out. Asserted as "not 401" rather than a specific success code: the responses are framework-owned
-  and Spike C records what they actually answer, but a 401 is the failure this test exists to catch.
+  out. Asserted as "not 401" rather than a specific success code: the responses are framework-owned,
+  and the spike recorded 200, 404 (no such circuit) and 400 (no circuit id) respectively — a 401 is
+  the failure this test exists to catch, and pinning the other three would make it a test of the
+  framework.
+- `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` — row 13, narrowed to status and
+  content type. The absence of a `Location` header is asserted by `AuthPipelineTests` instead, for
+  the reason given there.
 
 `tests/Envanex.IntegrationTests/Api/DevelopmentEndpointExemptionTests.cs` (**created, +3**)
 - `OpenApiDocument_InDevelopment_WithoutAuthentication_ShouldReturn200`
@@ -1178,15 +1333,18 @@ dotnet test tests\Envanex.IntegrationTests --filter "FullyQualifiedName~AuthPipe
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: /api/products/datasource in a browser answers 401 JSON, not the login page
 ```
 
-Expected test count at end: **624** (120 + 126 + **378**).
+Expected test count at end: **625** (120 + 126 + **379**). The extra case over the plan's earlier
+624 is `AuthPipelineTests`' no-`Location` case; neither spike branch moved a count.
 **No schema, no migration, no query — db-reviewer not required for this phase.**
 
 ---
 
 # Phase 5: The read-only demo account
 
-Decision 7 and Decision 12. Assumes Spike outcome **E1**; under **E2** the call site moves into a
-hosted service exactly as Spike E spells out, with no change to the test list or the counts.
+Decision 7 and Decision 12. Spike E landed on **E1**: the marker row written between `app.Build()`
+and `app.Run()` was there when a `WebApplicationFactory` client queried for it, so `HostFactoryResolver`
+does not cut the entry point short. `await app.SeedIdentityAsync();` stays in that position, and
+`IdentitySeedingHostedService` / `AddEnvanexIdentitySeeding` are **not** created.
 
 ### Files
 
@@ -1194,8 +1352,7 @@ hosted service exactly as Spike E spells out, with no change to the test list or
 - `src/Envanex.Infrastructure/Identity/DemoAccountSeeder.cs` — **created** — idempotent; ensures the
   two roles through `IdentityRoleSeeder`, then the demo user, then its `Viewer` membership.
 - `src/Envanex.Web/Extensions/IdentitySeedingExtensions.cs` — **created** — one call site, invoked
-  from `Program.cs` between `app.Build()` and `app.Run()` (E1) or registered as a hosted service
-  (E2).
+  from `Program.cs` between `app.Build()` and `app.Run()` (Spike E → E1).
 - `src/Envanex.Web/Program.cs` — **modified** — `await app.SeedIdentityAsync();`.
 - `src/Envanex.Web/appsettings.json` — **modified** — a `Demo` block with `"Enabled": false` and
   `"Email": "demo@envanex.local"` and `"Password": ""`. **The password is never committed**; it
@@ -1258,8 +1415,8 @@ that its startup seeding is not deleted out from under the test — the same per
 - **`DemoAccount_ShouldBeAbleToReadButNotWrite`** — end to end over HTTP against a host built from
   `new EnvanexWebApplicationFactory(conn, "Testing", new Dictionary<string, string?> { ["Demo:Enabled"] = "true", ["Demo:Password"] = SqlServerFixture.SeededPassword })`:
   `POST /api/auth/login` with the configured password → 200, `GET /api/unit-of-measures` → 200,
-  `POST /api/unit-of-measures` → 403. This case is what Spike E exists to protect; under E2 it is
-  unchanged, because a hosted service also runs under `WebApplicationFactory`.
+  `POST /api/unit-of-measures` → 403. This case is what Spike E exists to protect, and E1 is why it
+  can be written against the startup call site at all: a factory-created client sees the seeding.
 
 `tests/Envanex.IntegrationTests/Configuration/DemoAppSettingsTests.cs` (**created, +2**) — mirrors
 `JwtAppSettingsTests` against the shipped `src/Envanex.Web/appsettings.json`
@@ -1278,7 +1435,7 @@ dotnet user-secrets set "Demo:Password" "<a local value, never committed>" --pro
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: sign in at /login as the demo account, confirm read-only
 ```
 
-Expected test count at end: **631** (120 + 126 + **385**).
+Expected test count at end: **632** (120 + 126 + **386**).
 
 **Run db-reviewer on this phase** — the seeder writes `auth.AspNetRoles`, `auth.AspNetUsers` and
 `auth.AspNetUserRoles` at host startup, in production.
@@ -1287,21 +1444,23 @@ Expected test count at end: **631** (120 + 126 + **385**).
 
 ## Expected test counts, by phase
 
-Baseline column assumes Spike outcomes A1/A2, **B1 with the GET guard**, C-a, **D1** and E1.
+One column, because Phase 0 settled every branch: **A1**, **B1 with the GET guard**, **C-a**,
+**C-b**, **C3-a**, **D1** and **E1**. The two sub-outcome columns the plan used to carry are gone —
+B1's guard keeps its case rather than dropping one, and D1 adds no convention test, so neither delta
+was ever taken.
 
-| Phase | Domain | Application | Integration | Total | B sub-outcome (−1) | D2 (+1) |
-|---|---|---|---|---|---|---|
-| baseline | 120 | 126 | 316 | 562 | 562 | 562 |
-| 0 spikes | 120 | 126 | 316 | 562 | 562 | 562 |
-| 1 role claim | 120 | 126 | 326 | **572** | 572 | 572 |
-| 2 authenticated clients | 120 | 126 | 331 | **577** | 577 | 577 |
-| 3 cookie + Blazor | 120 | 126 | 352 | **598** | 597 | 599 |
-| 4 close the gate | 120 | 126 | 378 | **624** | 623 | 625 |
-| 5 demo account | 120 | 126 | 385 | **631** | 630 | 632 |
+| Phase | Domain | Application | Integration | Total |
+|---|---|---|---|---|
+| baseline | 120 | 126 | 316 | 562 |
+| 0 spikes | 120 | 126 | 316 | 562 |
+| 1 role claim | 120 | 126 | 326 | **572** |
+| 2 authenticated clients | 120 | 126 | 331 | **577** |
+| 3 cookie + Blazor | 120 | 126 | 352 | **598** |
+| 4 close the gate | 120 | 126 | 379 | **625** |
+| 5 demo account | 120 | 126 | 386 | **632** |
 
-The two deltas are independent and additive: B sub-outcome **and** D2 together give 598 / 624 / 631.
-They are tracked to the end of the plan rather than dropped after Phase 3, so that a coder who lands
-on either branch can still check the number the phase is supposed to produce.
+Phases 4 and 5 are one higher than the plan's earlier 624 / 631, and the single cause is the
+no-`Location` case added to `AuthPipelineTests` in Phase 4. No spike outcome moved a count.
 
 Watch the integration suite's wall clock. ADR 0007 set 60 seconds as the point where it becomes a
 decision. The lazy per-collection token cache is what keeps this PR's addition to a handful of
@@ -1319,10 +1478,10 @@ PBKDF2 pairs; if the suite crosses 60 s, the cause to check first is a class cal
 - **No migration is created, so there is nothing to roll back in the database.** Reverting Phase 5
   leaves the seeded roles and demo user in place; they are harmless once no policy names them, and
   the test database is ephemeral.
-- If Spike B lands on outcome B2, Phase 3 is the reshaped variant and Phase 4 is unchanged. If Spike
-  D lands on D2, Phase 3 gains the convention file and one test and the `.razor` attributes come
-  back out. If Spike E lands on E2, Phase 5's call site becomes a hosted service. Do not start any
-  of Phases 3, 4 or 5 before the spike note exists.
+- Phase 0 is done and none of the reshaped variants is in play: B1 keeps `Login.razor` doing its own
+  sign-in (no `MapPost("/login")` endpoint), D1 keeps page permissions in the `.razor` files (no
+  convention class), and E1 keeps seeding at the `app.Build()`/`app.Run()` call site (no hosted
+  service). Phases 3, 4 and 5 have one shape each.
 
 ## Known gaps this PR opens, for the roadmap table
 
@@ -1346,8 +1505,8 @@ PBKDF2 pairs; if the suite crosses 60 s, the cause to check first is a class cal
   component while keeping the 403. Adopt it in PR 7, when the UI gets its second screen and the
   machinery pays for itself. This gap is reachable from Phase 3 onward, since `Home.razor` requires
   `CanRead`.
-- `AuthorizeRouteView`'s `NotAuthorized` template is unreachable for statically rendered pages under
-  Spike outcome D1 — the endpoint layer answers first. It is carried because Decision 8 requires it
+- `AuthorizeRouteView`'s `NotAuthorized` template is unreachable for statically rendered pages — the
+  endpoint layer answers first, as Spike D part 1 observed. It is carried because Decision 8 requires it
   and PR 7's interactive components make it live. Until then it is untested markup, and the comment
   in `Routes.razor` is what stops it being deleted as dead code.
 - The roadmap row "No `JwtBearerEvents.OnChallenge` body" closes in Phase 4 and should be struck.
@@ -1443,8 +1602,9 @@ A Blazor page endpoint serves GET and POST. `[EnableRateLimiting("login")]` on `
 therefore spends a login permit every time the page is *rendered*, so five reloads would lock login
 out for five minutes in production (5 per 300 s). The plan adds a method guard inside the existing
 `"login"` policy delegate so the limit applies to POST only; this keeps Decision 9's "same named
-policy" intact and leaves `AuthController.Login`, which is POST-only, unaffected. Spike B confirms
-whether the guard is needed before Phase 3 is written.
+policy" intact and leaves `AuthController.Login`, which is POST-only, unaffected. **Spike B confirmed
+it: the third consecutive GET of the attributed page answered 429.** The guard is required and the
+correction is no longer a prediction.
 
 ## Correction 3 — Decision 1's exemption list needs one more entry (not a disagreement)
 
@@ -1478,7 +1638,9 @@ Phase 1 now names those two tests (and the Phase 1 bearer test) instead of gestu
 authenticated administrator client and keeps asserting 404, which preserves the non-routability fact
 the test exists for; the anonymous 401 becomes exemption row 13 with its own case. The comment
 rewrite is specified. Blast radius corrected to 77 in Phase 2's new table, in Correction 1, and
-everywhere 72 or 76 appeared.
+everywhere 72 or 76 appeared. **(Superseded when Phase 0's outcomes were folded in: the case stays
+anonymous and its expected status becomes 401 with problem+json, renamed `Register_ShouldReturn401`.
+Non-routability is no longer probed — see Phase 4's entry for what that gives up.)**
 
 **4 — exemption row 5 has no mechanism.** The unmatched-path question is now Spike C3, with two
 `curl` probes (non-API and API), its raw response recorded, and two named outcomes C3-a/C3-b that
@@ -1522,9 +1684,10 @@ test is renamed to `Refresh_WithoutAuthentication_ShouldReturn401CarryingTheInva
 and asserts the ProblemDetails detail, which does distinguish the two 401s. The header's absence is
 recorded as a known gap.
 
-**N3 — Spike B alternative not propagated.** The count table now carries two extra columns
+**N3 — Spike B alternative not propagated.** The count table carried two extra columns
 (B sub-outcome −1, D2 +1) through Phases 3, 4 and 5, with a sentence saying they are additive and
-why they are tracked to the end.
+why they are tracked to the end. (Both columns were dropped when Phase 0's outcomes were folded in:
+B1 kept its case and D1 added none, so neither delta was ever taken.)
 
 **N4 — the 72 is over-counted by one.** Phase 2's new blast-radius table records 72 cases in five
 classes of which 71 go red, names `SharedFactory_WithGlobalLimiterDisabled_ShouldNotRegisterAGlobalLimiter`
