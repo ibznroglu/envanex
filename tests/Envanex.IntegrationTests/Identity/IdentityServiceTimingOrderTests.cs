@@ -82,6 +82,12 @@ public sealed class IdentityServiceTimingOrderTests : IAsyncLifetime
 
         // Incrementing here would let an attacker extend a victim's lockout indefinitely.
         manager.AccessFailedCallCount.ShouldBe(0);
+
+        // The role lookup belongs to the success path alone. Today every failure branch returns
+        // above it, but that is code shape, and code shape disappears silently under refactoring:
+        // a role read on this branch would be a round trip only locked-out attempts pay for, which
+        // is exactly the timing channel Decision 6 exists to keep closed.
+        manager.GetRolesCallCount.ShouldBe(0);
     }
 
     [Fact]
@@ -101,6 +107,9 @@ public sealed class IdentityServiceTimingOrderTests : IAsyncLifetime
         var manager = await ValidateAndCaptureAsync(Email, WrongPassword);
 
         manager.AccessFailedCallCount.ShouldBe(1);
+
+        // Same guarantee on the wrong-password branch: it must not pay for a role read either.
+        manager.GetRolesCallCount.ShouldBe(0);
     }
 
     [Fact]
@@ -141,6 +150,9 @@ public sealed class IdentityServiceTimingOrderTests : IAsyncLifetime
         // The deliberate, documented half of the timing channel: an unknown address answers
         // without verifying a hash. Closing it means inverting this test, not deleting it.
         manager.CheckPasswordCallCount.ShouldBe(0);
+
+        // And the unknown-email branch returns before the user exists to read roles for.
+        manager.GetRolesCallCount.ShouldBe(0);
     }
 
     private async Task<CountingUserManager> ValidateAndCaptureAsync(string email, string password)
