@@ -23,7 +23,10 @@ public sealed class JwtAccessTokenIssuerTests
     private const string OtherSigningKey = "a-completely-different-key-0123456789abcdef";
 
     private static readonly AuthenticatedUser User =
-        new(Guid.Parse("3f1b6a2c-7c2a-4f5d-9a11-9b5c1f2d3e40"), "issuer@envanex.test", "issuer@envanex.test");
+        new(Guid.Parse("3f1b6a2c-7c2a-4f5d-9a11-9b5c1f2d3e40"), "issuer@envanex.test", "issuer@envanex.test", []);
+
+    private static readonly AuthenticatedUser UserInRoles =
+        User with { Roles = [EnvanexRoles.Administrator, EnvanexRoles.Viewer] };
 
     // Anchored to real time so that lifetime validation, which reads the system clock, is a real
     // check rather than one that has to be switched off.
@@ -39,6 +42,32 @@ public sealed class JwtAccessTokenIssuerTests
         jwt.GetPayloadValue<string>("sub").ShouldBe(User.Id.ToString());
         jwt.GetPayloadValue<string>("email").ShouldBe(User.Email);
         jwt.GetPayloadValue<string>("jti").ShouldNotBeNullOrWhiteSpace();
+    }
+
+    [Fact]
+    public void Issue_ForAUserInTwoRoles_ShouldWriteOneRoleClaimPerRole()
+    {
+        var issued = CreateIssuer().Issue(UserInRoles);
+
+        var jwt = new JsonWebToken(issued.Token);
+
+        // One claim per element, not one claim carrying a comma-separated list: the JSON array in
+        // the payload is what the bearer handler expands back into two role claims.
+        jwt.Claims
+            .Where(claim => string.Equals(claim.Type, EnvanexClaimTypes.Role, StringComparison.Ordinal))
+            .Select(claim => claim.Value)
+            .ShouldBe([EnvanexRoles.Administrator, EnvanexRoles.Viewer]);
+    }
+
+    [Fact]
+    public void Issue_ForAUserWithNoRoles_ShouldWriteNoRoleClaim()
+    {
+        var issued = CreateIssuer().Issue(User);
+
+        var jwt = new JsonWebToken(issued.Token);
+
+        // Not "an empty array": a role-less user's token says nothing about roles at all.
+        jwt.Claims.ShouldNotContain(claim => string.Equals(claim.Type, EnvanexClaimTypes.Role, StringComparison.Ordinal));
     }
 
     [Fact]

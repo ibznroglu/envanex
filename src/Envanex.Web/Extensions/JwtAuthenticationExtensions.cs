@@ -1,6 +1,7 @@
 using System.Text;
 using Envanex.Application.Authentication;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
+using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 
 namespace Envanex.Web.Extensions;
@@ -43,7 +44,23 @@ public static class JwtAuthenticationExtensions
                     // The default five-minute skew would make a 15-minute access token last 20 and
                     // would make every fake-clock expiry test lie.
                     ClockSkew = TimeSpan.Zero,
+
+                    // Folded into this initializer rather than assigned after it: the line above
+                    // replaces the whole TokenValidationParameters object, so anything set on the
+                    // previous one is silently discarded.
+                    //
+                    // The claim types the issuer actually writes. IdentityOptions.ClaimsIdentity
+                    // .RoleClaimType is deliberately left alone: a cookie identity carries its
+                    // roles under ClaimTypes.Role, IsInRole resolves per identity, and the two
+                    // identities therefore satisfy the same RequireRole without sharing a type.
+                    RoleClaimType = EnvanexClaimTypes.Role,
+                    NameClaimType = JwtRegisteredClaimNames.Sub,
                 };
+
+                // Not part of TokenValidationParameters, so its position here does not matter.
+                // Without it the handler rewrites "role" to the WS-Federation URI on the way in,
+                // RoleClaimType above then matches nothing, and every role check fails.
+                bearer.MapInboundClaims = false;
             });
 
         return services;

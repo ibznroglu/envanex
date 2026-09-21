@@ -16,7 +16,7 @@ public class LoginCommandHandlerTests
     private readonly LoginCommandHandler _handler;
 
     private static readonly AuthenticatedUser User =
-        new(Guid.CreateVersion7(), "user@envanex.local", "user@envanex.local");
+        new(Guid.CreateVersion7(), "user@envanex.local", "user@envanex.local", []);
 
     private static readonly DateTimeOffset AccessTokenExpiresAt =
         new(2026, 9, 19, 12, 15, 0, TimeSpan.Zero);
