@@ -1238,27 +1238,35 @@ redirect*, names probe 7 in its comment, and is the one that fails if a later ch
 from `OnChallenge` or removes its `HandleResponse()`. Row 13's assertion was narrowed to status and
 content type so the two do not overlap.
 
-`tests/Envanex.IntegrationTests/Api/AuthApiTests.cs` — **modified, no count change.**
+`tests/Envanex.IntegrationTests/Api/AuthApiTests.cs` — **modified, +1.**
 `Register_ShouldReturn404` (`AuthApiTests.cs:365-378`) is an anonymous GET of an unmatched `/api/*`
 path. Once the gate closes it answers **401**, not 404 — `[AllowAnonymous]` on `AuthController`
 cannot reach it because no action matches, and the fallback policy denies before routing can report
 the miss. Spike C3's probe 7 observed exactly that.
-- **The case stays anonymous and its expected status becomes 401 with an `application/problem+json`
-  body.** It is renamed to say so: `Register_ShouldReturn401`. Keeping it anonymous and rewriting
-  the expectation is the ruling; the alternative the plan previously carried — switch to an
-  administrator client and keep asserting 404 — is dropped.
-- **What it stops proving, stated rather than left to be noticed.** Non-routability is no longer
-  observable to an anonymous caller: after PR 6b, `/api/auth/register` and any other unmatched
-  `/api/*` path are indistinguishable from each other and from a real endpoint that rejects
-  anonymous callers. That is the gate working as designed, and the closure of "no registration
-  endpoint exists" now rests on the absence of an action in `AuthController` rather than on this
-  test. No replacement authenticated case is added; if PR 8 ever wants routing probed again, it
-  probes with credentials.
-- The comment is rewritten. The GET-not-POST paragraph stays (it is still true, and it is still why
-  the probe is a GET: an unmatched `POST /api/*` falls through to the Blazor catch-all and is
-  rejected by antiforgery with 400 before routing reports a miss). A second paragraph replaces the
-  old reasoning and names the three anonymous probes of this path that now exist and why each is
-  distinct: this one (the path itself is closed), exemption row 13's
+**It becomes two cases, and neither is a duplicate of the other.** The gate splits one test into
+two because it splits the fact the test was proving. Before PR 6b a single anonymous 404 said both
+"the gate does not open this path" and "there is no registration endpoint". After PR 6b an anonymous
+caller cannot tell those apart — an unmatched path and a real endpoint that rejects anonymous
+callers both answer 401 — so each property needs the caller that can still see it.
+
+- **`Register_ShouldReturn401`** — anonymous, **401 with an `application/problem+json` body**,
+  renamed from `Register_ShouldReturn404` to say so. It guards the **gate**: this path is covered by
+  the fallback policy and answers a body-carrying 401 rather than leaking a 404 or a redirect.
+- **`Register_WhileAuthenticated_ShouldReturn404`** — **added** (`+1`), with
+  `using var client = await _fixture.CreateAdministratorClientAsync();`. An authenticated caller
+  satisfies the fallback policy, so routing reports the miss and the answer is 404; a registration
+  endpoint that existed would answer 405, or 200/400, but not 404. It guards **PR 6a's Decision 11 —
+  no endpoint creates a user** — and it is the only test in the repository that does. An
+  authenticated caller is now the only caller who can see the difference, which is why this case
+  cannot be folded back into the one above and must not be deleted as a duplicate of it: they
+  assert the same URL for opposite reasons, one that the door is shut and one that there is no room
+  behind it.
+- The comment is rewritten, once, above the pair. The GET-not-POST paragraph stays (it is still
+  true, and it is still why the probe is a GET: an unmatched `POST /api/*` falls through to the
+  Blazor catch-all and is rejected by antiforgery with 400 before routing reports a miss). A second
+  paragraph replaces the old reasoning: it says which property each of the two cases guards, and
+  names the other two anonymous probes of this same path and why each of those is distinct from
+  `Register_ShouldReturn401` — exemption row 13's
   `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` (the exemption table is
   complete: it is 401, not 404), and `AuthPipelineTests`'
   `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader` (the
@@ -1333,8 +1341,9 @@ dotnet test tests\Envanex.IntegrationTests --filter "FullyQualifiedName~AuthPipe
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: /api/products/datasource in a browser answers 401 JSON, not the login page
 ```
 
-Expected test count at end: **625** (120 + 126 + **379**). The extra case over the plan's earlier
-624 is `AuthPipelineTests`' no-`Location` case; neither spike branch moved a count.
+Expected test count at end: **626** (120 + 126 + **380**). The two cases over the plan's earlier 624
+are `AuthPipelineTests`' no-`Location` case and `AuthApiTests.Register_WhileAuthenticated_ShouldReturn404`;
+neither spike branch moved a count.
 **No schema, no migration, no query — db-reviewer not required for this phase.**
 
 ---
@@ -1435,7 +1444,7 @@ dotnet user-secrets set "Demo:Password" "<a local value, never committed>" --pro
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: sign in at /login as the demo account, confirm read-only
 ```
 
-Expected test count at end: **632** (120 + 126 + **386**).
+Expected test count at end: **633** (120 + 126 + **387**).
 
 **Run db-reviewer on this phase** — the seeder writes `auth.AspNetRoles`, `auth.AspNetUsers` and
 `auth.AspNetUserRoles` at host startup, in production.
@@ -1456,11 +1465,12 @@ was ever taken.
 | 1 role claim | 120 | 126 | 326 | **572** |
 | 2 authenticated clients | 120 | 126 | 331 | **577** |
 | 3 cookie + Blazor | 120 | 126 | 352 | **598** |
-| 4 close the gate | 120 | 126 | 379 | **625** |
-| 5 demo account | 120 | 126 | 386 | **632** |
+| 4 close the gate | 120 | 126 | 380 | **626** |
+| 5 demo account | 120 | 126 | 387 | **633** |
 
-Phases 4 and 5 are one higher than the plan's earlier 624 / 631, and the single cause is the
-no-`Location` case added to `AuthPipelineTests` in Phase 4. No spike outcome moved a count.
+Phases 4 and 5 are two higher than the plan's earlier 624 / 631, and both causes are in Phase 4:
+`AuthPipelineTests`' no-`Location` case, and the split of `Register_ShouldReturn404` into an
+anonymous 401 case and an authenticated 404 case. No spike outcome moved a count.
 
 Watch the integration suite's wall clock. ADR 0007 set 60 seconds as the point where it becomes a
 decision. The lazy per-collection token cache is what keeps this PR's addition to a handful of
@@ -1638,9 +1648,11 @@ Phase 1 now names those two tests (and the Phase 1 bearer test) instead of gestu
 authenticated administrator client and keeps asserting 404, which preserves the non-routability fact
 the test exists for; the anonymous 401 becomes exemption row 13 with its own case. The comment
 rewrite is specified. Blast radius corrected to 77 in Phase 2's new table, in Correction 1, and
-everywhere 72 or 76 appeared. **(Superseded when Phase 0's outcomes were folded in: the case stays
-anonymous and its expected status becomes 401 with problem+json, renamed `Register_ShouldReturn401`.
-Non-routability is no longer probed — see Phase 4's entry for what that gives up.)**
+everywhere 72 or 76 appeared. **(Revised when Phase 0's outcomes were folded in: the case splits in
+two. `Register_ShouldReturn401` keeps the anonymous client and expects 401 with problem+json;
+`Register_WhileAuthenticated_ShouldReturn404` keeps the 404 with an administrator client. The
+review's answer was right about the authenticated probe and incomplete about the anonymous one —
+after the gate closes, the two facts need two callers.)**
 
 **4 — exemption row 5 has no mechanism.** The unmatched-path question is now Spike C3, with two
 `curl` probes (non-API and API), its raw response recorded, and two named outcomes C3-a/C3-b that
