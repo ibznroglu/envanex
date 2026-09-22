@@ -47,6 +47,20 @@ recorded against ADR 0007's token-content decision (Decision 5); path-prefix sch
 its consequence that `/api/*` is bearer-only; why the landing page requires `CanRead` rather than
 mere authentication; and the `Demo:Enabled` gate.
 
+Two further items, produced by Phase 1's reviews and recorded here so they do not get lost between
+sessions:
+
+- **Roles are read at refresh time, not carried from login.** Each access token is stamped with the
+  roles read as it is issued, so a revoked role takes effect at the next refresh — within the
+  fifteen-minute access-token lifetime. Carrying the roles forward from login would have let a
+  revocation survive for the life of the refresh family, up to thirty days. This is a security
+  property the system now has, and nothing else in the repository writes it down.
+- **The role seeder's unique-violation clause is reached, not merely defensive.** Removing the
+  clause turned `EnsureRolesAsync_RunByTwoHostsAtOnce_ShouldNotThrowAndShouldLeaveExactlyTwoRoles`
+  red on every run. That is the inverse of ADR 0007's kept-but-unreachable 2601/2627 clause in
+  `RotateAsync`, and the two should be recorded as a pair: the same shape of catch, opposite
+  evidence.
+
 ---
 
 # Phase 0: Spikes — throwaway code, one committed note
@@ -509,7 +523,7 @@ dotnet test
 dotnet test tests\Envanex.IntegrationTests --filter "FullyQualifiedName~Identity"
 ```
 
-Expected test count at end: **572** (120 + 126 + **326**).
+Expected test count at end: **573** (120 + 126 + **327**).
 
 **Run db-reviewer on this phase** — three new query shapes against the `auth` schema.
 
@@ -682,7 +696,7 @@ dotnet test
 dotnet test tests\Envanex.IntegrationTests --filter "FullyQualifiedName~Envanex.IntegrationTests.Api"
 ```
 
-Expected test count at end: **577** (120 + 126 + **331**). **No schema, no migration, no production
+Expected test count at end: **578** (120 + 126 + **332**). **No schema, no migration, no production
 query — db-reviewer not required.**
 
 ---
@@ -1006,7 +1020,7 @@ and spike step in this PR, and it only works because `appsettings.Development.js
 the sign-in appears to fail with no error: the browser discards the `Secure` cookie and the
 redirect to `/` bounces back to `/login`.
 
-Expected test count at end: **598** (120 + 126 + **352**). Settled, not provisional: B1 keeps the
+Expected test count at end: **599** (120 + 126 + **353**). Settled, not provisional: B1 keeps the
 GET case and D1 adds none, so neither of the deltas the plan used to carry applies.
 
 **Run db-reviewer on this phase** — two new production reads: a `FindByIdAsync` per cookie sign-in,
@@ -1341,9 +1355,10 @@ dotnet test tests\Envanex.IntegrationTests --filter "FullyQualifiedName~AuthPipe
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: /api/products/datasource in a browser answers 401 JSON, not the login page
 ```
 
-Expected test count at end: **626** (120 + 126 + **380**). The two cases over the plan's earlier 624
-are `AuthPipelineTests`' no-`Location` case and `AuthApiTests.Register_WhileAuthenticated_ShouldReturn404`;
-neither spike branch moved a count.
+Expected test count at end: **627** (120 + 126 + **381**). The three cases over the plan's earlier
+624 are `AuthPipelineTests`' no-`Location` case,
+`AuthApiTests.Register_WhileAuthenticated_ShouldReturn404`, and the Phase 1 role-seeder race test
+carried forward; neither spike branch moved a count.
 **No schema, no migration, no query — db-reviewer not required for this phase.**
 
 ---
@@ -1444,7 +1459,7 @@ dotnet user-secrets set "Demo:Password" "<a local value, never committed>" --pro
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: sign in at /login as the demo account, confirm read-only
 ```
 
-Expected test count at end: **633** (120 + 126 + **387**).
+Expected test count at end: **634** (120 + 126 + **388**).
 
 **Run db-reviewer on this phase** — the seeder writes `auth.AspNetRoles`, `auth.AspNetUsers` and
 `auth.AspNetUserRoles` at host startup, in production.
@@ -1462,15 +1477,23 @@ was ever taken.
 |---|---|---|---|---|
 | baseline | 120 | 126 | 316 | 562 |
 | 0 spikes | 120 | 126 | 316 | 562 |
-| 1 role claim | 120 | 126 | 326 | **572** |
-| 2 authenticated clients | 120 | 126 | 331 | **577** |
-| 3 cookie + Blazor | 120 | 126 | 352 | **598** |
-| 4 close the gate | 120 | 126 | 380 | **626** |
-| 5 demo account | 120 | 126 | 387 | **633** |
+| 1 role claim | 120 | 126 | 327 | **573** |
+| 2 authenticated clients | 120 | 126 | 332 | **578** |
+| 3 cookie + Blazor | 120 | 126 | 353 | **599** |
+| 4 close the gate | 120 | 126 | 381 | **627** |
+| 5 demo account | 120 | 126 | 388 | **634** |
 
-Phases 4 and 5 are two higher than the plan's earlier 624 / 631, and both causes are in Phase 4:
+Every row from Phase 1 onward is one higher than the plan first wrote it, because Phase 1 added one
+test the plan did not anticipate: `IdentityRoleSeederTests`'
+`EnsureRolesAsync_RunByTwoHostsAtOnce_ShouldNotThrowAndShouldLeaveExactlyTwoRoles`, which runs two
+seeders concurrently against the same empty `auth.AspNetRoles` so that the seeder's unique-violation
+clause on `RoleNameIndex` is proved reachable by a real race rather than left as an unexercised
+defensive branch.
+
+Phases 4 and 5 are three higher than the plan's earlier 624 / 631: two of the three are in Phase 4 —
 `AuthPipelineTests`' no-`Location` case, and the split of `Register_ShouldReturn404` into an
-anonymous 401 case and an authenticated 404 case. No spike outcome moved a count.
+anonymous 401 case and an authenticated 404 case — and the third is the Phase 1 race test above. No
+spike outcome moved a count.
 
 Watch the integration suite's wall clock. ADR 0007 set 60 seconds as the point where it becomes a
 decision. The lazy per-collection token cache is what keeps this PR's addition to a handful of
