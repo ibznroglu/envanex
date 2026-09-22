@@ -638,8 +638,11 @@ public sealed class SqlServerFixture : IAsyncLifetime
     public Task<HttpClient> CreateViewerClientAsync();
     public Task<HttpClient> CreateViewerClientAsync(WebApplicationFactory<Program> factory);
 
-    // Test seam for the expiry path: rewrites the cached entry's expiry into the past without
-    // touching the database, so the re-mint branch is reachable without a fifteen-minute wait.
+    // Test seam for the expiry path: moves the cached entry's expiry to thirty seconds ahead —
+    // still valid, but inside the one-minute margin — without touching the database, so the
+    // re-mint branch is reachable without a fifteen-minute wait. Not into the past on purpose: a
+    // naive "has it expired yet" check would also re-mint an already-expired entry, so only a
+    // near-expiry one proves the margin itself. Mutation D2 is what proves it.
     internal void ExpireCachedToken(string email);
 
     private sealed record CachedToken(string Token, DateTimeOffset ExpiresAt);
