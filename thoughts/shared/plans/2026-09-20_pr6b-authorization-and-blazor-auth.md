@@ -1262,23 +1262,36 @@ Four of the five existing cases change.
 It looks like a restatement of exemption row 13 and is not one, so the reason is written here rather
 than left to be re-derived.
 
-Spike C3's probe 7, run against the configuration Phase 4 actually ships **minus** the bearer
-events, observed `GET /api/auth/register` answer **`302 Found`, `Location:
+Spike C3's probe 7 observed `GET /api/auth/register` answer **`302 Found`, `Location:
 /login?ReturnUrl=%2Fnot-found`** — an unmatched API path redirecting a client to an HTML login page,
-which is precisely what Decision 4 forbids. It happens by accident and through a route nobody
-designed: the bearer handler challenges with a bodiless 401, the response has therefore not started,
-`UseStatusCodePagesWithReExecute` re-executes the request as `/not-found`, `/not-found` is **not**
-under `/api/*`, so the selector forwards the re-executed request to the **cookie** scheme, and the
+which is precisely what Decision 4 forbids. The route: the bearer handler challenges with a bodiless
+401, the response has therefore not started, `UseStatusCodePagesWithReExecute` re-executes the
+request as `/not-found`, `/not-found` is **not** under `/api/*`, so the selector forwards the
+re-executed request to the **cookie** scheme, and — because `/not-found` was itself closed — the
 cookie scheme redirects. The redirect overwrites the 401.
 
-`OnChallenge` is the only thing that stops it: it writes a body, the response starts, and a started
-response is never re-executed. **So `OnChallenge` is load-bearing for `/api/*` 404 handling, not a
-nicety about response bodies** — and that is a claim about a mechanism, which is what this case
-pins. Row 13's case asserts the *behaviour* an operator reads off the exemption table (an unmatched
-API path answers 401 with a problem+json body, not 404); this case asserts the *absence of the
-redirect*, names probe 7 in its comment, and is the one that fails if a later change drops the body
-from `OnChallenge` or removes its `HandleResponse()`. Row 13's assertion was narrowed to status and
-content type so the two do not overlap.
+**This section first said the bearer body alone stood between `/api/*` and that redirect. Phase 4's
+mutation run showed otherwise.** Probe 7 had *two* things missing: no `OnChallenge` body, and no
+exemption on `/not-found`. The mutation run separated them:
+
+| Mutation | `GET /api/auth/register`, anonymous | What catches it in this case |
+|---|---|---|
+| body-writing call removed from `OnChallenge` (status never set) | empty `200` | the status assertion |
+| `OnChallenge` left as a bodiless `401`, `/not-found` still exempt | `401`, `text/html`, the re-executed not-found page | the content-type assertion |
+| bodiless `401` **and** `[AllowAnonymous]` removed from `NotFound.razor` | **`302`, `Location: /login?ReturnUrl=%2Fnot-found`**, no content type, empty body | the status assertion fails first; the `Location` assertion would fail with it |
+
+The redirect needs both defects together. With row 4 in place, a bodiless challenge's re-execution
+renders the not-found page and the 401 survives — as an HTML page rather than problem+json, which is
+still wrong for an API client but is not a redirect.
+
+So the claim this case pins is narrower than first written: `OnChallenge`'s body keeps every
+`/api/*` 401 a problem+json 401, and together with row 4 it keeps `/api/*` from ever redirecting.
+Row 13's case asserts the *behaviour* an operator reads off the exemption table (an unmatched API
+path answers 401 with a problem+json body, not 404); this case additionally asserts the *absence of
+the redirect*. The `Location` assertion is kept although no single mutation reaches it: the
+combination is reachable in production, since any change that closes `/not-found` again turns a
+bodiless `/api/*` challenge into a redirect to an HTML login page. Row 13's assertion was narrowed to
+status and content type so the two do not overlap.
 
 `tests/Envanex.IntegrationTests/Api/AuthApiTests.cs` — **modified, +1.**
 `Register_ShouldReturn404` (`AuthApiTests.cs:365-378`) is an anonymous GET of an unmatched `/api/*`
@@ -1357,9 +1370,22 @@ three, one `[InlineData]` per hub endpoint. Notable bodies:
   The plan first specified "not 401" alone, under the name `…ShouldNotReturn401`, and that
   assertion was too weak: it was written in Phase 0, when bearer was still the default scheme and
   a denial on any path was a 401. Under the selector Phase 3 introduced, `/_blazor` is a non-`/api/*`
-  path, so a denied request there is forwarded to the cookie scheme and answered with a 302 to
-  `/login`. "Not 401" would stay green with the row 12 convention removed. The 302 and `Location`
-  assertions are what make it fail, and the test was renamed to say what it asserts.
+  path, so a denied request there is forwarded to the cookie scheme — and the cookie scheme does
+  not answer all three endpoints the same way. .NET 10 puts `DisableCookieRedirectMetadata` on
+  negotiate and on the transport endpoint but not on disconnect, so on those two the cookie
+  challenge answers a bodiless 401 carrying `Location` instead of a 302, and that 401 is then
+  re-executed as `/not-found`. Phase 4's mutation run removed the row 12 convention and observed:
+
+  | Endpoint | Denied answer | Assertion that catches it |
+  |---|---|---|
+  | negotiate | `400` with `Location: /login?ReturnUrl=…` | `Location` — the only one that fires |
+  | transport | `401` with `Location` and an HTML body | the 401 assertion |
+  | disconnect | `302` to `/login?ReturnUrl=…` | the 302 assertion |
+
+  So "not 401" alone would have caught only the transport endpoint. Each of the three assertions is
+  the one that catches one endpoint, which is why none may be dropped, and why the test was
+  renamed to say what it asserts. The claim this entry first carried — that a denied `/_blazor`
+  request is answered with a 302 — holds for disconnect only.
 - `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` — row 13, narrowed to status and
   content type. The absence of a `Location` header is asserted by `AuthPipelineTests` instead, for
   the reason given there.
