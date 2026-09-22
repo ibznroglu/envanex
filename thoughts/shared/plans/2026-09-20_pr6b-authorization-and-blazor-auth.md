@@ -1135,9 +1135,13 @@ requirement written in the place it is read, which is what Decision 2 asks for.
 otherwise the handler continues and appends its own headers and empty body. The consequence is that
 **no `WWW-Authenticate` header is emitted on any 401 in this application.** No existing test asserts
 that header (a repo-wide search under `tests/` returns no match), so nothing breaks — but exemption
-row 2's test is rewritten because of it, see below. The challenge body is a ProblemDetails with the
-Turkish title "Kimlik doğrulaması gerekli."; the forbid body's title is "Bu işlem için yetkiniz
-yok."; both take their reason phrase from `GetReasonPhrase`.
+row 2's test is rewritten because of it, see below. Both bodies are ProblemDetails whose `Title` is
+the English reason phrase from `GetReasonPhrase` ("Unauthorized", "Forbidden") and whose `Detail` is
+the Turkish sentence — "Kimlik doğrulaması gerekli." for the challenge, "Bu işlem için yetkiniz
+yok." for the forbid. This plan first said "Turkish title", and that was wrong: `ResultExtensions`
+already titles every ProblemDetails from `GetReasonPhrase` and puts the Turkish message in
+`Detail`, so the events follow it and a rejection from the authentication middleware has the same
+shape as a rejection from a use case. Consistency across the two sources decided it.
 
 **The rule these bodies exist to satisfy: once a response has started, no re-execution happens at
 all.** That is the whole of it, and it is narrower than either sentence the plan previously carried.
@@ -1175,7 +1179,7 @@ the disconnect finding under C2.
 | 9 | `/openapi/v1.json`, Development only | `app.MapOpenApi().AllowAnonymous()` | `OpenApiDocument_InDevelopment_WithoutAuthentication_ShouldReturn200` |
 | 10 | Scalar reference, Development only | `app.MapScalarApiReference().AllowAnonymous()` | `ScalarReference_InDevelopment_WithoutAuthentication_ShouldReturn200` |
 | 11 | `_framework/blazor.web.js` | **a consequence of row 8** — the script is served out of the asset manifest and flips from 401 to 200 the moment `MapStaticAssets()` carries `.AllowAnonymous()` (Spike C1 → C-a). No production line of its own | `BlazorFrameworkScript_WithoutAuthentication_ShouldReturn200` |
-| 12 | the `/_blazor` endpoints — **negotiate, the transport endpoint and disconnect, all three** | **its own mechanism** (Spike C2 → C-b): the route-pattern convention in the Files list above. `MapRazorComponents<App>().AllowAnonymous()` is the wrong one — the spike observed it opening `/` and every other page as a side effect | `BlazorHubEndpoints_WithoutAuthentication_ShouldNotReturn401`, a `[Theory]` with one `[InlineData]` per endpoint |
+| 12 | the `/_blazor` endpoints — **negotiate, the transport endpoint and disconnect, all three** | **its own mechanism** (Spike C2 → C-b): the route-pattern convention in the Files list above. `MapRazorComponents<App>().AllowAnonymous()` is the wrong one — the spike observed it opening `/` and every other page as a side effect | `BlazorHubEndpoints_WithoutAuthentication_ShouldReturnNeither401NorARedirect`, a `[Theory]` with one `[InlineData]` per endpoint |
 | 13 | unmatched `/api/*` paths | none — the selector forwards to bearer, so the answer is a 401 with a body rather than a redirect. Listed because it is a behaviour change, not an exemption | `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` |
 
 Row 2's test no longer asserts the absence of `WWW-Authenticate`, because `OnChallenge` calls
@@ -1338,13 +1342,24 @@ three, one `[InlineData]` per hub endpoint. Notable bodies:
   case that makes row 4's exemption matter: for an authenticated caller the challenge does not
   happen, routing reports the miss, and the 404 re-execution path is reachable at last.
 - `BlazorFrameworkScript_WithoutAuthentication_ShouldReturn200` — `GET /_framework/blazor.web.js`
-  signed out. The regression this guards is the login page losing enhanced navigation.
-- `BlazorHubEndpoints_WithoutAuthentication_ShouldNotReturn401` — `POST
+  signed out. The regression this guards is the login page losing enhanced navigation. The shared
+  Testing host does not serve static web assets, so the case builds its own host with
+  `WithWebHostBuilder(b => b.UseStaticWebAssets())`, scoped to itself. The exemption itself needs no
+  production line; putting `UseStaticWebAssets` on the shared factory would change the host for
+  every other test to fix one.
+- `BlazorHubEndpoints_WithoutAuthentication_ShouldReturnNeither401NorARedirect` — `POST
   /_blazor/negotiate?negotiateVersion=1`, `GET /_blazor?id=…` and `POST /_blazor/disconnect`, signed
-  out. Asserted as "not 401" rather than a specific success code: the responses are framework-owned,
-  and the spike recorded 200, 404 (no such circuit) and 400 (no circuit id) respectively — a 401 is
-  the failure this test exists to catch, and pinning the other three would make it a test of the
-  framework.
+  out. Asserts not 401, not 302, and no `Location` header, rather than a specific success code: the
+  responses are framework-owned, and the spike recorded 200, 404 (no such circuit) and 400 (no
+  circuit id) respectively — a denial is the failure this test exists to catch, and pinning the
+  other three would make it a test of the framework.
+
+  The plan first specified "not 401" alone, under the name `…ShouldNotReturn401`, and that
+  assertion was too weak: it was written in Phase 0, when bearer was still the default scheme and
+  a denial on any path was a 401. Under the selector Phase 3 introduced, `/_blazor` is a non-`/api/*`
+  path, so a denied request there is forwarded to the cookie scheme and answered with a 302 to
+  `/login`. "Not 401" would stay green with the row 12 convention removed. The 302 and `Location`
+  assertions are what make it fail, and the test was renamed to say what it asserts.
 - `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` — row 13, narrowed to status and
   content type. The absence of a `Location` header is asserted by `AuthPipelineTests` instead, for
   the reason given there.
