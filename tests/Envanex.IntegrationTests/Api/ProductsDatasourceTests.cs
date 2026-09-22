@@ -16,16 +16,19 @@ namespace Envanex.IntegrationTests.Api;
 public sealed class ProductsDatasourceTests : IAsyncLifetime
 {
     private readonly SqlServerFixture _fixture;
-    private readonly HttpClient _client;
+    private HttpClient _client = null!;
 
     public ProductsDatasourceTests(SqlServerFixture fixture)
     {
         ArgumentNullException.ThrowIfNull(fixture);
         _fixture = fixture;
-        _client = fixture.WebApplicationFactory.CreateClient();
     }
 
-    public Task InitializeAsync() => _fixture.ResetAsync();
+    public async Task InitializeAsync()
+    {
+        await _fixture.ResetAsync();
+        _client = await _fixture.CreateAdministratorClientAsync();
+    }
 
     public Task DisposeAsync()
     {

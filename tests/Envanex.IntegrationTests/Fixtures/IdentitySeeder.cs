@@ -36,6 +36,80 @@ internal static class IdentitySeeder
         return user.Id;
     }
 
+    /// <summary>
+    /// Creates the role if it is not already there.
+    /// </summary>
+    /// <remarks>
+    /// Idempotent on purpose, unlike <see cref="CreateUserAsync"/>: the fixture's token cache calls
+    /// this on every cache miss, and a miss says nothing about whether an earlier class already
+    /// seeded the role.
+    /// </remarks>
+    public static async Task EnsureRoleAsync(IServiceProvider services, string role)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(role);
+
+        using var scope = services.CreateScope();
+        var roleManager = scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>();
+
+        if (await roleManager.RoleExistsAsync(role))
+        {
+            return;
+        }
+
+        ThrowIfFailed(await roleManager.CreateAsync(new IdentityRole<Guid>(role)), $"create the role '{role}'");
+    }
+
+    /// <summary>
+    /// Creates the user if it is not already there, and returns its id either way.
+    /// </summary>
+    /// <remarks>
+    /// Goes through <see cref="UserManager{TUser}"/> rather than writing the rows directly, so the
+    /// password the fixture logs in with is hashed by the same code the login path verifies it
+    /// with.
+    /// </remarks>
+    public static async Task<Guid> EnsureUserAsync(IServiceProvider services, string email, string password)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(email);
+
+        using var scope = services.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<EnvanexUser>>();
+
+        var existing = await userManager.FindByEmailAsync(email);
+
+        if (existing is not null)
+        {
+            return existing.Id;
+        }
+
+        var user = new EnvanexUser { UserName = email, Email = email };
+
+        ThrowIfFailed(await userManager.CreateAsync(user, password), $"create the user '{email}'");
+
+        return user.Id;
+    }
+
+    /// <summary>
+    /// Adds the user to the role if it is not in it already.
+    /// </summary>
+    public static async Task EnsureUserInRoleAsync(IServiceProvider services, string email, string role)
+    {
+        ArgumentNullException.ThrowIfNull(role);
+
+        var (scope, userManager, user) = await ResolveUserAsync(services, email);
+
+        using (scope)
+        {
+            if (await userManager.IsInRoleAsync(user, role))
+            {
+                return;
+            }
+
+            ThrowIfFailed(await userManager.AddToRoleAsync(user, role), $"add '{email}' to the role '{role}'");
+        }
+    }
+
     public static async Task<int> GetAccessFailedCountAsync(IServiceProvider services, string email)
     {
         var (scope, userManager, user) = await ResolveUserAsync(services, email);

@@ -6,17 +6,41 @@ namespace Envanex.IntegrationTests.Fixtures;
 public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString;
+    private readonly string _environment;
+    private readonly IReadOnlyDictionary<string, string?> _settingOverrides;
 
     public EnvanexWebApplicationFactory(string connectionString)
+        : this(connectionString, TestingEnvironment, EmptyOverrides)
     {
+    }
+
+    /// <summary>
+    /// A host that differs from the collection's shared one by an environment name and a handful
+    /// of settings.
+    /// </summary>
+    /// <remarks>
+    /// This overload exists so that a later phase configures <em>this</em> type instead of adding
+    /// another <see cref="WebApplicationFactory{TEntryPoint}"/> subclass for every variation. The
+    /// overrides are applied last in <see cref="ConfigureWebHost"/>, so a caller can replace a
+    /// value the shared configuration below already set.
+    /// </remarks>
+    public EnvanexWebApplicationFactory(
+        string connectionString,
+        string environment,
+        IReadOnlyDictionary<string, string?> settingOverrides)
+    {
+        ArgumentNullException.ThrowIfNull(settingOverrides);
+
         _connectionString = connectionString;
+        _environment = environment;
+        _settingOverrides = settingOverrides;
     }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.UseEnvironment("Testing");
+        builder.UseEnvironment(_environment);
 
         builder.UseSetting("ConnectionStrings:EnvanexDb", _connectionString);
 
@@ -39,6 +63,12 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
         builder.UseSetting("Jwt:AccessTokenMinutes", "15");
         builder.UseSetting("Jwt:RefreshTokenIdleDays", "7");
         builder.UseSetting("Jwt:RefreshTokenAbsoluteDays", "30");
+
+        // Last on purpose: the caller's overrides win over every default above.
+        foreach (var (key, value) in _settingOverrides)
+        {
+            builder.UseSetting(key, value);
+        }
     }
 
     /// <summary>
@@ -46,4 +76,9 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
     /// outlives a test run.
     /// </summary>
     internal const string TestSigningKey = "envanex-integration-test-signing-key-0123456789";
+
+    private const string TestingEnvironment = "Testing";
+
+    private static readonly IReadOnlyDictionary<string, string?> EmptyOverrides =
+        new Dictionary<string, string?>(StringComparer.Ordinal);
 }
