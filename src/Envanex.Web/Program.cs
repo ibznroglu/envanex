@@ -1,13 +1,17 @@
 using System.Text.Json;
 using System.Threading.RateLimiting;
 using Envanex.Application;
+using Envanex.Application.Authentication;
 using Envanex.Infrastructure;
+using Envanex.Web.Authentication;
+using Envanex.Web.Authorization;
 using Envanex.Web.Components;
 using Envanex.Web.Controllers;
 using Envanex.Web.DataSource;
 using Envanex.Web.Extensions;
 using Envanex.Web.Middleware;
 using Envanex.Web.RateLimiting;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;
 
@@ -25,7 +29,21 @@ builder.Services.AddControllers(options =>
 builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddEnvanexJwtBearer(builder.Configuration);
-builder.Services.AddAuthorization();
+builder.Services.AddAuthorization(options =>
+{
+    // Roles map to policies here and nowhere else: a page or an endpoint names a policy, so adding
+    // a role later is an edit to these two lines rather than to every place that checks one.
+    options.AddPolicy(EnvanexPolicies.CanRead, policy => policy.RequireRole(EnvanexRoles.Administrator, EnvanexRoles.Viewer));
+    options.AddPolicy(EnvanexPolicies.CanWrite, policy => policy.RequireRole(EnvanexRoles.Administrator));
+
+    // FallbackPolicy lands in PR 6b Phase 4, when the API endpoints close.
+});
+
+// The Blazor side of authentication. The provider replaces the framework's plain
+// ServerAuthenticationStateProvider, which never re-reads the user once a circuit is open.
+builder.Services.AddCascadingAuthenticationState();
+builder.Services.AddScoped<AuthenticationStateProvider, RevalidatingIdentityAuthenticationStateProvider>();
+builder.Services.AddScoped<CookieSignInService>();
 
 var rateLimitingSection = builder.Configuration.GetSection("RateLimiting");
 bool rateLimitingEnabled = rateLimitingSection.GetValue("Enabled", true);
@@ -87,6 +105,20 @@ builder.Services.AddRateLimiter(options =>
         if (!loginRateLimitingEnabled)
         {
             return RateLimitPartition.GetNoLimiter(partitionKey);
+        }
+
+        // POST only. The policy also sits on the /login page, and a component endpoint serves GET
+        // and POST from one endpoint, so without this every render of the form would spend a
+        // permit and five reloads would lock login out for the whole window. AuthController.Login
+        // is POST-only already and is unaffected.
+        //
+        // Its own fixed key, never the per-address partitionKey. A limiter is built once per key
+        // and reused for the host's lifetime, so a no-limiter under the address key would let
+        // whichever method arrived first decide that address's limiter for good: one GET of
+        // /login switched off brute-force protection on POST /api/auth/login for that address.
+        if (!HttpMethods.IsPost(context.Request.Method))
+        {
+            return RateLimitPartition.GetNoLimiter("login-non-post");
         }
 
         return RateLimitPartition.GetFixedWindowLimiter(partitionKey, _ => new FixedWindowRateLimiterOptions

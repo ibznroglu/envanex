@@ -1,0 +1,41 @@
+@page "/sign-out"
+@using Envanex.Web.Authentication
+@* Signed in, whatever the role: a user who holds none must still be able to leave. *@
+@attribute [Authorize]
+@inject CookieSignInService SignInService
+@inject NavigationManager Navigation
+
+@*
+    A page rather than a form inside NavMenu: a named form handler in a layout component under static
+    server rendering is an unverified mechanism. A POST behind a confirm button rather than a GET,
+    so that a link or an image on another page cannot sign the user out.
+*@
+
+<PageTitle>Oturumu kapat</PageTitle>
+
+<h1>Oturumu kapat</h1>
+
+<p>Oturumu kapatmak istediğinizden emin misiniz?</p>
+
+<EditForm Model="_confirmation" FormName="sign-out" method="post" OnSubmit="SignOutAsync">
+    <button type="submit" class="btn btn-primary">Oturumu kapat</button>
+</EditForm>
+
+@code {
+    // EditForm needs a model to render, and rendering is what emits the antiforgery field. The form
+    // posts no fields of its own.
+    private readonly object _confirmation = new();
+
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private async Task SignOutAsync()
+    {
+        var httpContext = HttpContext
+            ?? throw new InvalidOperationException("The sign-out page must be statically server-rendered; it has no HttpContext to clear the auth cookie on.");
+
+        await SignInService.SignOutAsync(httpContext);
+
+        Navigation.NavigateTo("/login");
+    }
+}

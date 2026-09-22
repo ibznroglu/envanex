@@ -119,6 +119,60 @@ public sealed class LoginRateLimiterTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task BlazorLoginForm_ExceedingTheLoginRateLimit_ShouldReturn429()
+    {
+        // Decision 9: the form posts to its own component endpoint, not to /api/auth/login, and
+        // must spend the same named policy's permits or it is a way round the REST door's limit.
+        var token = await CookieAuthHelper.ReadAntiforgeryTokenAsync(_client, CookieAuthHelper.LoginPath);
+
+        (await CookieAuthHelper.PostLoginFormAsync(_client, token, TestEmail, WrongPassword))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await CookieAuthHelper.PostLoginFormAsync(_client, token, TestEmail, WrongPassword))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var rejected = await CookieAuthHelper.PostLoginFormAsync(_client, token, TestEmail, WrongPassword);
+
+        rejected.StatusCode.ShouldBe(HttpStatusCode.TooManyRequests);
+    }
+
+    [Fact]
+    public async Task BlazorLoginPage_RepeatedGets_ShouldNotSpendLoginPermits()
+    {
+        // The page and the form are one component endpoint, so the policy sees every GET too. Only
+        // the POST-only guard in the policy delegate keeps a reload from costing a login attempt.
+        //
+        // The GETs come first on purpose, and the case does not end until a POST is refused. The
+        // guard as first written returned a no-limiter under the same per-address partition key
+        // the POSTs use; a limiter is built once per key and reused, so the first GET fixed that
+        // address's limiter as "no limit" for the host's lifetime. Observed: after one GET of
+        // /login, form POSTs and POST /api/auth/login were never answered 429. A version of this
+        // case that stopped after the GETs, or after two POSTs, stayed green with that bug in.
+        for (int attempt = 0; attempt < 3; attempt++)
+        {
+            var response = await _client.GetAsync(CookieAuthHelper.LoginPath);
+
+            response.StatusCode.ShouldBe(
+                HttpStatusCode.OK,
+                $"GET #{attempt + 1} of the login page was rate limited; rendering the form spent a login permit.");
+        }
+
+        // Both permits are still there to be spent by the form itself...
+        var token = await CookieAuthHelper.ReadAntiforgeryTokenAsync(_client, CookieAuthHelper.LoginPath);
+
+        (await CookieAuthHelper.PostLoginFormAsync(_client, token, TestEmail, WrongPassword))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+        (await CookieAuthHelper.PostLoginFormAsync(_client, token, TestEmail, WrongPassword))
+            .StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        // ...and the POSTs are still limited after the GETs: the third is refused.
+        var rejected = await CookieAuthHelper.PostLoginFormAsync(_client, token, TestEmail, WrongPassword);
+
+        rejected.StatusCode.ShouldBe(
+            HttpStatusCode.TooManyRequests,
+            "After GETs of the login page the form's POSTs were no longer limited; the GETs decided the address's limiter.");
+    }
+
+    [Fact]
     public async Task ProductsEndpoint_ShouldNotBeAffectedByTheLoginPolicy()
     {
         // The policy is attached to the login action only; the global limiter is off in this

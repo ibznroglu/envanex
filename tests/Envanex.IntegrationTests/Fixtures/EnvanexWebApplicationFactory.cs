@@ -64,6 +64,12 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
         builder.UseSetting("Jwt:RefreshTokenIdleDays", "7");
         builder.UseSetting("Jwt:RefreshTokenAbsoluteDays", "30");
 
+        // The default client's BaseAddress is http://localhost and UseHttpsRedirection no-ops under
+        // TestServer, so an auth cookie marked Secure would never be replayed by the client's
+        // cookie container, and every cookie test would fail for a reason unrelated to the code
+        // under test. Production keeps Always because the setting is absent there.
+        builder.UseSetting("Auth:Cookie:SecurePolicy", "SameAsRequest");
+
         // Last on purpose: the caller's overrides win over every default above.
         foreach (var (key, value) in _settingOverrides)
         {
