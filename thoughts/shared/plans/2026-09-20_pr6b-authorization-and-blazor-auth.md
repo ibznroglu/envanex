@@ -627,16 +627,16 @@ public sealed class SqlServerFixture : IAsyncLifetime
     public const string RoleLessEmail      = "fixture-no-role@envanex.test";
     public const string SeededPassword     = "Envanex-Fixture-Parola-1";
 
-    public Task<string> GetAccessTokenAsync(string email, string? role);
+    // Private (amendment): the cache is keyed by email alone, so only the fixed wrappers below —
+    // one email, one role each — may reach it.
+    private Task<string> GetAccessTokenAsync(string email, string? role);
     public Task<string> GetAdministratorTokenAsync();
     public Task<string> GetViewerTokenAsync();
-    public Task<string> GetRoleLessTokenAsync();
 
     public Task<HttpClient> CreateAdministratorClientAsync();
     public Task<HttpClient> CreateAdministratorClientAsync(WebApplicationFactory<Program> factory);
     public Task<HttpClient> CreateViewerClientAsync();
     public Task<HttpClient> CreateViewerClientAsync(WebApplicationFactory<Program> factory);
-    public Task<HttpClient> CreateRoleLessClientAsync();
 
     // Test seam for the expiry path: rewrites the cached entry's expiry into the past without
     // touching the database, so the re-mint branch is reachable without a fifteen-minute wait.
@@ -960,7 +960,10 @@ internal static class CookieAuthHelper
 half of Decision 3, and the cookie half of the two-claim-type equivalence Phase 1 asserts.
 - **`Cookie_AuthenticatedUserWithNoRole_ShouldReturn403WithABodyAndNotTheNotFoundPage`** — signs in
   through the login form as `SqlServerFixture.RoleLessEmail`, requests `/`, and asserts 403, a
-  non-empty body, and that the body is not the not-found page. Reachable because `Home.razor`
+  non-empty body, and that the body is not the not-found page. The test must create that user
+  itself with `IdentitySeeder.EnsureUserAsync` before signing in — `CookieAuthHelper.SignInAsync`
+  signs in, it does not create, and the Phase 2 amendment removed `GetRoleLessTokenAsync`, which
+  was the only other code that would have created it. Reachable because `Home.razor`
   requires `CanRead`. Remove `OnRedirectToAccessDenied` and this goes red as a 404 carrying the
   not-found page; remove the policy from `Home.razor` and it goes red as a 200.
 - **`Cookie_AuthenticatedViewer_ShouldReadTheHomePage`** — signs in as `SqlServerFixture.ViewerEmail`
