@@ -754,11 +754,23 @@ merely authenticated. Three consequences follow and are honoured below:
 - `src/Envanex.Web/Program.cs` — **modified** — `AddCascadingAuthenticationState()`, the
   `AuthenticationStateProvider` registration, `CookieSignInService` registration, the two
   `AddPolicy` calls inside the existing `AddAuthorization` at line 28, and **the POST-only guard in
-  the `"login"` policy delegate** — `return RateLimitPartition.GetNoLimiter(partitionKey)` when
-  `context.Request.Method` is not `POST`. The guard is required, not optional: Spike B observed the
-  third consecutive **GET** of the attributed page answer 429, because a component endpoint serves
-  GET and POST from one endpoint. Without it, five reloads of `/login` lock login out for five
-  minutes in production.
+  the `"login"` policy delegate** — when `context.Request.Method` is not `POST`, the request falls
+  into its own fixed partition, `return RateLimitPartition.GetNoLimiter("login-non-post")`, so every
+  GET shares one unlimited bucket and never touches the per-address POST bucket. The guard is
+  required, not optional: Spike B observed the third consecutive **GET** of the attributed page
+  answer 429, because a component endpoint serves GET and POST from one endpoint. Without it, five
+  reloads of `/login` lock login out for five minutes in production.
+
+  **The guard as first written here was a defect, and it is the one place PR 6b nearly regressed
+  PR 6a.** It returned `GetNoLimiter(partitionKey)` — the same per-address key the POST limiter
+  uses. A limiter is built once per partition key and reused for the host's lifetime, so whichever
+  method arrived first from an address decided that address's limiter forever. The coder observed
+  it on a real host (`--launch-profile http`, login limit 2 per 60 s): after one visit to `/login`,
+  four consecutive `POST /api/auth/login` answered 401 and never 429 — one page load had turned off
+  brute-force protection on the REST login for that address, the protection PR 6a shipped. The
+  reverse order was broken too: POSTs first spent the limit, and every later GET of `/login`
+  answered 429. Spike B missed it because it restarted the host between its GET and POST
+  sequences, so the two methods never shared a partition. The fixed key is what separates them.
 - `src/Envanex.Web/Components/Routes.razor` — **modified** — `RouteView` → `AuthorizeRouteView` with
   a `NotAuthorized` template carrying the Turkish "Bu sayfayı görüntüleme yetkiniz yok." and, for an
   anonymous user, a link to `/login`, plus the comment recording that under static SSR the endpoint
@@ -1003,9 +1015,13 @@ half of Decision 3, and the cookie half of the two-claim-type equivalence Phase 
 
 `tests/Envanex.IntegrationTests/Api/LoginRateLimiterTests.cs` (**+2**, Decision 9)
 - `BlazorLoginForm_ExceedingTheLoginRateLimit_ShouldReturn429`
-- `BlazorLoginPage_RepeatedGets_ShouldNotSpendLoginPermits` — **kept.** Spike B observed a bare GET
-  of the attributed page spending a login permit, so this case is the guard's proof: delete the
-  POST-only guard from the `"login"` policy delegate and it goes red on the third `GET /login`. No
+- `BlazorLoginPage_RepeatedGets_ShouldNotSpendLoginPermits` — **kept, and strengthened.** It issues
+  the GETs of `/login` first, then two POSTs that must answer 200, then a third POST that must
+  answer 429. Both halves are the guard's proof: without the guard a GET spends a permit and the
+  first POSTs fail; with the guard keyed on the address, the GETs claim the address's partition as
+  a no-limiter and the third POST answers 200 instead of 429. The test as first written here —
+  GETs only, asserting none of them answered 429 — stayed green with that second defect present,
+  which is why it was strengthened rather than kept. Its comment records the observed failure. No
   count falls.
 
 ### Validation
@@ -1104,10 +1120,12 @@ builder.Services.AddAuthorization(options =>
 });
 ```
 
-**`DefaultPolicy` is deliberately left alone, and the reason is not `Home.razor`.** After the ruling
-that the landing page carries `CanRead`, this codebase contains **no** policy-less `[Authorize]` at
-all — so raising `DefaultPolicy` to require a role would change nothing today and would set a trap
-for later: an `[Authorize]` written in PR 8 to mean "signed in" would silently mean "has a role",
+**`DefaultPolicy` is deliberately left alone, and the reason is not `Home.razor`.** The codebase
+carries exactly one policy-less `[Authorize]`: `SignOut.razor`, added in Phase 3, because a user
+with no role must still be able to sign out. Raising `DefaultPolicy` to require a role would
+therefore break sign-out today, for exactly the users most likely to need it — an authenticated
+user whose roles were revoked. It would also set a trap for later: an `[Authorize]` written in PR 8
+to mean "signed in" would silently mean "has a role",
 and `AuthorizeView` with no policy would start hiding UI from authenticated users for a reason
 nobody wrote down. Leaving it at `RequireAuthenticatedUser()` keeps `DefaultPolicy` and
 `FallbackPolicy` saying the same thing — "authentication is the floor" — and keeps every role
@@ -1553,6 +1571,11 @@ PBKDF2 pairs; if the suite crosses 60 s, the cause to check first is a class cal
 - The roadmap row about PR 6a's unrun manual smoke steps closes in Phase 3/Phase 5.
 - `Demo:Password` joins `Jwt:SigningKey` as a value the first deploy must set in App Service
   configuration — add it to the PR 7 deployment row.
+- `ReturnUrl` is not honoured. The cookie handler writes `?ReturnUrl=<path>` on its redirect to
+  `/login`, and the login page ignores it and always redirects to `/` after a successful sign-in.
+  Honouring it needs open-redirect validation — a `ReturnUrl` pointing off-site must not be
+  followed — and the tests that prove it, neither of which this plan carries. Its own chore, no PR
+  number.
 
 ---
 
