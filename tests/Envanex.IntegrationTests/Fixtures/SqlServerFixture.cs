@@ -82,8 +82,15 @@ public sealed class SqlServerFixture : IAsyncLifetime
     /// is not a shortcut around logging in for real — the cached token was minted by the real
     /// endpoint against a real password hash, and it still passes full issuer, audience, lifetime
     /// and signature validation on every single use.
+    /// <para>
+    /// Private on purpose. The cache is keyed by email alone, so a caller free to pass any
+    /// <paramref name="role"/> could ask for an already-cached email under a different role and be
+    /// handed the cached token in the first role without noticing. The only reachable entry points
+    /// are the fixed wrappers below, each binding one email to one role, which removes the misuse
+    /// rather than guarding it.
+    /// </para>
     /// </remarks>
-    public async Task<string> GetAccessTokenAsync(string email, string? role)
+    private async Task<string> GetAccessTokenAsync(string email, string? role)
     {
         if (_tokenCache.TryGetValue(email, out var cached) && cached.ExpiresAt - DateTimeOffset.UtcNow > ExpiryMargin)
         {
@@ -123,9 +130,6 @@ public sealed class SqlServerFixture : IAsyncLifetime
     public Task<string> GetViewerTokenAsync()
         => GetAccessTokenAsync(ViewerEmail, EnvanexRoles.Viewer);
 
-    public Task<string> GetRoleLessTokenAsync()
-        => GetAccessTokenAsync(RoleLessEmail, null);
-
     public Task<HttpClient> CreateAdministratorClientAsync()
         => CreateAdministratorClientAsync(WebApplicationFactory);
 
@@ -147,9 +151,6 @@ public sealed class SqlServerFixture : IAsyncLifetime
 
     public async Task<HttpClient> CreateViewerClientAsync(WebApplicationFactory<Program> factory)
         => Authenticate(factory, await GetViewerTokenAsync());
-
-    public async Task<HttpClient> CreateRoleLessClientAsync()
-        => Authenticate(WebApplicationFactory, await GetRoleLessTokenAsync());
 
     /// <summary>
     /// Moves the cached token for <paramref name="email"/> to within <see cref="ExpiryMargin"/> of
