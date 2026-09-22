@@ -1312,7 +1312,13 @@ callers both answer 401 — so each property needs the caller that can still see
 
 `tests/Envanex.IntegrationTests/Blazor/CookieAuthPipelineTests.cs` (**modified, +1**)
 - **`ApiPath_WithASessionCookieAndNoBearerToken_ShouldReturn401AndNotARedirect`** — Decision 4's
-  end-to-end proof: the exact case a header-presence selector would have got wrong.
+  end-to-end proof: the exact case a header-presence selector would have got wrong. It is the
+  **only** end-to-end guard on Decision 4: Phase 3's mutation proofs changed the selector to key on
+  `Authorization`-header presence and observed every cookie test stay green, leaving
+  `SchemeSelectionTests`' direct call to the selector as the sole guard. This test must therefore
+  actually reach the selector — a signed-in cookie client with no bearer token requesting a
+  protected `/api/*` endpoint, asserting 401 with no `Location` header rather than a 302 — and not
+  merely assert a status that any denial would produce.
 
 The two cookie cases this class already carries from Phase 3 (the role-less 403 and the Viewer 200)
 are unchanged by the gate. `Cookie_AnonymousRequestToAProtectedPage_ShouldRedirectToTheLoginPage` is
