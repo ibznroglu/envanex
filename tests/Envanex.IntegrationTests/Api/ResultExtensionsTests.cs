@@ -128,6 +128,14 @@ public sealed class ResultExtensionsTests
     }
 
     [Fact]
+    public void GetReasonPhrase_ForForbidden_ShouldBeForbiddenRatherThanError()
+    {
+        // No error code maps to 403, so no ToActionResult call can reach this arm. The bearer
+        // forbid's ProblemDetails is titled through it instead.
+        ResultExtensions.GetReasonPhrase(403).ShouldBe("Forbidden");
+    }
+
+    [Fact]
     public void ToNoContentActionResult_Success_ShouldReturn204()
     {
         var result = Result.Success(true);

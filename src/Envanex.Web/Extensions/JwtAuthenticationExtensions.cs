@@ -79,10 +79,12 @@ public static class JwtAuthenticationExtensions
                 // the forbid has to be a 403 carrying a body. The events write that body.
                 cookie.Events = EnvanexAuthenticationEvents.Cookie;
             })
-            // No JwtBearerEvents.OnChallenge handler yet: no /api/* endpoint is [Authorize], so a
-            // handler would be dead code. It ships with the first [Authorize] on a controller.
             .AddJwtBearer(bearer =>
             {
+                // The challenge and the forbid both write a ProblemDetails body, so neither is ever
+                // re-executed as the not-found page; see EnvanexAuthenticationEvents.Bearer.
+                bearer.Events = EnvanexAuthenticationEvents.Bearer;
+
                 bearer.TokenValidationParameters = new TokenValidationParameters
                 {
                     ValidateIssuer = true,

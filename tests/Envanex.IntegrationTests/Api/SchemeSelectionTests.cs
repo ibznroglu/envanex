@@ -15,8 +15,10 @@ namespace Envanex.IntegrationTests.Api;
 /// cookie and sending no header to <c>/api/*</c> must still reach the bearer scheme.
 /// </summary>
 /// <remarks>
-/// The end-to-end proof that an <c>/api/*</c> challenge never redirects needs an API endpoint that
-/// challenges, and none does until the gate closes.
+/// These call the selector directly. The end-to-end proof that an <c>/api/*</c> challenge never
+/// redirects is
+/// <c>CookieAuthPipelineTests.ApiPath_WithASessionCookieAndNoBearerToken_ShouldReturn401AndNotARedirect</c>,
+/// which sends a session cookie and no bearer token to a protected API endpoint.
 /// </remarks>
 [Collection(DatabaseCollection.Name)]
 public sealed class SchemeSelectionTests

@@ -2,17 +2,25 @@ using Envanex.Application.Abstractions.Messaging;
 using Envanex.Application.Authentication.Commands;
 using Envanex.Application.Authentication.DTOs;
 using Envanex.Web.Extensions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.RateLimiting;
 
 namespace Envanex.Web.Controllers;
 
 /// <summary>
-/// Login, refresh and logout. Every endpoint here is deliberately open: PR 6a authenticates, and
-/// PR 6b is where <c>[Authorize]</c> and the authorization policies arrive.
+/// Login, refresh and logout. The one controller exempt from the fallback policy: a caller cannot
+/// be required to hold an access token in order to obtain one.
 /// </summary>
+/// <remarks>
+/// <c>Logout</c> is exempt too, and that is a decision rather than a side effect of the class-level
+/// attribute (PR 6b Decision 14). Logout is authorized by possession of the refresh token it
+/// revokes, and it has to work after the access token has expired — which is exactly when a client
+/// is most likely to be signing out.
+/// </remarks>
 [ApiController]
 [Route("api/auth")]
+[AllowAnonymous]
 public sealed class AuthController : ControllerBase
 {
     /// <summary>

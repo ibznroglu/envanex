@@ -9,7 +9,8 @@ namespace Envanex.IntegrationTests.Blazor;
 /// The cookie half of two claims. First, that a cookie forbid carries a body and is therefore never
 /// re-executed as the not-found page. Second, that <c>RequireRole</c> evaluated against a
 /// <em>cookie</em> identity — whose roles sit under <c>ClaimTypes.Role</c>, not the bearer's short
-/// <c>role</c> — admits a Viewer and refuses a user with no role.
+/// <c>role</c> — admits a Viewer and refuses a user with no role. And one end-to-end proof that the
+/// cookie is never read on <c>/api/*</c>.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public sealed class CookieAuthPipelineTests
@@ -66,5 +67,40 @@ public sealed class CookieAuthPipelineTests
         response.StatusCode.ShouldBe(
             HttpStatusCode.OK,
             "A Viewer's cookie identity must satisfy CanRead; the role claim did not reach RequireRole.");
+    }
+
+    [Fact]
+    public async Task ApiPath_WithASessionCookieAndNoBearerToken_ShouldReturn401AndNotARedirect()
+    {
+        // The only end-to-end guard on path-prefix scheme selection. The caller is a signed-in
+        // Administrator whose cookie would satisfy CanRead if it were read, and it sends no
+        // Authorization header. A selector keyed on header presence would forward this request to
+        // the cookie scheme and answer 200; a cookie challenge would answer 302. Only the bearer
+        // scheme, chosen by path, answers 401 with no Location.
+        var services = _fixture.WebApplicationFactory.Services;
+        await IdentitySeeder.EnsureRoleAsync(services, EnvanexRoles.Administrator);
+        await IdentitySeeder.EnsureUserAsync(services, SqlServerFixture.AdministratorEmail, SqlServerFixture.SeededPassword);
+        await IdentitySeeder.EnsureUserInRoleAsync(services, SqlServerFixture.AdministratorEmail, EnvanexRoles.Administrator);
+
+        using var client = await CookieAuthHelper.SignInAsync(
+            _fixture.WebApplicationFactory, SqlServerFixture.AdministratorEmail, SqlServerFixture.SeededPassword);
+
+        // Control: the session is live, so a 401 below is the selector's doing, not a dead cookie.
+        using (var page = await client.GetAsync("/"))
+        {
+            page.StatusCode.ShouldBe(HttpStatusCode.OK, "The cookie session is not live, so this test proves nothing.");
+        }
+
+        client.DefaultRequestHeaders.Authorization.ShouldBeNull();
+
+        using var response = await client.GetAsync("/api/unit-of-measures");
+
+        response.StatusCode.ShouldBe(
+            HttpStatusCode.Unauthorized,
+            "The session cookie was read on /api/*; the scheme selector must key on the path, not on the header.");
+        response.Headers.Location.ShouldBeNull("An /api/* path was redirected to the login page.");
+
+        response.Content.Headers.ContentType.ShouldNotBeNull();
+        response.Content.Headers.ContentType.MediaType.ShouldBe("application/problem+json");
     }
 }

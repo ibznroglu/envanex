@@ -3,8 +3,10 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Text.Json;
+using Envanex.Application.Authentication;
 using Envanex.Application.Authentication.Commands;
 using Envanex.IntegrationTests.Fixtures;
+using Envanex.Web.Authentication;
 using Microsoft.IdentityModel.JsonWebTokens;
 using Microsoft.IdentityModel.Tokens;
 using Shouldly;
@@ -12,15 +14,18 @@ using Shouldly;
 namespace Envanex.IntegrationTests.Api;
 
 /// <summary>
-/// Guards the position of <c>UseAuthentication</c>/<c>UseAuthorization</c> in the pipeline. They sit
-/// inside the <c>UseStatusCodePagesWithReExecute("/not-found")</c> wrapper, which re-executes any
-/// bodiless error response as the not-found page. No endpoint is <c>[Authorize]</c> in PR 6a, so the
-/// only 401s that exist carry a ProblemDetails body; these tests prove that and prove that adding
-/// the two middlewares did not close a single open endpoint.
+/// Guards the bearer side of the gate and the position of <c>UseAuthentication</c>/<c>UseAuthorization</c>
+/// in the pipeline. They sit inside the <c>UseStatusCodePagesWithReExecute("/not-found")</c> wrapper,
+/// which re-executes any bodiless 4xx, and the re-executed request can overwrite the original status.
+/// Every <c>/api/*</c> endpoint outside <c>AuthController</c> now requires a policy, so the bearer
+/// scheme challenges and forbids for real; these tests prove that each of those rejections carries
+/// a ProblemDetails body, is therefore never re-executed, and never becomes a redirect.
 /// </summary>
 [Collection(DatabaseCollection.Name)]
 public sealed class AuthPipelineTests : IAsyncLifetime
 {
+    private const string ProtectedPath = "/api/unit-of-measures";
+
     private readonly SqlServerFixture _fixture;
     private readonly HttpClient _client;
 
@@ -63,55 +68,125 @@ public sealed class AuthPipelineTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task OpenEndpoint_WithNoAuthorizationHeader_ShouldStillReturn200()
+    public async Task ProtectedEndpoint_WithNoAuthorizationHeader_ShouldReturn401ProblemJsonAndNotTheNotFoundPage()
     {
-        // Every endpoint stays open in PR 6a. [Authorize] arrives in PR 6b.
-        var response = await _client.GetAsync("/api/unit-of-measures");
+        var response = await _client.GetAsync(ProtectedPath);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        await ShouldBeProblemJsonAsync(
+            response, HttpStatusCode.Unauthorized, EnvanexAuthenticationEvents.ChallengeDetail);
     }
 
     [Fact]
-    public async Task OpenEndpoint_WithAMalformedBearerToken_ShouldStillReturn200()
+    public async Task ProtectedEndpoint_WithAMalformedBearerToken_ShouldReturn401ProblemJson()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/unit-of-measures");
+        using var request = new HttpRequestMessage(HttpMethod.Get, ProtectedPath);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "not.a.jwt");
 
         var response = await _client.SendAsync(request);
 
-        // A failed bearer authentication does not challenge on an endpoint with no authorization
-        // requirement; it leaves HttpContext.User unauthenticated and the request proceeds.
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        await ShouldBeProblemJsonAsync(
+            response, HttpStatusCode.Unauthorized, EnvanexAuthenticationEvents.ChallengeDetail);
     }
 
     [Fact]
-    public async Task OpenEndpoint_WithAnExpiredBearerToken_ShouldStillReturn200()
+    public async Task ProtectedEndpoint_WithAnExpiredBearerToken_ShouldReturn401ProblemJson()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/unit-of-measures");
+        using var request = new HttpRequestMessage(HttpMethod.Get, ProtectedPath);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(expired: true));
 
         var response = await _client.SendAsync(request);
 
-        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+        await ShouldBeProblemJsonAsync(
+            response, HttpStatusCode.Unauthorized, EnvanexAuthenticationEvents.ChallengeDetail);
     }
 
     [Fact]
-    public async Task OpenEndpoint_WithAValidBearerToken_ShouldStillReturn200()
+    public async Task ProtectedEndpoint_WithAValidBearerTokenCarryingNoRole_ShouldReturn403ProblemJsonAndNotTheNotFoundPage()
     {
-        using var request = new HttpRequestMessage(HttpMethod.Get, "/api/unit-of-measures");
+        // The bearer half of the body-carrying forbid. The token validates, so the caller is
+        // authenticated, and it carries no role, so CanRead refuses it: a forbid, not a challenge.
+        using var request = new HttpRequestMessage(HttpMethod.Get, ProtectedPath);
         request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", CreateToken(expired: false));
+
+        var response = await _client.SendAsync(request);
+
+        await ShouldBeProblemJsonAsync(
+            response, HttpStatusCode.Forbidden, EnvanexAuthenticationEvents.ForbiddenDetail);
+    }
+
+    [Fact]
+    public async Task ProtectedEndpoint_WithAValidBearerTokenCarryingTheAdministratorRole_ShouldReturn200()
+    {
+        // The positive control for the case above: the same hand-built token, with a role added,
+        // is admitted. Without it a 403 above could equally mean that no token is ever accepted.
+        using var request = new HttpRequestMessage(HttpMethod.Get, ProtectedPath);
+        request.Headers.Authorization = new AuthenticationHeaderValue(
+            "Bearer", CreateToken(expired: false, EnvanexRoles.Administrator));
 
         var response = await _client.SendAsync(request);
 
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    private static string CreateToken(bool expired)
+    [Fact]
+    public async Task UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader()
+    {
+        // PR 6b Spike C3, probe 7, observed this request answer 302 to
+        // /login?ReturnUrl=%2Fnot-found when the bearer challenge carried no body: the bodiless 401
+        // was re-executed as /not-found, which is not under /api/*, so the selector handed the
+        // re-executed request to the cookie scheme, and the cookie scheme redirected. OnChallenge
+        // writing a body is the only thing that stops it. This case goes red if the body or the
+        // HandleResponse() call is dropped from OnChallenge.
+        using var client = CookieAuthHelper.CreateNonRedirectingClient(_fixture.WebApplicationFactory);
+
+        using var response = await client.GetAsync("/api/auth/register");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+        response.Headers.Location.ShouldBeNull(
+            "An unmatched /api/* path was redirected; the bearer challenge was re-executed as /not-found.");
+
+        response.Content.Headers.ContentType.ShouldNotBeNull();
+        response.Content.Headers.ContentType.MediaType.ShouldBe("application/problem+json");
+    }
+
+    private static async Task ShouldBeProblemJsonAsync(
+        HttpResponseMessage response, HttpStatusCode expectedStatus, string expectedDetail)
+    {
+        response.StatusCode.ShouldBe(expectedStatus);
+
+        response.Content.Headers.ContentType.ShouldNotBeNull();
+        response.Content.Headers.ContentType.MediaType.ShouldBe("application/problem+json");
+
+        var body = await response.Content.ReadAsStringAsync();
+        body.ShouldNotContain(
+            "<html",
+            Case.Insensitive,
+            $"The {(int)expectedStatus} was re-executed as the /not-found page; the bearer event wrote no body.");
+
+        using var document = JsonDocument.Parse(body);
+        document.RootElement.GetProperty("status").GetInt32().ShouldBe((int)expectedStatus);
+        document.RootElement.GetProperty("detail").GetString().ShouldBe(expectedDetail);
+    }
+
+    private static string CreateToken(bool expired, params string[] roles)
     {
         var now = DateTimeOffset.UtcNow;
         var (notBefore, expires) = expired
             ? (now.AddMinutes(-30).UtcDateTime, now.AddMinutes(-15).UtcDateTime)
             : (now.UtcDateTime, now.AddMinutes(15).UtcDateTime);
+
+        var claims = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            [JwtRegisteredClaimNames.Sub] = Guid.NewGuid().ToString(),
+            [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
+        };
+
+        // The same shape JwtAccessTokenIssuer writes: a JSON array under the short claim type,
+        // and no claim at all when there is no role.
+        if (roles.Length > 0)
+        {
+            claims[EnvanexClaimTypes.Role] = roles;
+        }
 
         var descriptor = new SecurityTokenDescriptor
         {
@@ -123,11 +198,7 @@ public sealed class AuthPipelineTests : IAsyncLifetime
             SigningCredentials = new SigningCredentials(
                 new SymmetricSecurityKey(Encoding.UTF8.GetBytes(EnvanexWebApplicationFactory.TestSigningKey)),
                 SecurityAlgorithms.HmacSha256),
-            Claims = new Dictionary<string, object>(StringComparer.Ordinal)
-            {
-                [JwtRegisteredClaimNames.Sub] = Guid.NewGuid().ToString(),
-                [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
-            },
+            Claims = claims,
         };
 
         return new JsonWebTokenHandler().CreateToken(descriptor);

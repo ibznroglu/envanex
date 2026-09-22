@@ -3,7 +3,9 @@ using Envanex.Application.Abstractions.Persistence;
 using Envanex.Application.UnitOfMeasures.Commands;
 using Envanex.Application.UnitOfMeasures.DTOs;
 using Envanex.Application.UnitOfMeasures.Queries;
+using Envanex.Web.Authorization;
 using Envanex.Web.Extensions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Envanex.Web.Controllers;
@@ -27,6 +29,7 @@ public sealed class UnitOfMeasuresController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = EnvanexPolicies.CanWrite)]
     public async Task<IActionResult> Create([FromBody] CreateUnitOfMeasureCommand command, CancellationToken ct)
     {
         var result = await _createHandler.HandleAsync(command, ct);
@@ -34,6 +37,7 @@ public sealed class UnitOfMeasuresController : ControllerBase
     }
 
     [HttpGet("{id:guid}", Name = "GetUnitOfMeasureById")]
+    [Authorize(Policy = EnvanexPolicies.CanRead)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var result = await _getByIdHandler.HandleAsync(new GetUnitOfMeasureByIdQuery(id), ct);
@@ -41,6 +45,7 @@ public sealed class UnitOfMeasuresController : ControllerBase
     }
 
     [HttpGet]
+    [Authorize(Policy = EnvanexPolicies.CanRead)]
     public async Task<IActionResult> List(CancellationToken ct)
     {
         var units = await _readRepository.GetAllAsync(ct);

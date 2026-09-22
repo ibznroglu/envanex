@@ -11,6 +11,7 @@ using Envanex.Web.DataSource;
 using Envanex.Web.Extensions;
 using Envanex.Web.Middleware;
 using Envanex.Web.RateLimiting;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Scalar.AspNetCore;
@@ -31,12 +32,21 @@ builder.Services.AddInfrastructure(builder.Configuration);
 builder.Services.AddEnvanexJwtBearer(builder.Configuration);
 builder.Services.AddAuthorization(options =>
 {
+    // Default deny. Every endpoint that carries no authorization metadata of its own — a controller
+    // action, a page, a framework endpoint, a path that matches nothing — requires a signed-in
+    // user. Opening something is an [AllowAnonymous] written where it is read.
+    //
+    // DefaultPolicy is deliberately left at the same floor. The one policy-less [Authorize] in the
+    // codebase is SignOut.razor, which a user holding no role must still be able to reach; every
+    // role requirement is written as a named policy instead.
+    options.FallbackPolicy = new AuthorizationPolicyBuilder()
+        .RequireAuthenticatedUser()
+        .Build();
+
     // Roles map to policies here and nowhere else: a page or an endpoint names a policy, so adding
     // a role later is an edit to these two lines rather than to every place that checks one.
     options.AddPolicy(EnvanexPolicies.CanRead, policy => policy.RequireRole(EnvanexRoles.Administrator, EnvanexRoles.Viewer));
     options.AddPolicy(EnvanexPolicies.CanWrite, policy => policy.RequireRole(EnvanexRoles.Administrator));
-
-    // FallbackPolicy lands in PR 6b Phase 4, when the API endpoints close.
 });
 
 // The Blazor side of authentication. The provider replaces the framework's plain
@@ -146,8 +156,10 @@ if (!app.Environment.IsDevelopment())
 
 if (app.Environment.IsDevelopment())
 {
-    app.MapOpenApi();
-    app.MapScalarApiReference();
+    // Development only, and open there: the API reference is how a developer finds the login
+    // endpoint in the first place.
+    app.MapOpenApi().AllowAnonymous();
+    app.MapScalarApiReference().AllowAnonymous();
 }
 
 app.UseMiddleware<SecurityHeadersMiddleware>();
@@ -163,20 +175,39 @@ app.UseHttpsRedirection();
 // bearer token should not be parsed off a plaintext request. Before UseAntiforgery and the endpoint
 // mappings: antiforgery, routing, the Blazor circuit and the MVC filters all read HttpContext.User.
 //
-// This sits inside the UseStatusCodePagesWithReExecute wrapper, so a bodiless 401 would be
-// re-executed as the not-found page. None is reachable in PR 6a: every 401 originates from
-// ResultExtensions with a ProblemDetails body, and no endpoint is [Authorize], so the bearer
-// handler never issues a challenge. AuthPipelineTests locks that in. The bodiless challenge 401
-// becomes reachable in PR 6b, together with the OnChallenge body that answers it.
+// This sits inside the UseStatusCodePagesWithReExecute wrapper, which re-executes any bodiless 4xx
+// as /not-found, and the re-executed request runs the whole pipeline again and can overwrite the
+// original status with one of its own. Once a response has started, nothing is re-executed, so
+// every rejection here writes a body: the bearer scheme's OnChallenge and OnForbidden, and the
+// cookie scheme's OnRedirectToAccessDenied, all in EnvanexAuthenticationEvents. The cookie
+// scheme's challenge is a 302, which the wrapper never touches. /not-found is [AllowAnonymous]
+// because a closed re-execution target would turn every other bodiless 4xx into a 401.
+// AuthPipelineTests and CookieAuthPipelineTests lock this in.
 app.UseAuthentication();
 app.UseAuthorization();
 
 app.UseAntiforgery();
 
-app.MapStaticAssets();
+// The framework script, _framework/blazor.web.js, is served from the same asset manifest, so this
+// one exemption also keeps enhanced navigation working on the login page.
+app.MapStaticAssets().AllowAnonymous();
 app.MapControllers();
 app.MapRazorComponents<App>()
-    .AddInteractiveServerRenderMode();
+    .AddInteractiveServerRenderMode()
+    .Add(endpointBuilder =>
+    {
+        // The circuit's own endpoints — negotiate, the transport, disconnect and initializers —
+        // carry no authorization metadata, so the fallback policy would stop the login page from
+        // ever opening a circuit. Scoped by route pattern on purpose: AllowAnonymous() on this
+        // builder would reach every page it maps as well, and pages are closed by default. The
+        // prefix, not a list of literals, because some of these patterns end in a slash.
+        string? pattern = (endpointBuilder as RouteEndpointBuilder)?.RoutePattern.RawText;
+
+        if (pattern is not null && pattern.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase))
+        {
+            endpointBuilder.Metadata.Add(new AllowAnonymousAttribute());
+        }
+    });
 
 app.Run();
 
