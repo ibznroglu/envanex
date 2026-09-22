@@ -131,12 +131,21 @@ public sealed class AuthPipelineTests : IAsyncLifetime
     [Fact]
     public async Task UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader()
     {
-        // PR 6b Spike C3, probe 7, observed this request answer 302 to
-        // /login?ReturnUrl=%2Fnot-found when the bearer challenge carried no body: the bodiless 401
-        // was re-executed as /not-found, which is not under /api/*, so the selector handed the
-        // re-executed request to the cookie scheme, and the cookie scheme redirected. OnChallenge
-        // writing a body is the only thing that stops it. This case goes red if the body or the
-        // HandleResponse() call is dropped from OnChallenge.
+        // The redirect this case is named for needs two defects at once. PR 6b's Phase 4 mutation
+        // run reproduced it only as a double mutation — the bearer challenge left as a bodiless 401
+        // AND [AllowAnonymous] removed from NotFound.razor — where this request answered
+        // 302, Location /login?ReturnUrl=%2Fnot-found, no content type, empty body: the bodiless
+        // 401 was re-executed as /not-found, /not-found is not under /api/*, so the selector handed
+        // the re-executed request to the cookie scheme, and the denied page redirected. Spike C3's
+        // probe 7 saw the same 302 for the same reason, before either exemption existed.
+        //
+        // Either defect alone does not redirect. With /not-found open and the body dropped, the
+        // re-executed page renders and the 401 survives as text/html; the content-type assertion
+        // catches it. With the body-writing call removed entirely, the status is never set and the
+        // answer is an empty 200; the status assertion catches it. Under the double mutation the
+        // status assertion fails first, and the Location assertion would fail with it. It is kept
+        // because the combination is reachable in production: any change that closes /not-found
+        // again turns a bodiless /api/* challenge into a redirect to an HTML login page.
         using var client = CookieAuthHelper.CreateNonRedirectingClient(_fixture.WebApplicationFactory);
 
         using var response = await client.GetAsync("/api/auth/register");

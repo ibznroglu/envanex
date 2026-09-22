@@ -187,8 +187,17 @@ public sealed class AnonymousExemptionTests : IAsyncLifetime
     // Row 12. All three, because an exemption that opened negotiate alone would still break every
     // circuit while a negotiate-only test stayed green. The success codes are framework-owned (the
     // spike recorded 200, 404 for no such circuit, and 400 for no circuit id), so the assertion is
-    // that the request was not denied. Under the shipped schemes a denial on a non-/api/* path is
-    // the cookie scheme's 302 to the login page rather than a 401, so both are ruled out.
+    // that the request was not denied.
+    //
+    // A denial does not look the same on the three endpoints. .NET 10 puts
+    // DisableCookieRedirectMetadata on negotiate and on the transport endpoint but not on
+    // disconnect, so the cookie challenge answers those two with a bodiless 401 carrying Location
+    // rather than a 302, and that 401 is then re-executed as /not-found. PR 6b's Phase 4 mutation
+    // run removed the /_blazor convention and observed:
+    //   negotiate  — 400 with Location /login?ReturnUrl=…   caught only by the Location assertion
+    //   transport  — 401 with Location and an HTML body     caught by the 401 assertion
+    //   disconnect — 302 to /login?ReturnUrl=…              caught by the 302 assertion
+    // Each assertion is the one that catches one endpoint, so none of the three may be dropped.
     [Theory]
     [InlineData("POST", "/_blazor/negotiate?negotiateVersion=1")]
     [InlineData("GET", "/_blazor?id=00000000000000000000000000000000")]

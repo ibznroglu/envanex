@@ -55,10 +55,14 @@ internal static class EnvanexAuthenticationEvents
     /// The bearer scheme's events. A new instance per call, so no two registrations share one.
     /// </summary>
     /// <remarks>
-    /// The challenge body is load-bearing, not cosmetic. Without it an unmatched <c>/api/*</c> path
-    /// answers a bodiless 401, the wrapper re-executes it as <c>/not-found</c>, which is not under
-    /// <c>/api/*</c>, the selector hands the re-executed request to the cookie scheme, and the
-    /// client receives a 302 to the login page (PR 6b Spike C3, probe 7).
+    /// The challenge body is load-bearing, not cosmetic. Without it a denied <c>/api/*</c> request
+    /// answers a bodiless 401 that the wrapper re-executes as <c>/not-found</c>. While
+    /// <c>/not-found</c> is open, the re-executed page renders and an API client receives a 401
+    /// carrying an HTML page instead of problem+json. If <c>/not-found</c> is also closed, the
+    /// selector hands the re-executed request to the cookie scheme, because <c>/not-found</c> is
+    /// not under <c>/api/*</c>, and the client receives a 302 to the login page. Both were observed
+    /// by mutation in PR 6b Phase 4. The redirect needs the two defects together, which is the
+    /// configuration Spike C3's probe 7 measured.
     /// </remarks>
     public static JwtBearerEvents Bearer => new()
     {
