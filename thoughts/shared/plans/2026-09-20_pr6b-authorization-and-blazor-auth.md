@@ -1180,7 +1180,7 @@ the disconnect finding under C2.
 | 10 | Scalar reference, Development only | `app.MapScalarApiReference().AllowAnonymous()` | `ScalarReference_InDevelopment_WithoutAuthentication_ShouldReturn200` |
 | 11 | `_framework/blazor.web.js` | **a consequence of row 8** — the script is served out of the asset manifest and flips from 401 to 200 the moment `MapStaticAssets()` carries `.AllowAnonymous()` (Spike C1 → C-a). No production line of its own | `BlazorFrameworkScript_WithoutAuthentication_ShouldReturn200` |
 | 12 | the `/_blazor` endpoints — **negotiate, the transport endpoint and disconnect, all three** | **its own mechanism** (Spike C2 → C-b): the route-pattern convention in the Files list above. `MapRazorComponents<App>().AllowAnonymous()` is the wrong one — the spike observed it opening `/` and every other page as a side effect | `BlazorHubEndpoints_WithoutAuthentication_ShouldReturnNeither401NorARedirect`, a `[Theory]` with one `[InlineData]` per endpoint |
-| 13 | unmatched `/api/*` paths | none — the selector forwards to bearer, so the answer is a 401 with a body rather than a redirect. Listed because it is a behaviour change, not an exemption | `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` |
+| 13 | unmatched `/api/*` paths | none — the selector forwards to bearer, so the answer is a 401 with a body rather than a redirect. Listed because it is a behaviour change, not an exemption | `AuthApiTests.Register_ShouldReturn401`. The exemption-table case `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` was removed as a byte-for-byte duplicate of it, found in the Phase 4 code review |
 
 Row 2's test no longer asserts the absence of `WWW-Authenticate`, because `OnChallenge` calls
 `HandleResponse()` and no 401 in this application carries that header — the assertion would stay
@@ -1286,7 +1286,7 @@ still wrong for an API client but is not a redirect.
 
 So the claim this case pins is narrower than first written: `OnChallenge`'s body keeps every
 `/api/*` 401 a problem+json 401, and together with row 4 it keeps `/api/*` from ever redirecting.
-Row 13's case asserts the *behaviour* an operator reads off the exemption table (an unmatched API
+Row 13's case, `AuthApiTests.Register_ShouldReturn401`, asserts the *behaviour* an operator reads off the exemption table (an unmatched API
 path answers 401 with a problem+json body, not 404); this case additionally asserts the *absence of
 the redirect*. The `Location` assertion is kept although no single mutation reaches it: the
 combination is reachable in production, since any change that closes `/not-found` again turns a
@@ -1319,13 +1319,13 @@ callers both answer 401 — so each property needs the caller that can still see
 - The comment is rewritten, once, above the pair. The GET-not-POST paragraph stays (it is still
   true, and it is still why the probe is a GET: an unmatched `POST /api/*` falls through to the
   Blazor catch-all and is rejected by antiforgery with 400 before routing reports a miss). A second
-  paragraph replaces the old reasoning: it says which property each of the two cases guards, and
-  names the other two anonymous probes of this same path and why each of those is distinct from
-  `Register_ShouldReturn401` — exemption row 13's
-  `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` (the exemption table is
-  complete: it is 401, not 404), and `AuthPipelineTests`'
-  `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader` (the
-  mechanism: `OnChallenge`'s body is what keeps it from being a 302).
+  paragraph replaces the old reasoning: it says which property each of the two cases guards, that
+  `Register_ShouldReturn401` is also exemption row 13's proving test, and names the one other
+  anonymous probe of this same path — `AuthPipelineTests`'
+  `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader`, which
+  additionally asserts the absence of a `Location` header. (A third probe,
+  `AnonymousExemptionTests.UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson`, was
+  removed in the Phase 4 code review as a byte-for-byte duplicate of `Register_ShouldReturn401`.)
 
 `tests/Envanex.IntegrationTests/Blazor/CookieAuthPipelineTests.cs` (**modified, +1**)
 - **`ApiPath_WithASessionCookieAndNoBearerToken_ShouldReturn401AndNotARedirect`** — Decision 4's
@@ -1342,8 +1342,10 @@ are unchanged by the gate. `Cookie_AnonymousRequestToAProtectedPage_ShouldRedire
 deliberately **not** added: it is the same HTTP request as
 `AuthenticatedShellTests.GetHome_WhileSignedOut_ShouldRedirectToTheLoginPage`, which already exists.
 
-`tests/Envanex.IntegrationTests/Api/AnonymousExemptionTests.cs` (**created, +14**) — rows 1–8, 11, 12
-and 13 of the table above, method names as listed there. Row 5 contributes two cases and row 12
+`tests/Envanex.IntegrationTests/Api/AnonymousExemptionTests.cs` (**created, +13**) — rows 1–8, 11 and
+12 of the table above, method names as listed there. It shipped with a fourteenth case for row 13;
+the Phase 4 code review found it a byte-for-byte duplicate of `AuthApiTests.Register_ShouldReturn401`
+and it was removed, so row 13 now points at that case. Row 5 contributes two cases and row 12
 three, one `[InlineData]` per hub endpoint. Notable bodies:
 - `UnknownPath_WithoutAuthentication_ShouldRedirectToTheLoginPage` — row 5's anonymous half, settled
   by Spike C3's re-run as **302**, not 404: the cookie scheme challenges a non-`/api/*` path before
@@ -1386,9 +1388,6 @@ three, one `[InlineData]` per hub endpoint. Notable bodies:
   the one that catches one endpoint, which is why none may be dropped, and why the test was
   renamed to say what it asserts. The claim this entry first carried — that a denied `/_blazor`
   request is answered with a 302 — holds for disconnect only.
-- `UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` — row 13, narrowed to status and
-  content type. The absence of a `Location` header is asserted by `AuthPipelineTests` instead, for
-  the reason given there.
 
 `tests/Envanex.IntegrationTests/Api/DevelopmentEndpointExemptionTests.cs` (**created, +3**)
 - `OpenApiDocument_InDevelopment_WithoutAuthentication_ShouldReturn200`
@@ -1426,10 +1425,12 @@ dotnet test tests\Envanex.IntegrationTests --filter "FullyQualifiedName~AuthPipe
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: /api/products/datasource in a browser answers 401 JSON, not the login page
 ```
 
-Expected test count at end: **627** (120 + 126 + **381**). The three cases over the plan's earlier
-624 are `AuthPipelineTests`' no-`Location` case,
-`AuthApiTests.Register_WhileAuthenticated_ShouldReturn404`, and the Phase 1 role-seeder race test
-carried forward; neither spike branch moved a count.
+Expected test count at end: **626** (120 + 126 + **380**). It shipped at 627; the Phase 4 code
+review removed one case, `AnonymousExemptionTests.UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson`,
+as a byte-for-byte duplicate of `AuthApiTests.Register_ShouldReturn401`. The two cases over the
+plan's earlier 624 are `AuthPipelineTests`' no-`Location` case and
+`AuthApiTests.Register_WhileAuthenticated_ShouldReturn404` (+1 each) plus the Phase 1 role-seeder
+race test carried forward (+1), less the removed duplicate (−1); neither spike branch moved a count.
 **No schema, no migration, no query — db-reviewer not required for this phase.**
 
 ---
@@ -1530,7 +1531,7 @@ dotnet user-secrets set "Demo:Password" "<a local value, never committed>" --pro
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: sign in at /login as the demo account, confirm read-only
 ```
 
-Expected test count at end: **634** (120 + 126 + **388**).
+Expected test count at end: **633** (120 + 126 + **387**).
 
 **Run db-reviewer on this phase** — the seeder writes `auth.AspNetRoles`, `auth.AspNetUsers` and
 `auth.AspNetUserRoles` at host startup, in production.
@@ -1551,8 +1552,8 @@ was ever taken.
 | 1 role claim | 120 | 126 | 327 | **573** |
 | 2 authenticated clients | 120 | 126 | 332 | **578** |
 | 3 cookie + Blazor | 120 | 126 | 353 | **599** |
-| 4 close the gate | 120 | 126 | 381 | **627** |
-| 5 demo account | 120 | 126 | 388 | **634** |
+| 4 close the gate | 120 | 126 | 380 | **626** |
+| 5 demo account | 120 | 126 | 387 | **633** |
 
 Every row from Phase 1 onward is one higher than the plan first wrote it, because Phase 1 added one
 test the plan did not anticipate: `IdentityRoleSeederTests`'
@@ -1561,10 +1562,13 @@ seeders concurrently against the same empty `auth.AspNetRoles` so that the seede
 clause on `RoleNameIndex` is proved reachable by a real race rather than left as an unexercised
 defensive branch.
 
-Phases 4 and 5 are three higher than the plan's earlier 624 / 631: two of the three are in Phase 4 —
-`AuthPipelineTests`' no-`Location` case, and the split of `Register_ShouldReturn404` into an
-anonymous 401 case and an authenticated 404 case — and the third is the Phase 1 race test above. No
-spike outcome moved a count.
+Phases 4 and 5 are two higher than the plan's earlier 624 / 631. Three cases were added: two in
+Phase 4 — `AuthPipelineTests`' no-`Location` case, and the split of `Register_ShouldReturn404` into
+an anonymous 401 case and an authenticated 404 case — and the Phase 1 race test above. One was
+removed: the Phase 4 code review found
+`AnonymousExemptionTests.UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson` a
+byte-for-byte duplicate of `AuthApiTests.Register_ShouldReturn401`, so Phase 4 shipped at 627 and
+stands at 626. No spike outcome moved a count.
 
 Watch the integration suite's wall clock. ADR 0007 set 60 seconds as the point where it becomes a
 decision. The lazy per-collection token cache is what keeps this PR's addition to a handful of
