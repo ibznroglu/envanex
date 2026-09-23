@@ -372,12 +372,14 @@ public sealed class AuthApiTests : IAsyncLifetime
     // answers a body-carrying 401, never a leaked 404 or a redirect. Register_WhileAuthenticated_
     // ShouldReturn404 guards RESEARCH DECISION 11 of PR 6a — no endpoint creates a user — and is the
     // only test that does: an anonymous caller can no longer tell an unmatched path from a real
-    // endpoint that refuses it, so only an authenticated caller still sees the miss. Two other
-    // anonymous probes of this path exist and are distinct from Register_ShouldReturn401 as well:
-    // AnonymousExemptionTests.UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson
-    // keeps the exemption table complete (an unmatched /api/* path is 401, not 404), and
-    // AuthPipelineTests.UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader
-    // pins the mechanism (OnChallenge's body is what keeps it from becoming a 302).
+    // endpoint that refuses it, so only an authenticated caller still sees the miss.
+    // Register_ShouldReturn401 is also the proving test for row 13 of the PR 6b exemption table.
+    //
+    // One other anonymous probe of this path exists:
+    // AuthPipelineTests.UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader.
+    // It sends the same request and additionally asserts the absence of a Location header, which
+    // Register_ShouldReturn401 does not — the redirect a bodiless challenge and a closed /not-found
+    // produce together.
     [Fact]
     public async Task Register_ShouldReturn401()
     {

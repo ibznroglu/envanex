@@ -11,11 +11,16 @@ using Shouldly;
 namespace Envanex.IntegrationTests.Api;
 
 /// <summary>
-/// One case per row of the PR 6b exemption table: every door the fallback policy leaves open, and
-/// the two behaviours it changes without opening anything. A missing exemption is a closed door
-/// that breaks something; a wrong one is an open door. Each case below fails for one of the two.
+/// Rows 1–8, 11 and 12 of the PR 6b exemption table: every door the fallback policy leaves open
+/// outside Development, and row 5's unmatched page path, a behaviour it changes without opening
+/// anything. A missing exemption is a closed door that breaks something; a wrong one is an open
+/// door. Each case below fails for one of the two.
 /// </summary>
 /// <remarks>
+/// Rows 9 and 10 need a Development host and live in <c>DevelopmentEndpointExemptionTests</c>.
+/// Row 13 is proved by <c>AuthApiTests.Register_ShouldReturn401</c>; this class carried a
+/// byte-for-byte duplicate of it until the Phase 4 code review.
+///
 /// Every non-<c>/api/*</c> probe uses the non-redirecting client. A denied page is answered with a
 /// 302 to <c>/login</c>, and a client that followed it would land on the anonymous login page and
 /// report 200 whether or not the exemption under test exists.
@@ -213,18 +218,5 @@ public sealed class AnonymousExemptionTests : IAsyncLifetime
             HttpStatusCode.Found,
             $"{method} {path} was denied and redirected to the login page.");
         response.Headers.Location.ShouldBeNull();
-    }
-
-    // Row 13. Not an exemption, but a behaviour change: an unmatched /api/* path answers 401, not
-    // 404. The absence of a redirect is asserted in AuthPipelineTests, which guards the mechanism.
-    [Fact]
-    public async Task UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJson()
-    {
-        var response = await _apiClient.GetAsync("/api/auth/register");
-
-        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
-
-        response.Content.Headers.ContentType.ShouldNotBeNull();
-        response.Content.Headers.ContentType.MediaType.ShouldBe("application/problem+json");
     }
 }
