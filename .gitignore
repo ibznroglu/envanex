@@ -24,6 +24,7 @@ artifacts/
 appsettings.*.Local.json
 .env
 .env.*
+!.env.example
 secrets.json
 
 # Test / coverage
