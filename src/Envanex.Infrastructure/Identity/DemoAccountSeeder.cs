@@ -17,9 +17,12 @@ namespace Envanex.Infrastructure.Identity;
 /// </para>
 /// <para>
 /// Unlike <see cref="IdentityRoleSeeder"/>, it does not survive a concurrent first seeding. Two
-/// hosts creating the demo user at the same moment can collide on <c>UserNameIndex</c>; the loser's
-/// boot fails, and a restart heals it. Production is a single App Service instance, so the limit is
-/// recorded rather than handled.
+/// hosts creating the demo user at the same moment can collide on <c>UserNameIndex</c> or
+/// <c>EmailIndex</c>. Once the user exists, a second window opens at <c>AddToRoleAsync</c>:
+/// <c>UserAlreadyInRole</c>, a <c>ConcurrencyStamp</c> mismatch, or a <c>PK_AspNetUserRoles</c>
+/// violation. Every case fails only the loser's boot, commits nothing of the loser's, and heals on
+/// restart. Production is a single App Service instance, so the limit is recorded rather than
+/// handled; an overlapped restart or slot swap can still run two processes on that one instance.
 /// </para>
 /// </remarks>
 public static class DemoAccountSeeder
