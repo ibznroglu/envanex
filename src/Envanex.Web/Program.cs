@@ -200,10 +200,13 @@ app.MapRazorComponents<App>()
         // carry no authorization metadata, so the fallback policy would stop the login page from
         // ever opening a circuit. Scoped by route pattern on purpose: AllowAnonymous() on this
         // builder would reach every page it maps as well, and pages are closed by default. The
-        // prefix, not a list of literals, because some of these patterns end in a slash.
+        // segment, not a list of literals, because some of these patterns end in a slash; and the
+        // segment, not a string prefix, because a prefix would also open a page at /_blazor-anything.
         string? pattern = (endpointBuilder as RouteEndpointBuilder)?.RoutePattern.RawText;
 
-        if (pattern is not null && pattern.StartsWith("/_blazor", StringComparison.OrdinalIgnoreCase))
+        if (pattern is not null
+            && (pattern.Equals("/_blazor", StringComparison.OrdinalIgnoreCase)
+                || pattern.StartsWith("/_blazor/", StringComparison.OrdinalIgnoreCase)))
         {
             endpointBuilder.Metadata.Add(new AllowAnonymousAttribute());
         }

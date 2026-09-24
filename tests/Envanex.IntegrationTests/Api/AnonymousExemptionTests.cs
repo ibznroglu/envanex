@@ -189,8 +189,8 @@ public sealed class AnonymousExemptionTests : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
-    // Row 12. All three, because an exemption that opened negotiate alone would still break every
-    // circuit while a negotiate-only test stayed green. The success codes are framework-owned (the
+    // Row 12. All four endpoints the /_blazor convention names, because an exemption that opened
+    // negotiate alone would still break every circuit while a negotiate-only test stayed green. The success codes are framework-owned (the
     // spike recorded 200, 404 for no such circuit, and 400 for no circuit id), so the assertion is
     // that the request was not denied.
     //
@@ -203,10 +203,13 @@ public sealed class AnonymousExemptionTests : IAsyncLifetime
     //   transport  — 401 with Location and an HTML body     caught by the 401 assertion
     //   disconnect — 302 to /login?ReturnUrl=…              caught by the 302 assertion
     // Each assertion is the one that catches one endpoint, so none of the three may be dropped.
+    // The initializers case was added after the final code review; the same mutation observed
+    //   initializers — 302 to /login?ReturnUrl=…          caught by the 302 assertion
     [Theory]
     [InlineData("POST", "/_blazor/negotiate?negotiateVersion=1")]
     [InlineData("GET", "/_blazor?id=00000000000000000000000000000000")]
     [InlineData("POST", "/_blazor/disconnect")]
+    [InlineData("GET", "/_blazor/initializers")]
     public async Task BlazorHubEndpoints_WithoutAuthentication_ShouldReturnNeither401NorARedirect(string method, string path)
     {
         using var request = new HttpRequestMessage(new HttpMethod(method), path);
