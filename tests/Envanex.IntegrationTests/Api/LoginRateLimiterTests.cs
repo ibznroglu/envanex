@@ -176,12 +176,19 @@ public sealed class LoginRateLimiterTests : IAsyncLifetime
     public async Task ProductsEndpoint_ShouldNotBeAffectedByTheLoginPolicy()
     {
         // The policy is attached to the login action only; the global limiter is off in this
-        // factory, so three reads in a row must all get through.
+        // factory, so one request more than the factory's 2 login permits must all get through.
+        //
+        // The probe is a POST on purpose. The policy hands every non-POST request a no-limiter, so
+        // GETs here would pass even if the policy were attached to this endpoint, and the case could
+        // not fail. UseRateLimiter runs before UseAuthentication, so an anonymous POST still passes
+        // through the limiter: a 401 means it got past the limiter, a 429 means it was spent.
         for (int attempt = 0; attempt < 3; attempt++)
         {
-            var response = await _client.GetAsync($"/api/products/{Guid.NewGuid()}");
+            var response = await _client.PostAsJsonAsync("/api/products", new { });
 
-            response.StatusCode.ShouldNotBe(HttpStatusCode.TooManyRequests);
+            response.StatusCode.ShouldBe(
+                HttpStatusCode.Unauthorized,
+                $"POST #{attempt + 1} of /api/products was not answered 401 by the authorization challenge.");
         }
     }
 }

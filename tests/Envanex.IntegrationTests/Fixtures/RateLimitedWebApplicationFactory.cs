@@ -43,5 +43,9 @@ public sealed class RateLimitedWebApplicationFactory : WebApplicationFactory<Pro
         builder.UseSetting("Jwt:AccessTokenMinutes", "15");
         builder.UseSetting("Jwt:RefreshTokenIdleDays", "7");
         builder.UseSetting("Jwt:RefreshTokenAbsoluteDays", "30");
+
+        // Pinned rather than left to appsettings.json. A developer who enabled the demo locally
+        // must not change what the suite does.
+        builder.UseSetting("Demo:Enabled", "false");
     }
 }
