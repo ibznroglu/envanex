@@ -1630,6 +1630,34 @@ Smoke, on the http profile against the local SQL Server:
 
 EF's design-time factories read `ENVANEX_CONNECTION_STRING`, not user-secrets, so `dotnet ef database update` fails without it. `CLAUDE.md`'s migration commands do not say so; see the roadmap list.
 
+#### Final whole-branch code review (2026-09-24)
+
+The code-reviewer, on Opus, reviewed the whole branch as one change. Verdict: **NEEDS_REVISION**, with one required change and six Low findings.
+
+Clean:
+- Policy coverage: each of the 11 `/api` actions carries the right policy.
+- The exemption table against the code, row by row.
+- The cross-phase seams.
+- Test isolation at PR level.
+
+Findings and decisions:
+- **F1 (Medium, fixed).** `ProductsEndpoint_ShouldNotBeAffectedByTheLoginPolicy` sent GETs, and since Phase 3 the login policy gives non-POST requests no limiter, so the test could not fail. It now sends three anonymous POSTs against a permit limit of 2 and expects 401 each time.
+- **F2 (fixed).** `Home.razor`'s comment claimed the page shows inventory data.
+- **F3 (fixed).** The `/_blazor` convention matched a string prefix; it now matches the path segment.
+- **F4 (fixed).** `/_blazor/initializers` was opened but not probed. The hub theory now has a fourth case.
+- **F5 (ADR).** The "roughly 72 tests" figure was stale.
+- **F6 (roadmap).** No test proves that the REST login and the form login share one bucket.
+- **F7 (fixed).** The two rate-limit factories now pin `Demo:Enabled=false` too.
+
+Mutation proofs, against 3e89d3d:
+
+| ID | Mutation | Test | Observed |
+|---|---|---|---|
+| FM1 | the login policy attached to `ProductsController.Create` | the rewritten F1 test | red: 429 on POST #3 |
+| FM2 | the hub convention skips `initializers` | the hub theory | red on the initializers case only |
+
+Final count: 120 + 126 + 392 = **638**. Integration suite: 57 s.
+
 ---
 
 ## Expected test counts, by phase
@@ -1760,6 +1788,7 @@ Also for the roadmap, though not opened by this PR:
 - **Order after this PR:** `docs(roadmap)`, then `fix(db)` for the compose file, then `chore(agents)`, then PR 7.
 - **Before PR 8 adds write endpoints, add a test that enforces endpoint policy coverage.** ADR 0008 records that the fallback is only an authentication floor. A mutating endpoint without `CanWrite` admits a signed-in `Viewer`, and nothing catches the omission. An endpoint-metadata test should enumerate every `/api/*` endpoint and fail when a mutating endpoint lacks `CanWrite` or a read endpoint lacks `CanRead`, apart from the named exemptions.
 - **Review verdicts are not persisted.** Per-phase verdicts from earlier sessions exist only in session transcripts, so `/pr`, which accepts only verdicts from its own session, cannot cite them. Scope for `chore(agents)`: each reviewer writes its verdict, and the commit range it covered, under `thoughts/shared/reviews/`, and `/pr` cites those files.
+- **A test that the REST login and the form login share one rate-limit bucket** (whole-branch review, F6). Today both name the same policy constant and partition key, so the behaviour holds by construction. But a regression that gave the page its own policy with identical limits would pass every current test. Write it as a mixed case: one `POST /api/auth/login`, one form POST, then a third request that expects 429. It goes with the policy-coverage test before PR 8, after the 60 s decision.
 
 ---
 
