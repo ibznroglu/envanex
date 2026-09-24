@@ -22,7 +22,7 @@ integration surface for legacy clients.
 
 ## Running locally
 
-Prerequisites: Docker Desktop and the .NET 10 SDK. `dotnet tool restore` installs the pinned EF Core CLI
+Prerequisites: Docker Desktop and the .NET 10 SDK, 10.0.400 or later (see global.json). `dotnet tool restore` installs the pinned EF Core CLI
 (`dotnet ef`) from `.config/dotnet-tools.json`. The commands are for Git Bash.
 
 ```bash
@@ -33,7 +33,7 @@ docker compose up -d --wait    # SQL Server 2022, bound to 127.0.0.1:1433 only; 
 # Use 127.0.0.1, not localhost: the port is bound to IPv4 loopback, and Windows resolves localhost to ::1 first.
 CS='Server=127.0.0.1,1433;Database=EnvanexDev;User Id=sa;Password=<the password from .env>;TrustServerCertificate=True'
 dotnet user-secrets set "ConnectionStrings:EnvanexDb" "$CS" --project src/Envanex.Web
-dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -base64 48)" --project src/Envanex.Web
+dotnet user-secrets set "Jwt:SigningKey" "$(openssl rand -hex 32)" --project src/Envanex.Web
 
 export ENVANEX_CONNECTION_STRING="$CS"   # the dotnet ef commands read this, not user-secrets
 dotnet ef database update -p src/Envanex.Infrastructure -s src/Envanex.Web --context EnvanexDbContext
@@ -46,7 +46,7 @@ With the demo off, the app starts but has no account to sign in with, so the dem
 
 The read-only demo account is off by default. To try it locally:
 1. In user-secrets, set `Demo:Enabled` to `true`.
-2. Set a `Demo:Password` that meets the Identity password policy. The app refuses to start otherwise.
+2. Set a `Demo:Password` of at least 12 characters, with an uppercase letter, a lowercase letter and a digit. The app refuses to start otherwise.
 3. Sign in as `demo@envanex.local`.
 
 ## Documentation
