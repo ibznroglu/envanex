@@ -14,7 +14,7 @@ EF Core · SQL Server 2022 · `DevExtreme.AspNet.Data` (MIT) for grid data endpo
 ## Commands
 
 ```bash
-docker compose up -d                          # SQL Server 2022 on localhost:1433 (needs .env, copied from .env.example)
+docker compose up -d                          # SQL Server 2022 on 127.0.0.1:1433 (needs .env, copied from .env.example)
 dotnet build -warnaserror                     # build (warnings are errors)
 dotnet test                                   # all tests
 dotnet format --verify-no-changes             # style check

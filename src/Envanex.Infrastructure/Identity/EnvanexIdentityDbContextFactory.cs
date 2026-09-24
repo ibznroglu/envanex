@@ -15,7 +15,7 @@ public sealed class EnvanexIdentityDbContextFactory : IDesignTimeDbContextFactor
         {
             throw new InvalidOperationException(
                 "ENVANEX_CONNECTION_STRING environment variable is not set. " +
-                "Example: set ENVANEX_CONNECTION_STRING=Server=localhost,1433;Database=EnvanexDev;User Id=sa;Password=<password>;TrustServerCertificate=True");
+                "Example: set ENVANEX_CONNECTION_STRING=Server=127.0.0.1,1433;Database=EnvanexDev;User Id=sa;Password=<password>;TrustServerCertificate=True");
         }
 
         var optionsBuilder = new DbContextOptionsBuilder<EnvanexIdentityDbContext>();

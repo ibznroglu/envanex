@@ -8,7 +8,7 @@ services:
       MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env - see .env.example}"
       MSSQL_PID: "Developer"
     ports:
-      # Loopback only, so other hosts on the network cannot reach sa.
+      # Loopback only, so other hosts on the network cannot reach sa. Connect via 127.0.0.1: Windows resolves localhost to ::1 first.
       - "127.0.0.1:1433:1433"
     volumes:
       - envanex-mssql-data:/var/opt/mssql
