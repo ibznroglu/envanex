@@ -5,6 +5,7 @@ using Envanex.Domain.Common;
 using Envanex.Infrastructure;
 using Envanex.Infrastructure.Identity;
 using Envanex.IntegrationTests.Fixtures;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Data.SqlClient;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
@@ -190,6 +191,37 @@ public sealed class RefreshTokenServiceTests : IAsyncLifetime
 
         rotated.Value.User.Id.ShouldBe(_userId);
         rotated.Value.User.Email.ShouldBe(Email);
+    }
+
+    [Fact]
+    public async Task RotateAsync_ForAUserInTheAdministratorRole_ShouldCarryThatRoleIntoTheRotatedResult()
+    {
+        await IdentityRoleSeeder.EnsureRolesAsync(_provider);
+        await AddToRoleAsync(EnvanexRoles.Administrator);
+
+        var issued = await IssueAsync();
+
+        var rotated = await RotateAsync(issued.Token);
+
+        // The rotated result is what the access token issuer reads on a refresh. Drop the role
+        // here and the refreshed token silently loses it, so the caller starts collecting 403s
+        // fifteen minutes after a login that every other test in this repository saw succeed.
+        rotated.IsSuccess.ShouldBeTrue($"Rotation failed with: {rotated.Error.Code}");
+        rotated.Value.User.Roles.ShouldBe([EnvanexRoles.Administrator]);
+    }
+
+    private async Task AddToRoleAsync(string role)
+    {
+        using var scope = _provider.CreateScope();
+        var userManager = scope.ServiceProvider.GetRequiredService<UserManager<EnvanexUser>>();
+
+        var user = await userManager.FindByIdAsync(_userId.ToString());
+        user.ShouldNotBeNull();
+
+        var result = await userManager.AddToRoleAsync(user, role);
+
+        result.Succeeded.ShouldBeTrue(
+            $"Failed to add the user to '{role}': {string.Join(", ", result.Errors.Select(error => error.Code))}");
     }
 
     [Fact]

@@ -171,9 +171,25 @@ internal sealed partial class RefreshTokenService : IRefreshTokenService
 
         var user = match.User;
 
+        // The rotated result feeds the access token issuer exactly as a fresh login does, so it
+        // has to carry the same roles. Without this a refreshed access token silently loses the
+        // user's role and every policy starts answering 403 fifteen minutes after sign-in — a
+        // failure no test of a fresh login can see.
+        //
+        // On the success path only: a rotation that fails above returns before this line and never
+        // pays for the read.
+        var roles = await _context.UserRoles
+            .Where(userRole => userRole.UserId == user.Id)
+            .Join(
+                _context.Roles,
+                userRole => userRole.RoleId,
+                role => role.Id,
+                (_, role) => role.Name!)
+            .ToListAsync(ct);
+
         return Result.Success(
             new RotatedRefreshToken(
-                new AuthenticatedUser(user.Id, user.Email!, user.UserName!),
+                new AuthenticatedUser(user.Id, user.Email!, user.UserName!, roles),
                 childToken,
                 child.ExpiresAt));
     }

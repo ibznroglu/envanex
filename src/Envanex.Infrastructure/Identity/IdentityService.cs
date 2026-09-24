@@ -89,7 +89,13 @@ internal sealed partial class IdentityService : IIdentityService
 
         await _userManager.ResetAccessFailedCountAsync(user);
 
-        return Result.Success(new AuthenticatedUser(user.Id, user.Email!, user.UserName!));
+        // The success path only, and deliberately after the reset. Every failure branch above
+        // returns before this line: a role lookup on any of them would add a round trip that only
+        // that branch pays for, which is a fourth timing channel on top of the three the remarks
+        // above account for.
+        var roles = await _userManager.GetRolesAsync(user);
+
+        return Result.Success(new AuthenticatedUser(user.Id, user.Email!, user.UserName!, [.. roles]));
     }
 
     // Logs carry the user id and nothing else. The email address is the credential the attacker

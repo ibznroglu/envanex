@@ -5,8 +5,10 @@ using Envanex.Application.Abstractions.Persistence;
 using Envanex.Application.Products.Commands;
 using Envanex.Application.Products.DTOs;
 using Envanex.Application.Products.Queries;
+using Envanex.Web.Authorization;
 using Envanex.Web.DataSource;
 using Envanex.Web.Extensions;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 namespace Envanex.Web.Controllers;
@@ -71,6 +73,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet("{id:guid}", Name = "GetProductById")]
+    [Authorize(Policy = EnvanexPolicies.CanRead)]
     public async Task<IActionResult> GetById(Guid id, CancellationToken ct)
     {
         var result = await _getProductByIdHandler.HandleAsync(new GetProductByIdQuery(id), ct);
@@ -78,6 +81,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPost]
+    [Authorize(Policy = EnvanexPolicies.CanWrite)]
     public async Task<IActionResult> Create([FromBody] CreateProductCommand command, CancellationToken ct)
     {
         var result = await _createProductHandler.HandleAsync(command, ct);
@@ -85,6 +89,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPut("{id:guid}")]
+    [Authorize(Policy = EnvanexPolicies.CanWrite)]
     public async Task<IActionResult> Update(Guid id, [FromBody] UpdateProductCommand command, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -102,6 +107,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/activate")]
+    [Authorize(Policy = EnvanexPolicies.CanWrite)]
     public async Task<IActionResult> Activate(Guid id, [FromBody] ActivateProductCommand command, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -119,6 +125,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpPost("{id:guid}/deactivate")]
+    [Authorize(Policy = EnvanexPolicies.CanWrite)]
     public async Task<IActionResult> Deactivate(Guid id, [FromBody] DeactivateProductCommand command, CancellationToken ct)
     {
         ArgumentNullException.ThrowIfNull(command);
@@ -136,6 +143,7 @@ public sealed class ProductsController : ControllerBase
     }
 
     [HttpGet("datasource")]
+    [Authorize(Policy = EnvanexPolicies.CanRead)]
     public async Task<IActionResult> GetDataSource(DataSourceLoadOptionsBase options, CancellationToken ct)
     {
         var guardResult = Guard.ValidateAndApply(options);

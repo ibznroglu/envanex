@@ -362,17 +362,41 @@ public sealed class AuthApiTests : IAsyncLifetime
         response.StatusCode.ShouldBe(HttpStatusCode.OK);
     }
 
+    // Both cases below are probed with GET rather than POST on purpose. MVC attribute routing
+    // answers a matched path with an unsupported verb with 405, so a 404 proves the path is not
+    // routable at all. A POST could not prove it: an unmatched POST falls through to the Blazor
+    // catch-all and is rejected by UseAntiforgery with 400 before routing ever reports the miss.
+    //
+    // The same URL, two callers, two properties, and neither case is a duplicate of the other.
+    // Register_ShouldReturn401 guards the gate: this path is covered by the fallback policy and
+    // answers a body-carrying 401, never a leaked 404 or a redirect. Register_WhileAuthenticated_
+    // ShouldReturn404 guards RESEARCH DECISION 11 of PR 6a — no endpoint creates a user — and is the
+    // only test that does: an anonymous caller can no longer tell an unmatched path from a real
+    // endpoint that refuses it, so only an authenticated caller still sees the miss.
+    // Register_ShouldReturn401 is also the proving test for row 13 of the PR 6b exemption table.
+    //
+    // One other anonymous probe of this path exists:
+    // AuthPipelineTests.UnknownApiPath_WithoutAuthentication_ShouldReturn401ProblemJsonAndCarryNoLocationHeader.
+    // It sends the same request and additionally asserts the absence of a Location header, which
+    // Register_ShouldReturn401 does not — the redirect a bodiless challenge and a closed /not-found
+    // produce together.
     [Fact]
-    public async Task Register_ShouldReturn404()
+    public async Task Register_ShouldReturn401()
     {
-        // RESEARCH DECISION 11. Nothing is protected in PR 6a, so a public registration endpoint
-        // would let anyone open an account on a wide-open API.
-        //
-        // Probed with GET rather than POST on purpose. MVC attribute routing answers a matched path
-        // with an unsupported verb with 405, so a 404 here proves the path is not routable at all.
-        // A POST could not prove it: an unmatched POST falls through to the Blazor catch-all and is
-        // rejected by UseAntiforgery with 400 before routing ever reports the miss.
         var response = await _client.GetAsync("/api/auth/register");
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Unauthorized);
+
+        response.Content.Headers.ContentType.ShouldNotBeNull();
+        response.Content.Headers.ContentType.MediaType.ShouldBe("application/problem+json");
+    }
+
+    [Fact]
+    public async Task Register_WhileAuthenticated_ShouldReturn404()
+    {
+        using var client = await _fixture.CreateAdministratorClientAsync();
+
+        var response = await client.GetAsync("/api/auth/register");
 
         response.StatusCode.ShouldBe(HttpStatusCode.NotFound);
     }

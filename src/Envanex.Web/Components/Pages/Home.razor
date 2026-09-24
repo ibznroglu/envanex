@@ -1,4 +1,8 @@
 @page "/"
+@using Envanex.Web.Authorization
+@* CanRead, not mere authentication: the landing page is the entry point that will show inventory
+   data, and a signed-in user holding no role has no business seeing it. *@
+@attribute [Authorize(Policy = EnvanexPolicies.CanRead)]
 
 <PageTitle>Envanex ERP</PageTitle>
 

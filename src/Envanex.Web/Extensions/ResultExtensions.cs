@@ -186,10 +186,19 @@ public static class ResultExtensions
         };
     }
 
-    private static string GetReasonPhrase(int statusCode) => statusCode switch
+    /// <summary>
+    /// The ProblemDetails title for a status code.
+    /// </summary>
+    /// <remarks>
+    /// Internal so that the bearer scheme's challenge and forbid bodies are titled by this function
+    /// rather than by a copy of it. No error code maps to 403, so the 403 arm serves those bodies
+    /// only; <see cref="StatusCodeMap"/> deliberately gains no entry for it.
+    /// </remarks>
+    internal static string GetReasonPhrase(int statusCode) => statusCode switch
     {
         StatusCodes.Status400BadRequest => "Bad Request",
         StatusCodes.Status401Unauthorized => "Unauthorized",
+        StatusCodes.Status403Forbidden => "Forbidden",
         StatusCodes.Status404NotFound => "Not Found",
         StatusCodes.Status409Conflict => "Conflict",
         StatusCodes.Status422UnprocessableEntity => "Unprocessable Entity",

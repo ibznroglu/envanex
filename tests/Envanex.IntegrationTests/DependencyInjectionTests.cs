@@ -13,6 +13,7 @@ using Envanex.Application.UnitOfMeasures.DTOs;
 using Envanex.Application.UnitOfMeasures.Queries;
 using Envanex.Infrastructure;
 using Envanex.IntegrationTests.Fixtures;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Shouldly;
@@ -82,6 +83,18 @@ public sealed class DependencyInjectionTests
         sp.GetRequiredService<ICommandHandler<LogoutCommand, bool>>().ShouldNotBeNull();
         sp.GetRequiredService<IQueryHandler<GetProductByIdQuery, ProductDetailDto>>().ShouldNotBeNull();
         sp.GetRequiredService<IQueryHandler<GetUnitOfMeasureByIdQuery, UnitOfMeasureDetailDto>>().ShouldNotBeNull();
+    }
+
+    [Fact]
+    public void RoleManager_ShouldResolveFromTheInfrastructureContainer()
+    {
+        using var provider = BuildProvider();
+        using var scope = provider.CreateScope();
+
+        // IdentityRoleSeeder resolves this, and AddRoles<IdentityRole<Guid>>() is the single line
+        // in AddEnvanexIdentity that supplies it. Drop that line and the seeder fails at host
+        // start rather than here.
+        scope.ServiceProvider.GetRequiredService<RoleManager<IdentityRole<Guid>>>().ShouldNotBeNull();
     }
 
     [Theory]

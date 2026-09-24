@@ -38,6 +38,23 @@ internal sealed class JwtAccessTokenIssuer : IAccessTokenIssuer
         var now = _timeProvider.GetUtcNow();
         var expiresAt = now + TimeSpan.FromMinutes(_options.AccessTokenMinutes);
 
+        var claims = new Dictionary<string, object>(StringComparer.Ordinal)
+        {
+            // A fresh jti per token, so two tokens issued in the same second are still
+            // distinguishable — which is what a future deny-list would be keyed on.
+            [JwtRegisteredClaimNames.Sub] = user.Id.ToString(),
+            [JwtRegisteredClaimNames.Email] = user.Email,
+            [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
+        };
+
+        if (user.Roles.Count > 0)
+        {
+            // A string[] value serialises as a JSON array, which the handler reads back as one
+            // claim per element. Written only when there is something to write: an empty array
+            // would put a meaningless "role": [] in every token a role-less user holds.
+            claims[EnvanexClaimTypes.Role] = user.Roles.ToArray();
+        }
+
         var descriptor = new SecurityTokenDescriptor
         {
             Issuer = _options.Issuer,
@@ -46,14 +63,7 @@ internal sealed class JwtAccessTokenIssuer : IAccessTokenIssuer
             NotBefore = now.UtcDateTime,
             Expires = expiresAt.UtcDateTime,
             SigningCredentials = _signingCredentials,
-            Claims = new Dictionary<string, object>(StringComparer.Ordinal)
-            {
-                // A fresh jti per token, so two tokens issued in the same second are still
-                // distinguishable — which is what a future deny-list would be keyed on.
-                [JwtRegisteredClaimNames.Sub] = user.Id.ToString(),
-                [JwtRegisteredClaimNames.Email] = user.Email,
-                [JwtRegisteredClaimNames.Jti] = Guid.NewGuid().ToString(),
-            },
+            Claims = claims,
         };
 
         return new IssuedAccessToken(_handler.CreateToken(descriptor), expiresAt);

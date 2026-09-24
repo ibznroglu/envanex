@@ -1,6 +1,24 @@
 ﻿<Router AppAssembly="typeof(Program).Assembly" NotFoundPage="typeof(Pages.NotFound)">
     <Found Context="routeData">
-        <RouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)" />
+        @*
+            The NotAuthorized template below is unreachable today, and that is known rather than
+            overlooked. Every page is statically server-rendered, so an [Authorize] page is denied
+            at the endpoint layer by UseAuthorization — a 302 to /login for an anonymous caller, a
+            403 with a body for a signed-in one — before any component renders (PR 6b Spike D).
+            It ships anyway because the router's authorization surface is part of the design
+            (Decision 8), and it goes live with PR 7's interactive components, where navigation
+            happens inside the circuit and never reaches the endpoint layer. It is not dead code;
+            do not delete it.
+        *@
+        <AuthorizeRouteView RouteData="routeData" DefaultLayout="typeof(Layout.MainLayout)">
+            <NotAuthorized>
+                <p role="alert">Bu sayfayı görüntüleme yetkiniz yok.</p>
+                @if (context.User.Identity?.IsAuthenticated != true)
+                {
+                    <p><a href="login">Giriş yapın</a></p>
+                }
+            </NotAuthorized>
+        </AuthorizeRouteView>
         <FocusOnNavigate RouteData="routeData" Selector="h1" />
     </Found>
 </Router>

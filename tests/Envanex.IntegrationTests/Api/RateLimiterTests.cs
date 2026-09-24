@@ -29,7 +29,10 @@ public sealed class RateLimiterTests : IAsyncLifetime
     {
         await _fixture.ResetAsync();
         _rateLimitedFactory = new RateLimitedWebApplicationFactory(_fixture.ConnectionString);
-        _client = _rateLimitedFactory.CreateClient();
+
+        // Minted through the shared factory on purpose: logging in through this host would spend
+        // one of its two global permits and break MutationEndpoint_ExceedingRateLimit_ShouldReturn429.
+        _client = await _fixture.CreateAdministratorClientAsync(_rateLimitedFactory);
     }
 
     public async Task DisposeAsync()
@@ -125,7 +128,7 @@ public sealed class RateLimiterTests : IAsyncLifetime
         // 150 exceeds the production PermitLimit of 100, so an accidentally active global limiter
         // fails this test. A read endpoint on purpose: it writes no rows and does not collide with
         // the collection's reset semantics.
-        using var client = _fixture.WebApplicationFactory.CreateClient();
+        using var client = await _fixture.CreateAdministratorClientAsync();
 
         for (int request = 0; request < 150; request++)
         {

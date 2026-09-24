@@ -1,5 +1,7 @@
 # 0007 — JWT access tokens with rotated, reuse-detected refresh tokens
 
+> Amended by [ADR 0008](0008-policy-based-authorization-two-authentication-schemes-and-the-demo-account.md): access tokens now also carry `role` claims, read from the database at every issue, refresh included.
+
 ## Context
 
 PR 6a introduces the first notion of a user. Until now nothing in the system knew who was calling:

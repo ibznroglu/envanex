@@ -6,12 +6,13 @@ using Microsoft.Extensions.Options;
 namespace Envanex.IntegrationTests.Fixtures;
 
 /// <summary>
-/// A <see cref="UserManager{TUser}"/> that records which of four calls the service under test made
+/// A <see cref="UserManager{TUser}"/> that records which of five calls the service under test made
 /// and in what order.
 /// </summary>
 /// <remarks>
-/// This is the instrument that makes "the password is verified before the lockout check" and
-/// "AccessFailedAsync fires at most once per attempt" assertable without a stopwatch. It is
+/// This is the instrument that makes "the password is verified before the lockout check",
+/// "AccessFailedAsync fires at most once per attempt" and "no failure branch reads the roles"
+/// assertable without a stopwatch. It is
 /// test-only and is never referenced from <c>src/</c>: no seam, hook or interceptor was added to
 /// production code for it. Every override delegates, so the behaviour it observes is the real one.
 /// </remarks>
@@ -50,6 +51,8 @@ internal sealed class CountingUserManager : UserManager<EnvanexUser>
 
     public int ResetAccessFailedCountCallCount { get; private set; }
 
+    public int GetRolesCallCount { get; private set; }
+
     /// <summary>Ordered names of the intercepted calls, for ordering assertions.</summary>
     public IReadOnlyList<string> CallLog => _callLog;
 
@@ -83,5 +86,13 @@ internal sealed class CountingUserManager : UserManager<EnvanexUser>
         _callLog.Add(nameof(ResetAccessFailedCountAsync));
 
         return base.ResetAccessFailedCountAsync(user);
+    }
+
+    public override Task<IList<string>> GetRolesAsync(EnvanexUser user)
+    {
+        GetRolesCallCount++;
+        _callLog.Add(nameof(GetRolesAsync));
+
+        return base.GetRolesAsync(user);
     }
 }

@@ -1,0 +1,86 @@
+@page "/login"
+@using Envanex.Web.Authentication
+@using Envanex.Web.Controllers
+@using Envanex.Web.Extensions
+@using Microsoft.AspNetCore.RateLimiting
+@attribute [AllowAnonymous]
+@* The same named policy as POST /api/auth/login, so the form cannot be used to go round it. The
+   policy delegate in Program.cs limits POSTs only; rendering the form spends no permit. *@
+@attribute [EnableRateLimiting(AuthController.LoginRateLimitPolicy)]
+@inject CookieSignInService SignInService
+@inject NavigationManager Navigation
+
+@*
+    Statically server-rendered on purpose, and therefore plain markup and an EditForm with no Radzen
+    component: signing in writes Set-Cookie, which needs the HttpContext of a live request, and
+    Radzen components need an interactive circuit that has none. EditForm renders the antiforgery
+    field itself.
+*@
+
+<PageTitle>Giriş</PageTitle>
+
+<h1>Giriş yap</h1>
+
+@if (_errorMessage is not null)
+{
+    <div id="login-error" class="alert alert-danger" role="alert">@_errorMessage</div>
+}
+
+<EditForm Model="Input" FormName="login" method="post" OnSubmit="SignInAsync">
+    <div class="mb-3">
+        <label for="login-email" class="form-label">E-posta</label>
+        <InputText id="login-email" type="email" class="form-control" autocomplete="username" @bind-Value="Input.Email" />
+    </div>
+    <div class="mb-3">
+        <label for="login-password" class="form-label">Parola</label>
+        <InputText id="login-password" type="password" class="form-control" autocomplete="current-password" @bind-Value="Input.Password" />
+    </div>
+    <button type="submit" class="btn btn-primary">Giriş yap</button>
+</EditForm>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    // No real initializer: a form post may bind it to null (BL0008), so OnInitialized supplies the
+    // empty model instead.
+    [SupplyParameterFromForm]
+    private LoginInput Input { get; set; } = default!;
+
+    private string? _errorMessage;
+
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task SignInAsync()
+    {
+        var httpContext = HttpContext
+            ?? throw new InvalidOperationException("The login page must be statically server-rendered; it has no HttpContext to write the auth cookie to.");
+
+        // A field posted empty binds as null. An empty credential is a failed sign-in, not a bug.
+        var result = await SignInService.SignInAsync(
+            httpContext,
+            Input.Email ?? string.Empty,
+            Input.Password ?? string.Empty,
+            httpContext.RequestAborted);
+
+        if (result.IsFailure)
+        {
+            // The same sentence POST /api/auth/login answers with. A wrong password, an unknown
+            // address and a locked-out account all arrive here as one error and must read as one.
+            _errorMessage = TurkishErrorMessages.GetMessage(result.Error.Code, result.Error.Message);
+
+            // Never echo the password back into the re-rendered form's value attribute.
+            Input.Password = null;
+            return;
+        }
+
+        Navigation.NavigateTo("/");
+    }
+
+    private sealed class LoginInput
+    {
+        public string? Email { get; set; }
+
+        public string? Password { get; set; }
+    }
+}
