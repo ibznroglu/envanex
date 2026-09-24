@@ -61,3 +61,16 @@ code-reviewer, on Opus, over the whole branch: **NEEDS_REVISION**, with one requ
 - Decided: this PR also rewrites README's "Running locally". The change made `docker compose up -d` require `.env`, and the old steps also lacked the JWT signing-key and connection-string secrets the app needs to boot. The rest of README stays for PR 7.
 - Decided: this PR removes the roadmap's `docker-compose.yml` row, which it closes. The PR table's status for `fix(db)` is filled in by the next PR that touches the roadmap, once the GitHub number is known.
 - Settled: `.env.example` is tracked; `git ls-tree` on the branch lists it.
+
+## Focused re-review (2026-09-24)
+
+code-reviewer, on Opus, over the commits after 3972595: **NEEDS_REVISION** on README's "Running locally". `.env.example`, the roadmap and this plan passed. Decided and done:
+- The EF Core CLI is a local tool, pinned in `.config/dotnet-tools.json` to the EF Core version the solution uses. `dotnet tool restore` is the first setup step, so a fresh machine no longer fails at `dotnet ef`.
+- `docker compose up -d --wait` waits for the healthcheck before the migrations run.
+- The connection string is single-quoted. Inside double quotes Git Bash expands `!`, backticks and `\`, and `!` is common in SQL Server passwords.
+- The signing key uses `openssl rand -base64 48`, 64 characters on one line. The earlier `-base64 64` wrapped, which put a newline inside the key.
+- One sentence says the demo steps are how to sign in locally; with the demo off, no account exists.
+
+Notes for `chore(agents)`:
+- `/commit` ran `git commit` through Windows PowerShell 5.1, which split a message at its double quotes. It recovered by soft-resetting its own unpushed commit and committing with `-F`. The skill should always commit with `-F <file>`.
+- "How the work is run" in the roadmap still says the code-reviewer runs on Sonnet. This PR's reviews ran on Opus through the per-invocation override.
