@@ -1602,6 +1602,18 @@ Files: `DemoAccountSeeder.cs` (R1, R3), `DemoAccountSeederTests.cs` (R1, R2). Te
 
 db-reviewer: **DB_APPROVED**, no required changes. Its one UNVERIFIED claim, that Phase 5 touched no migration, is settled: `git diff --name-only 5e4fcf6~1 5a305ba -- src/Envanex.Infrastructure/Migrations` prints nothing. Of its two optional items, widening the R3 doc comment is done with the next code change; the collision can also hit `EmailIndex`, and a second window exists at `AddToRoleAsync`. The other, the migrations-before-boot corollary, is recorded under "Known gaps".
 
+#### Security review (2026-09-24)
+
+`/security-review`, built into Claude Code, ran at max effort over the whole branch against main. No finding reached its 8/10 confidence bar. It excluded two candidates:
+- Cookie sessions are never revalidated (2/10). This is hardening, and nothing of value sits behind the cookie yet.
+- The demo account survives `Demo:Enabled=false` (3/10). This is already a PR 7 blocker.
+
+It also found a factual error in this plan: the demo-lifecycle blocker claimed that rotating the security stamp ends live cookie sessions. With this cookie setup it does not. That bullet is corrected, and the cookie gap has its own PR 7 blocker.
+
+Rechecked against 9a50d14:
+- `AddCookie` at `JwtAuthenticationExtensions.cs:66` sets `SlidingExpiration`, but no `OnValidatePrincipal` or `ExpireTimeSpan`.
+- No `.razor` file declares a render mode, so `RevalidatingIdentityAuthenticationStateProvider` never runs.
+
 ---
 
 ## Expected test counts, by phase
@@ -1694,7 +1706,12 @@ PBKDF2 pairs; if the suite crosses 60 s, the cause to check first is a class cal
   Honouring it needs open-redirect validation — a `ReturnUrl` pointing off-site must not be
   followed — and the tests that prove it, neither of which this plan carries. Its own chore, no PR
   number.
-- **BLOCKER for PR 7: the demo account's lifecycle is not driven by configuration.** `Demo:Enabled=false` leaves an existing demo account able to sign in and read, and a new `Demo:Password` does not rotate an existing account's password. Before the demo goes public, `Enabled=true` must set the configured password, and `Enabled=false` must revoke the account, including its refresh-token families and its security stamp, so that live cookies and refresh tokens die with it.
+- **BLOCKER for PR 7: the demo account's lifecycle is not driven by configuration.** `Demo:Enabled=false` leaves an existing demo account able to sign in and read, and a new `Demo:Password` does not rotate an existing account's password. Before the demo goes public, `Enabled=true` must set the configured password, and `Enabled=false` must revoke the account, including its refresh-token families and its live cookie sessions. Rotating the security stamp alone ends no cookie session today; see the next bullet.
+- **BLOCKER for PR 7: cookie sessions are never revalidated.** The cookie scheme (`JwtAuthenticationExtensions.cs:66`) has no `OnValidatePrincipal` and no explicit `ExpireTimeSpan`, so the default 14-day sliding lifetime applies. `AddIdentityCore` wires no security-stamp validation into it.
+  - A cookie therefore outlives its user's deletion, the loss of its roles, a stamp change and a lockout. Nothing checks lockout on a live session, so research Decision 11's lockout goal is unmet.
+  - `RevalidatingIdentityAuthenticationStateProvider` never runs today, because no component declares a render mode. Once it runs, it only flips the circuit to anonymous; it never touches the cookie.
+  - This is harmless today: the cookie guards only `/`, and `/api/*` accepts bearer tokens only. It becomes a real gap when PR 7 puts data behind the cookie.
+  - Needed before then, each with a test: a security-stamp validator with an interval on the cookie scheme, an explicit expiry, and lockout honoured on live sessions. The demo lifecycle above depends on it.
 - The shared demo account can be locked out by anyone: `Lockout.AllowedForNewUsers = true` means five wrong passwords lock it for 15 minutes, across any number of client addresses. Its password is public, so lockout protects nothing on it. Turn lockout off for the demo account as part of the lifecycle above — PR 7.
 - Every host start now needs a reachable, migrated identity database, because the roles are seeded at boot. There is no `EnableRetryOnFailure`, so a slow first connection (an auto-paused Azure SQL free-tier database) fails the whole host — PR 7, with the first deploy. The boot-time queries project every mapped column, so a future Identity migration must be applied before the build that expects it boots (db-reviewer).
 - The demo user's first seeding is not safe against two hosts starting at once (Phase 5 revision, R3): the loser fails its boot and heals on restart. Accepted while production is a single instance. An App Service overlapped restart or slot swap can briefly run two processes even on one instance. It matters only when both are first-seeding with the demo on, and it still heals on restart (db-reviewer).
