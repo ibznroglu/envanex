@@ -1630,6 +1630,11 @@ Smoke, on the http profile against the local SQL Server:
 
 EF's design-time factories read `ENVANEX_CONNECTION_STRING`, not user-secrets, so `dotnet ef database update` fails without it. `CLAUDE.md`'s migration commands do not say so; see the roadmap list.
 
+Environment-variable pin proof, run after the merge on main at 11c44fd:
+- With `Demo__Enabled=true` set in the environment, the whole integration suite passed, 392 of 392.
+- With the pin commented out in `LoginRateLimitedWebApplicationFactory`, `LoginRateLimiterTests` failed at boot with "Demo:Password is not configured, and Demo:Enabled is true".
+- So environment variables do reach the test hosts, and the pins are what stop them. This proves ADR 0008's sentence that neither user-secrets nor an environment variable can change the suite's behavior.
+
 #### Final whole-branch code review (2026-09-24)
 
 The code-reviewer, on Opus, reviewed the whole branch as one change. Verdict: **NEEDS_REVISION**, with one required change and six Low findings.
