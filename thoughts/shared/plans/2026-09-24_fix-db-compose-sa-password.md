@@ -74,3 +74,12 @@ code-reviewer, on Opus, over the commits after 3972595: **NEEDS_REVISION** on RE
 Notes for `chore(agents)`:
 - `/commit` ran `git commit` through Windows PowerShell 5.1, which split a message at its double quotes. It recovered by soft-resetting its own unpushed commit and committing with `-F`. The skill should always commit with `-F <file>`.
 - "How the work is run" in the roadmap still says the code-reviewer runs on Sonnet. This PR's reviews ran on Opus through the per-invocation override.
+
+## Second focused re-review and gate (2026-09-24)
+
+- code-reviewer, on Opus: **APPROVED**, with four optional README items. Three are applied:
+  - the SDK floor from `global.json` (10.0.400)
+  - `openssl rand -hex 32` for the signing key, because base64 output can start with `/`, which Git Bash rewrites into a Windows path for a native program
+  - the demo password policy, spelled out
+- Declined: moving the demo commands into the code block. README's structure is PR 7's to decide.
+- The first tester run returned NEEDS_FIXES, because the gate prompt listed only the plan's original files and not README.md, docs/roadmap.md and .config/dotnet-tools.json. The change was right and the list was stale; the tester reran with the full list.
