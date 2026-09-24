@@ -58,7 +58,7 @@ exemptions, is:
 | OpenAPI | Exempt in Development only. |
 | Scalar | Exempt in Development only. |
 | `/_framework/blazor.web.js` | Covered by the static-asset exemption. |
-| `/_blazor` negotiate, transport, and disconnect endpoints | Exempt through a narrowly scoped route-pattern convention. |
+| `/_blazor` negotiate, transport, disconnect, and initializers endpoints | Exempt through a route-pattern convention that matches the `/_blazor` path segment. |
 | Unmatched `/api/*` paths | Not exempt: anonymous requests receive a body-bearing 401 rather than a redirect. |
 
 Each row has a corresponding behavioral test. The hub exemption must not
@@ -135,8 +135,9 @@ demo password must not silently acquire administrative access, including when
 the configured email collides with an existing administrator. This is a
 startup invariant, not continuous monitoring of later role changes.
 
-The test host pins `Demo:Enabled=false` unless a test explicitly overrides it,
-so a developer's user-secrets cannot change the suite's behavior.
+Every test host pins `Demo:Enabled=false` unless a test explicitly overrides
+it, so neither a developer's user-secrets nor an environment variable can
+change the suite's behavior.
 
 ## Alternatives
 
@@ -173,8 +174,8 @@ A browser cookie cannot call even read-only API endpoints such as
 DevExpress showcase, must address bearer-token handling explicitly.
 
 Real-login integration tests exercise the actual security boundary, at the
-cost of broader failure propagation: a broken login can fail roughly 72 tests.
-The recorded integration suite takes 58–59 seconds, close to ADR 0007's
+cost of broader failure propagation: a broken login fails every test that signs
+in for real. The integration suite runs in 57–59 seconds, close to ADR 0007's
 60-second decision threshold. No schema change or migration is introduced.
 
 ### PR 7 blockers: live sessions and the demo lifecycle
