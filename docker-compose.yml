@@ -4,10 +4,12 @@ services:
     container_name: envanex-sqlserver
     environment:
       ACCEPT_EULA: "Y"
-      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:-Erp_Local_Dev_2026!}"
+      # No default: a committed password in a public repo is a published credential.
+      MSSQL_SA_PASSWORD: "${MSSQL_SA_PASSWORD:?Set MSSQL_SA_PASSWORD in .env - see .env.example}"
       MSSQL_PID: "Developer"
     ports:
-      - "1433:1433"
+      # Loopback only, so other hosts on the network cannot reach sa. Connect via 127.0.0.1: Windows resolves localhost to ::1 first.
+      - "127.0.0.1:1433:1433"
     volumes:
       - envanex-mssql-data:/var/opt/mssql
     healthcheck:
