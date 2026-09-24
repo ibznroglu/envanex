@@ -1585,6 +1585,23 @@ The code-reviewer returned NEEDS_REVISION with eight findings. Decided:
 
 Files: `DemoAccountSeeder.cs` (R1, R3), `DemoAccountSeederTests.cs` (R1, R2). Tests: 391 integration, 637 total. Run the code-reviewer again only if the coder departs from R1–R3; db-reviewer is still required on Phase 5.
 
+#### Revision mutation proofs, against 5a305ba
+
+| ID | Mutation | Test | Observed |
+|---|---|---|---|
+| MR1 | the `HasOtherRoles` predicate never matches | R1 | red: no failure was returned |
+| MR2 | the roles are ensured before the R1 check | R1 | red: `Viewer` was seeded |
+| MR3 | `isAlreadyViewer` is never true | called twice | red: the second call failed |
+| MR4 | the host ignores a seeding failure | R2 | red: the host started |
+| MR5 | the password is appended to the `CreateFailed` message | R2, invalid email | both red |
+| MR6 | the password is appended to the `HasOtherRoles` message | R1 | red |
+
+- MR5's first run failed on a Docker API fault before any assertion ran, so it did not count and was run again. A red counts only when the test's own assertion fails.
+- The coder's two structural choices stand. The R1 read runs before `EnsureRolesAsync`, so a refused demo account leaves the roles table untouched too. `isAlreadyViewer` replaced the `IsInRoleAsync` call, and MR3 re-proves the called-twice test on it.
+- Untested and accepted: an existing demo user with no role gets `Viewer` on the next boot. That is the state a crash between `CreateAsync` and `AddToRoleAsync` leaves. Until it heals, the user passes the fallback policy but no role-based one.
+
+db-reviewer: **DB_APPROVED**, no required changes. Its one UNVERIFIED claim, that Phase 5 touched no migration, is settled: `git diff --name-only 5e4fcf6~1 5a305ba -- src/Envanex.Infrastructure/Migrations` prints nothing. Of its two optional items, widening the R3 doc comment is done with the next code change; the collision can also hit `EmailIndex`, and a second window exists at `AddToRoleAsync`. The other, the migrations-before-boot corollary, is recorded under "Known gaps".
+
 ---
 
 ## Expected test counts, by phase
@@ -1679,8 +1696,18 @@ PBKDF2 pairs; if the suite crosses 60 s, the cause to check first is a class cal
   number.
 - **BLOCKER for PR 7: the demo account's lifecycle is not driven by configuration.** `Demo:Enabled=false` leaves an existing demo account able to sign in and read, and a new `Demo:Password` does not rotate an existing account's password. Before the demo goes public, `Enabled=true` must set the configured password, and `Enabled=false` must revoke the account, including its refresh-token families and its security stamp, so that live cookies and refresh tokens die with it.
 - The shared demo account can be locked out by anyone: `Lockout.AllowedForNewUsers = true` means five wrong passwords lock it for 15 minutes, across any number of client addresses. Its password is public, so lockout protects nothing on it. Turn lockout off for the demo account as part of the lifecycle above — PR 7.
-- Every host start now needs a reachable, migrated identity database, because the roles are seeded at boot. There is no `EnableRetryOnFailure`, so a slow first connection (an auto-paused Azure SQL free-tier database) fails the whole host — PR 7, with the first deploy.
-- The demo user's first seeding is not safe against two hosts starting at once (Phase 5 revision, R3): the loser fails its boot and heals on restart. Accepted while production is a single instance.
+- Every host start now needs a reachable, migrated identity database, because the roles are seeded at boot. There is no `EnableRetryOnFailure`, so a slow first connection (an auto-paused Azure SQL free-tier database) fails the whole host — PR 7, with the first deploy. The boot-time queries project every mapped column, so a future Identity migration must be applied before the build that expects it boots (db-reviewer).
+- The demo user's first seeding is not safe against two hosts starting at once (Phase 5 revision, R3): the loser fails its boot and heals on restart. Accepted while production is a single instance. An App Service overlapped restart or slot swap can briefly run two processes even on one instance. It matters only when both are first-seeding with the demo on, and it still heals on restart (db-reviewer).
+
+Also for the roadmap, though not opened by this PR:
+
+- **The integration suite sits at 58-59 s after Phase 5**, against the 60 s decision line ADR 0007 records, and the next PR's tests will cross it. Before PR 7 adds tests, measure the median of three runs with the SQL Server container's start-up separated out, then decide. The options:
+  - fewer `ResetIdentityAsync` calls, which weakens nothing and is this plan's first suspect
+  - fewer `ConcurrencyIterations`, which weakens the concurrency tests
+  - parallel test collections, which break `DatabaseCollection`'s serialisation
+  - a higher line, which revises ADR 0007
+- **PR 7's "deploy on merge to main" has no recorded method.** There is no Dockerfile, `docker-compose.yml` starts only SQL Server, and the tests use Testcontainers. PR 7's research decides between an App Service publish profile, GitHub Actions and a container.
+- **`docker-compose.yml` ships a default SA password and publishes 1433 on every interface.** Its own `fix(db)` PR follows this one.
 
 ---
 
