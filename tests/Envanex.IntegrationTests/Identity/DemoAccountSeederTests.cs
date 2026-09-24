@@ -141,6 +141,59 @@ public sealed class DemoAccountSeederTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task SeedAsync_WhenTheDemoAccountAlreadyHoldsAnotherRole_ShouldFailAndLeaveItsRolesUnchanged()
+    {
+        await using var provider = BuildProvider(enabled: true, DemoEmail, SqlServerFixture.SeededPassword);
+
+        await IdentitySeeder.EnsureRoleAsync(provider, EnvanexRoles.Administrator);
+        await IdentitySeeder.CreateUserAsync(provider, DemoEmail, SqlServerFixture.SeededPassword);
+        await IdentitySeeder.EnsureUserInRoleAsync(provider, DemoEmail, EnvanexRoles.Administrator);
+
+        var result = await DemoAccountSeeder.SeedAsync(provider);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.Code.ShouldBe("DemoAccount.HasOtherRoles");
+        result.Error.Message.ShouldContain(DemoEmail);
+        result.Error.Message.ShouldContain(EnvanexRoles.Administrator);
+        result.Error.Message.ShouldNotContain(SqlServerFixture.SeededPassword);
+
+        (await ReadRolesOfAsync(provider, DemoEmail)).ShouldBe([EnvanexRoles.Administrator]);
+
+        // Refused before any write, so not even the Viewer role was seeded.
+        (await ReadRoleNamesAsync()).ShouldBe([EnvanexRoles.Administrator]);
+    }
+
+    [Fact]
+    public async Task Host_WhenDemoSeedingFails_ShouldNotStart()
+    {
+        // Constructed here, after InitializeAsync's reset. The address fails Identity's email
+        // validation, so seeding returns DemoAccount.CreateFailed and SeedIdentityAsync throws.
+        await using var factory = new EnvanexWebApplicationFactory(
+            _fixture.ConnectionString,
+            "Testing",
+            new Dictionary<string, string?>(StringComparer.Ordinal)
+            {
+                ["Demo:Enabled"] = "true",
+                ["Demo:Password"] = SqlServerFixture.SeededPassword,
+                ["Demo:Email"] = "not-an-email",
+            });
+
+        var exception = Record.Exception(() => factory.CreateClient());
+
+        exception.ShouldNotBeNull("The host started although demo seeding failed.");
+
+        var chain = ExceptionChain(exception).ToList();
+        var seedingFailure = chain
+            .OfType<InvalidOperationException>()
+            .FirstOrDefault(candidate => candidate.Message.Contains("DemoAccount.CreateFailed", StringComparison.Ordinal))
+            .ShouldNotBeNull(
+                "No InvalidOperationException naming DemoAccount.CreateFailed in the chain: " +
+                string.Join(" -> ", chain.Select(link => link.GetType().FullName)));
+
+        seedingFailure.Message.ShouldNotContain(SqlServerFixture.SeededPassword);
+    }
+
+    [Fact]
     public async Task DemoAccount_ShouldBeAbleToReadButNotWrite()
     {
         // Constructed here, after InitializeAsync's reset, so the reset cannot delete what this
@@ -198,6 +251,24 @@ public sealed class DemoAccountSeederTests : IAsyncLifetime
             .ShouldNotBeNull($"No user with the email '{email}' was seeded.");
 
         return [.. await userManager.GetRolesAsync(user)];
+    }
+
+    /// <summary>
+    /// The exception and everything it wraps, depth first, following every inner exception of an
+    /// <see cref="AggregateException"/> as well as <see cref="Exception.InnerException"/>.
+    /// </summary>
+    private static IEnumerable<Exception> ExceptionChain(Exception exception)
+    {
+        yield return exception;
+
+        IEnumerable<Exception> inner = exception is AggregateException aggregate
+            ? aggregate.InnerExceptions
+            : exception.InnerException is null ? [] : [exception.InnerException];
+
+        foreach (var link in inner.SelectMany(ExceptionChain))
+        {
+            yield return link;
+        }
     }
 
     private ServiceProvider BuildProvider(bool enabled, string email, string password)
