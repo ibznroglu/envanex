@@ -9,7 +9,7 @@ endpoints remained open, and the Blazor UI had no sign-in flow.
 PR 6b adds authorization before PR 8 and PR 10 expand the endpoint and screen
 surface. The default must remain safe when an authorization attribute is
 forgotten. Permissions must be expressed independently of role names so that
-changes to role membership do not require changes throughout the controllers.
+adding or renaming a role does not require changes throughout the controllers.
 
 The REST API and the server-rendered UI need different authentication
 contracts. API clients need bearer authentication and HTTP error responses;
