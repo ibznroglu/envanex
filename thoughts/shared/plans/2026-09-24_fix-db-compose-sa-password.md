@@ -40,3 +40,10 @@ SQL Server applies `MSSQL_SA_PASSWORD` only when it creates the data volume, so 
 4. Run both migrations with `ENVANEX_CONNECTION_STRING` set.
 
 No ADR: this is a configuration fix, not a decision with alternatives worth recording.
+
+## As built (2026-09-24)
+
+- The coder changed `docker-compose.yml`, `.gitignore` and `CLAUDE.md`.
+- The PreToolUse path guard blocked `.env.example`. Its `\.env($|\.)` rule matches the template as well as real secrets, so the human wrote the file from the coder's draft. `chore(agents)` should allowlist `.env.example` when it fixes the guard. The block also shows that the guard's suffix rules fire on Windows paths; its directory rules are still unverified.
+- With an empty env file, `docker compose config` fails with "required variable MSSQL_SA_PASSWORD is missing a value: Set MSSQL_SA_PASSWORD in .env - see .env.example". With a value, the port is published on `host_ip: 127.0.0.1`.
+- Gates: 638 green. The integration suite took 61 s, one sample over ADR 0007's 60 s line. The decision stays scheduled before PR 7 adds tests, with the median-of-three measurement.
