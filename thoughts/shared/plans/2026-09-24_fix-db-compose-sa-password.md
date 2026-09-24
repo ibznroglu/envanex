@@ -47,3 +47,9 @@ No ADR: this is a configuration fix, not a decision with alternatives worth reco
 - The PreToolUse path guard blocked `.env.example`. Its `\.env($|\.)` rule matches the template as well as real secrets, so the human wrote the file from the coder's draft. `chore(agents)` should allowlist `.env.example` when it fixes the guard. The block also shows that the guard's suffix rules fire on Windows paths; its directory rules are still unverified.
 - With an empty env file, `docker compose config` fails with "required variable MSSQL_SA_PASSWORD is missing a value: Set MSSQL_SA_PASSWORD in .env - see .env.example". With a value, the port is published on `host_ip: 127.0.0.1`.
 - Gates: 638 green. The integration suite took 61 s, one sample over ADR 0007's 60 s line. The decision stays scheduled before PR 7 adds tests, with the median-of-three measurement.
+
+## Finding during verification (2026-09-24)
+
+- After the rotation, both `dotnet ef database update` commands timed out (SqlClient error 258). The connection strings used `Server=localhost,1433`. Windows resolves `localhost` to `::1` first, and the new binding listens on IPv4 loopback only. `Test-NetConnection` confirmed it: `127.0.0.1 -> True`, `::1 -> False`. The old `"1433:1433"` binding also listened on IPv6, which hid the dependency.
+- With `Server=127.0.0.1,1433`, the migrations applied.
+- Decision: connect to `127.0.0.1`, not `localhost`. The compose comment, `CLAUDE.md` and both design-time factories' example connection strings now say so. Also binding `[::1]` was rejected: it depends on Docker Desktop's IPv6 port publishing, and it keeps an ambiguous hostname in the setup.
