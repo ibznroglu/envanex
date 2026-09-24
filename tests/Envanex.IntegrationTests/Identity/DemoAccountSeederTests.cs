@@ -96,6 +96,7 @@ public sealed class DemoAccountSeederTests : IAsyncLifetime
             () => DemoAccountSeeder.SeedAsync(provider));
 
         exception.Message.ShouldContain("Demo:Password");
+        exception.Message.ShouldContain("is not configured");
 
         // Checked before any write, so a misconfigured host leaves nothing behind — not even roles.
         (await ReadRoleNamesAsync()).ShouldBeEmpty();
