@@ -26,6 +26,10 @@ public static class IdentityInfrastructureExtensions
         JwtOptionsGuard.ThrowIfInvalid(section.Get<JwtOptions>() ?? new JwtOptions());
         services.Configure<JwtOptions>(section);
 
+        // No guard here: a blank or policy-violating demo password is only a misconfiguration when
+        // the demo is enabled, and DemoAccountSeeder.SeedAsync is where that is checked and thrown.
+        services.Configure<DemoAccountOptions>(configuration.GetSection(DemoAccountOptions.SectionName));
+
         // TryAdd so a test that registers a FakeTimeProvider first keeps it.
         services.TryAddSingleton(TimeProvider.System);
 

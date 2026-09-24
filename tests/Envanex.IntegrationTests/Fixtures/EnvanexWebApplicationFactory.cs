@@ -70,6 +70,11 @@ public sealed class EnvanexWebApplicationFactory : WebApplicationFactory<Program
         // under test. Production keeps Always because the setting is absent there.
         builder.UseSetting("Auth:Cookie:SecurePolicy", "SameAsRequest");
 
+        // Pinned rather than left to appsettings.json. DevelopmentEndpointExemptionTests hosts in
+        // Development, which loads user-secrets, and a developer who enabled the demo locally must
+        // not change what the suite does. Per-test overrides still win because they are applied last.
+        builder.UseSetting("Demo:Enabled", "false");
+
         // Last on purpose: the caller's overrides win over every default above.
         foreach (var (key, value) in _settingOverrides)
         {

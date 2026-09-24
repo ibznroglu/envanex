@@ -209,6 +209,10 @@ app.MapRazorComponents<App>()
         }
     });
 
+// Between Build() and Run(): the roles always, the demo account when Demo:Enabled is true. A
+// failure here throws, so a misconfigured host never starts serving.
+await app.SeedIdentityAsync();
+
 app.Run();
 
 // Required for WebApplicationFactory<Program> access
