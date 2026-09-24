@@ -1531,10 +1531,47 @@ dotnet user-secrets set "Demo:Password" "<a local value, never committed>" --pro
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: sign in at /login as the demo account, confirm read-only
 ```
 
-Expected test count at end: **633** (120 + 126 + **387**).
+Expected test count at end: **635** (120 + 126 + **389**).
 
 **Run db-reviewer on this phase** — the seeder writes `auth.AspNetRoles`, `auth.AspNetUsers` and
 `auth.AspNetUserRoles` at host startup, in production.
+
+### Phase 5 as built (recorded 2026-09-24)
+
+The coder prompt decided the four gaps this plan left open; nothing else was left to the coder.
+
+1. `DemoAccountOptions` is bound in `IdentityInfrastructureExtensions.AddEnvanexIdentity`, beside `JwtOptions`, so the direct tests exercise the production binding (M13).
+2. With `Demo:Enabled` true, `SeedAsync` checks `Demo:Password` before any write. A blank password throws with a user-secrets hint. A password any registered `IPasswordValidator` rejects throws, naming the Identity error codes. No message contains the password (M9, M11).
+3. `SeedIdentityAsync` throws when `SeedAsync` returns a failure, so the host fails at boot. This line is untested: proving it needs a host boot of its own.
+4. `EnvanexWebApplicationFactory` pins `Demo:Enabled=false`, because `DevelopmentEndpointExemptionTests` hosts in Development, which loads user-secrets. M16a and M16b prove the pin beats appsettings.json; the user-secrets case is checked at the manual smoke.
+
+Files: `IdentityInfrastructureExtensions.cs` (gap 1) and `EnvanexWebApplicationFactory.cs` (gap 4) joined the list. Tests: nine, not seven. `SeedAsync_WhenDemoIsEnabledWithAPolicyViolatingPassword_ShouldThrow` and `SeedAsync_WhenDemoIsEnabledWithAnInvalidEmail_ShouldReturnFailure` reach the two branches the Signatures require. Integration suite: 54 s and 52 s.
+
+#### Mutation proofs, against 5e4fcf6
+
+| ID | Mutation | Test(s) | Observed |
+|---|---|---|---|
+| M1 | drop the `EnsureRolesAsync` call | disabled | red |
+| M2b | `if (!options.Enabled)` becomes `if (bool.Parse("false"))` | disabled | red |
+| M3 | `Viewer` becomes `Administrator` in `AddToRoleAsync` | enabled, end-to-end | both red; the write was not 403 |
+| M4 | always create the user | called twice | red |
+| M5 | drop the `IsInRoleAsync` early return | called twice | red |
+| M6 | skip the blank-password check | blank password | green, then red after the test fix |
+| M7 | seed the roles before the password check | blank, policy | both red |
+| M8 | never throw on policy codes | policy | red |
+| M9 | password appended to the policy message | policy | red |
+| M10 | creation failure reported as success | invalid email | red |
+| M11 | password appended to the creation-failure message | invalid email | red |
+| M12 | drop `await app.SeedIdentityAsync();` | end-to-end | red |
+| M13 | drop the options binding | whole class | 6 red, disabled green |
+| M14 | ship `Enabled: true` | settings | red |
+| M15 | ship a non-empty password | settings | red |
+| M16a | ship `Enabled: true` and drop the factory pin | DevelopmentEndpointExemptionTests | red |
+| M16b | ship `Enabled: true`, pin kept | DevelopmentEndpointExemptionTests | green |
+
+- M2 as first written (`if (false)` before a `return`) did not compile. CS0162 is an error under `TreatWarningsAsErrors`, so the build failed and no test ran. A mutation must not be a constant the compiler can see through.
+- M6 survived because the policy check also rejects an empty password and its message also contains `Demo:Password`. `SeedAsync_WhenDemoIsEnabledWithABlankPassword_ShouldThrow` now also asserts `is not configured`.
+- `DemoAccount.AddToRoleFailed` was reached only under M5. Like ADR 0007's `RotateAsync` clause, it is kept but no test reaches it.
 
 ---
 
@@ -1553,7 +1590,7 @@ was ever taken.
 | 2 authenticated clients | 120 | 126 | 332 | **578** |
 | 3 cookie + Blazor | 120 | 126 | 353 | **599** |
 | 4 close the gate | 120 | 126 | 380 | **626** |
-| 5 demo account | 120 | 126 | 387 | **633** |
+| 5 demo account | 120 | 126 | 389 | **635** |
 
 Every row from Phase 1 onward is one higher than the plan first wrote it, because Phase 1 added one
 test the plan did not anticipate: `IdentityRoleSeederTests`'
