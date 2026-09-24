@@ -1614,6 +1614,22 @@ Rechecked against 9a50d14:
 - `AddCookie` at `JwtAuthenticationExtensions.cs:66` sets `SlidingExpiration`, but no `OnValidatePrincipal` or `ExpireTimeSpan`.
 - No `.razor` file declares a render mode, so `RevalidatingIdentityAuthenticationStateProvider` never runs.
 
+#### Manual smoke and the user-secrets pin proof (2026-09-24)
+
+Pin proof, with `Demo:Enabled=true` and `Demo:Password=short` set in user-secrets:
+- With the pin in place, `DevelopmentEndpointExemptionTests` passed 3 of 3.
+- With the pin line commented out, all 3 failed at boot with "Demo:Password does not satisfy the password policy, and Demo:Enabled is true. Identity reported: PasswordTooShort, PasswordRequiresDigit, PasswordRequiresUpper". The message names the codes, not the password.
+- So the Development test host does read user-secrets, and the pin is what stops them. This settles the last UNVERIFIED claim of gap 4.
+
+Smoke, on the http profile against the local SQL Server:
+- With a policy-violating `Demo:Password`, the application refused to start: the misconfiguration guard, live.
+- With a valid password, boot seeded the missing role and the user, then wrote the membership and the user update in one batch. EF logged parameter values as `?`, so no hash reached the log.
+- `/login` signed the demo account in, and `/` showed its email.
+- With the demo account's bearer token, the API answered: login 200, `GET /api/unit-of-measures` 200, `POST /api/unit-of-measures` 403.
+- The local secrets were removed afterwards.
+
+EF's design-time factories read `ENVANEX_CONNECTION_STRING`, not user-secrets, so `dotnet ef database update` fails without it. `CLAUDE.md`'s migration commands do not say so; see the roadmap list.
+
 ---
 
 ## Expected test counts, by phase
@@ -1725,6 +1741,23 @@ Also for the roadmap, though not opened by this PR:
   - a higher line, which revises ADR 0007
 - **PR 7's "deploy on merge to main" has no recorded method.** There is no Dockerfile, `docker-compose.yml` starts only SQL Server, and the tests use Testcontainers. PR 7's research decides between an App Service publish profile, GitHub Actions and a container.
 - **`docker-compose.yml` ships a default SA password and publishes 1433 on every interface.** Its own `fix(db)` PR follows this one.
+- **PR 7's UI must meet a senior-frontend bar, not the Blazor template's.** The smoke showed the template's full-width Bootstrap login form, its "About" link in the top bar, and an https-redirect warning on the http profile. PR 7 starts with a design phase:
+  - design tokens (colour, type, spacing, radius), and a Radzen theme built from them
+  - login as a centred card, with the brand and every state: error, loading, locked out
+  - an app shell with the template leftovers removed
+  - a responsive layout down to mobile widths
+  - keyboard and screen-reader access to WCAG 2.2 AA
+  - Playwright checks for the sign-in flow
+
+  Evaluate Anthropic's frontend-design skill for that phase.
+- **`chore(agents)` hardens the agent pipeline before PR 7.** Its research, `thoughts/shared/research/2026-09-24_agent-workflow-hardening.md`, is committed with that PR. Scope:
+  - permission deny rules and per-agent hooks in place of prompt-only rules, including a working Windows path guard
+  - a model and effort tier per agent
+  - `/verify` renamed to `/gate` and backed by a script
+  - a new `/mutate` skill that encodes this PR's mutation discipline
+  - `CLAUDE.md` scope and verification rules, plus the missing `ENVANEX_CONNECTION_STRING` note in its migration commands
+  - the `csharp-lsp` and Microsoft Learn plugins
+- **Order after this PR:** `docs(roadmap)`, then `fix(db)` for the compose file, then `chore(agents)`, then PR 7.
 
 ---
 
