@@ -1531,7 +1531,7 @@ dotnet user-secrets set "Demo:Password" "<a local value, never committed>" --pro
 dotnet run --project src\Envanex.Web --launch-profile http   # manual: sign in at /login as the demo account, confirm read-only
 ```
 
-Expected test count at end: **635** (120 + 126 + **389**).
+Expected test count at end: **637** (120 + 126 + **391**).
 
 **Run db-reviewer on this phase** — the seeder writes `auth.AspNetRoles`, `auth.AspNetUsers` and
 `auth.AspNetUserRoles` at host startup, in production.
@@ -1542,7 +1542,7 @@ The coder prompt decided the four gaps this plan left open; nothing else was lef
 
 1. `DemoAccountOptions` is bound in `IdentityInfrastructureExtensions.AddEnvanexIdentity`, beside `JwtOptions`, so the direct tests exercise the production binding (M13).
 2. With `Demo:Enabled` true, `SeedAsync` checks `Demo:Password` before any write. A blank password throws with a user-secrets hint. A password any registered `IPasswordValidator` rejects throws, naming the Identity error codes. No message contains the password (M9, M11).
-3. `SeedIdentityAsync` throws when `SeedAsync` returns a failure, so the host fails at boot. This line is untested: proving it needs a host boot of its own.
+3. `SeedIdentityAsync` throws when `SeedAsync` returns a failure, so the host fails at boot. The Phase 5 revision below tests it.
 4. `EnvanexWebApplicationFactory` pins `Demo:Enabled=false`, because `DevelopmentEndpointExemptionTests` hosts in Development, which loads user-secrets. M16a and M16b prove the pin beats appsettings.json; the user-secrets case is checked at the manual smoke.
 
 Files: `IdentityInfrastructureExtensions.cs` (gap 1) and `EnvanexWebApplicationFactory.cs` (gap 4) joined the list. Tests: nine, not seven. `SeedAsync_WhenDemoIsEnabledWithAPolicyViolatingPassword_ShouldThrow` and `SeedAsync_WhenDemoIsEnabledWithAnInvalidEmail_ShouldReturnFailure` reach the two branches the Signatures require. Integration suite: 54 s and 52 s.
@@ -1573,6 +1573,18 @@ Files: `IdentityInfrastructureExtensions.cs` (gap 1) and `EnvanexWebApplicationF
 - M6 survived because the policy check also rejects an empty password and its message also contains `Demo:Password`. `SeedAsync_WhenDemoIsEnabledWithABlankPassword_ShouldThrow` now also asserts `is not configured`.
 - `DemoAccount.AddToRoleFailed` was reached only under M5. Like ADR 0007's `RotateAsync` clause, it is kept but no test reaches it.
 
+### Phase 5 revision (after code review, 2026-09-24)
+
+The code-reviewer returned NEEDS_REVISION with eight findings. Decided:
+
+- **R1 — the demo account holds only `Viewer` (finding 1).** When the user at `Demo:Email` already exists, `SeedAsync` reads its roles first. If it holds any role other than `Viewer`, it returns `Result.Failure` with code `DemoAccount.HasOtherRoles`, naming the roles and never the password, and writes nothing; `SeedIdentityAsync` then fails the boot. The check runs before `AddToRoleAsync`. Test: `SeedAsync_WhenTheDemoAccountAlreadyHoldsAnotherRole_ShouldFailAndLeaveItsRolesUnchanged`. It creates the user at the demo email in `Administrator` through `IdentitySeeder`, runs `SeedAsync` with the demo on, and asserts the code and that the roles are still exactly `[Administrator]`.
+- **R2 — the fail-at-boot line gets its test (finding 4).** Test: `Host_WhenDemoSeedingFails_ShouldNotStart`. It builds `new EnvanexWebApplicationFactory(conn, "Testing", { Demo:Enabled=true, Demo:Password=SqlServerFixture.SeededPassword, Demo:Email="not-an-email" })` inside the test, after the reset, and asserts that starting it (`CreateClient()`) throws. The exception chain must hold an `InvalidOperationException` whose message contains `DemoAccount.CreateFailed` and not the password. How `WebApplicationFactory` wraps an exception thrown between `Build()` and `Run()` is UNVERIFIED, so the test asserts on the chain and the coder reports the observed outer type.
+- **R3 — the concurrent-first-seeding race is recorded, not handled (finding 3).** Two hosts seeding the demo user at the same moment can collide on `UserNameIndex`; the loser's boot fails and a restart heals it. Production is a single App Service instance, and a race test in the role seeder's style would cost about twenty extra PBKDF2 pairs against the 60 s line. The doc comment in `DemoAccountSeeder` that says "like IdentityRoleSeeder" is reworded to state this limit.
+- **Deferred to PR 7 (findings 2, 5, 6)**, where the demo account first becomes public. They are listed under "Known gaps".
+- **No change (findings 7, 8).**
+
+Files: `DemoAccountSeeder.cs` (R1, R3), `DemoAccountSeederTests.cs` (R1, R2). Tests: 391 integration, 637 total. Run the code-reviewer again only if the coder departs from R1–R3; db-reviewer is still required on Phase 5.
+
 ---
 
 ## Expected test counts, by phase
@@ -1590,7 +1602,7 @@ was ever taken.
 | 2 authenticated clients | 120 | 126 | 332 | **578** |
 | 3 cookie + Blazor | 120 | 126 | 353 | **599** |
 | 4 close the gate | 120 | 126 | 380 | **626** |
-| 5 demo account | 120 | 126 | 389 | **635** |
+| 5 demo account | 120 | 126 | 391 | **637** |
 
 Every row from Phase 1 onward is one higher than the plan first wrote it, because Phase 1 added one
 test the plan did not anticipate: `IdentityRoleSeederTests`'
@@ -1621,8 +1633,9 @@ PBKDF2 pairs; if the suite crosses 60 s, the cause to check first is a class cal
   riskiest revert — it reopens every API endpoint. Phases 1 and 2 are purely additive and enforce
   nothing.
 - **No migration is created, so there is nothing to roll back in the database.** Reverting Phase 5
-  leaves the seeded roles and demo user in place; they are harmless once no policy names them, and
-  the test database is ephemeral.
+  leaves the seeded roles and the demo user in place, and the demo user is not harmless: `CanRead`
+  still names `Viewer`, so it can still sign in and read. Delete it by hand after a revert. The test
+  database is ephemeral.
 - Phase 0 is done and none of the reshaped variants is in play: B1 keeps `Login.razor` doing its own
   sign-in (no `MapPost("/login")` endpoint), D1 keeps page permissions in the `.razor` files (no
   convention class), and E1 keeps seeding at the `app.Build()`/`app.Run()` call site (no hosted
@@ -1664,6 +1677,10 @@ PBKDF2 pairs; if the suite crosses 60 s, the cause to check first is a class cal
   Honouring it needs open-redirect validation — a `ReturnUrl` pointing off-site must not be
   followed — and the tests that prove it, neither of which this plan carries. Its own chore, no PR
   number.
+- **BLOCKER for PR 7: the demo account's lifecycle is not driven by configuration.** `Demo:Enabled=false` leaves an existing demo account able to sign in and read, and a new `Demo:Password` does not rotate an existing account's password. Before the demo goes public, `Enabled=true` must set the configured password, and `Enabled=false` must revoke the account, including its refresh-token families and its security stamp, so that live cookies and refresh tokens die with it.
+- The shared demo account can be locked out by anyone: `Lockout.AllowedForNewUsers = true` means five wrong passwords lock it for 15 minutes, across any number of client addresses. Its password is public, so lockout protects nothing on it. Turn lockout off for the demo account as part of the lifecycle above — PR 7.
+- Every host start now needs a reachable, migrated identity database, because the roles are seeded at boot. There is no `EnableRetryOnFailure`, so a slow first connection (an auto-paused Azure SQL free-tier database) fails the whole host — PR 7, with the first deploy.
+- The demo user's first seeding is not safe against two hosts starting at once (Phase 5 revision, R3): the loser fails its boot and heals on restart. Accepted while production is a single instance.
 
 ---
 
