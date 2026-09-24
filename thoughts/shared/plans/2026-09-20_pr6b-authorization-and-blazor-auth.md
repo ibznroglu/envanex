@@ -1758,6 +1758,8 @@ Also for the roadmap, though not opened by this PR:
   - `CLAUDE.md` scope and verification rules, plus the missing `ENVANEX_CONNECTION_STRING` note in its migration commands
   - the `csharp-lsp` and Microsoft Learn plugins
 - **Order after this PR:** `docs(roadmap)`, then `fix(db)` for the compose file, then `chore(agents)`, then PR 7.
+- **Before PR 8 adds write endpoints, add a test that enforces endpoint policy coverage.** ADR 0008 records that the fallback is only an authentication floor. A mutating endpoint without `CanWrite` admits a signed-in `Viewer`, and nothing catches the omission. An endpoint-metadata test should enumerate every `/api/*` endpoint and fail when a mutating endpoint lacks `CanWrite` or a read endpoint lacks `CanRead`, apart from the named exemptions.
+- **Review verdicts are not persisted.** Per-phase verdicts from earlier sessions exist only in session transcripts, so `/pr`, which accepts only verdicts from its own session, cannot cite them. Scope for `chore(agents)`: each reviewer writes its verdict, and the commit range it covered, under `thoughts/shared/reviews/`, and `/pr` cites those files.
 
 ---
 
