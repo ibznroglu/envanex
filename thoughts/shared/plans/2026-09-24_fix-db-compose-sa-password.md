@@ -53,3 +53,11 @@ No ADR: this is a configuration fix, not a decision with alternatives worth reco
 - After the rotation, both `dotnet ef database update` commands timed out (SqlClient error 258). The connection strings used `Server=localhost,1433`. Windows resolves `localhost` to `::1` first, and the new binding listens on IPv4 loopback only. `Test-NetConnection` confirmed it: `127.0.0.1 -> True`, `::1 -> False`. The old `"1433:1433"` binding also listened on IPv6, which hid the dependency.
 - With `Server=127.0.0.1,1433`, the migrations applied.
 - Decision: connect to `127.0.0.1`, not `localhost`. The compose comment, `CLAUDE.md` and both design-time factories' example connection strings now say so. Also binding `[::1]` was rejected: it depends on Docker Desktop's IPv6 port publishing, and it keeps an ambiguous hostname in the setup.
+
+## Code review (2026-09-24)
+
+code-reviewer, on Opus, over the whole branch: **NEEDS_REVISION**, with one required change.
+- Fixed: `.env.example` now names all three places that hold the password: `.env`, the `ConnectionStrings:EnvanexDb` user-secret, and `ENVANEX_CONNECTION_STRING`. It gives the connection-string shape with `127.0.0.1`, and it warns against `$`, `#`, `;` and quotes in the password. The human wrote the file, because the path guard blocks the coder from writing `.env.example`.
+- Decided: this PR also rewrites README's "Running locally". The change made `docker compose up -d` require `.env`, and the old steps also lacked the JWT signing-key and connection-string secrets the app needs to boot. The rest of README stays for PR 7.
+- Decided: this PR removes the roadmap's `docker-compose.yml` row, which it closes. The PR table's status for `fix(db)` is filled in by the next PR that touches the roadmap, once the GitHub number is known.
+- Settled: `.env.example` is tracked; `git ls-tree` on the branch lists it.
