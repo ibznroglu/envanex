@@ -541,6 +541,454 @@ git status --short
 
 ---
 
+## As built — Phase 1
+
+# Phase 1 probe evidence — chore/agents-hardening
+
+Date: 2026-09-26
+Preconditions:
+- `git status --short` (before probes): (empty output)
+- `git rev-parse HEAD`: ac397c956c18edb55fee6cc5e018efc9c48e369d
+- `claude --version`: 2.1.282 (Claude Code)
+
+## Human-verified facts
+
+### H1.1 (verified by the human)
+- .claude/settings.local.json no longer allows git:* or node:*, and holds no Password= entry.
+- The git add/commit allows were removed from the user-level settings.
+
+### C1.5 (run by the human in an external Git Bash inside the H1.2 scratch dir)
+- `docker compose down -v --help`, `docker compose down --volumes --help` and `dotnet ef database drop --help` each printed their help text (Usage lines), with exit=0.
+- COMPOSE_FILE and COMPOSE_PROJECT_NAME were unset.
+- No compose file exists in the scratch dir or in any parent.
+
+## P1.1
+
+Tool call: Write file_path=`obj\LIVEPROBE-1-1.txt`
+
+Tool result:
+```
+<error>PreToolUse:Write hook error: [node "$CLAUDE_PROJECT_DIR/.claude/hooks/path-guard.js" || exit 2]: Blocked by path-guard: protected segment "obj" (build output, IDE state and VCS internals are off-limits) -> C:\projects\envanex\obj\LIVEPROBE-1-1.txt
+</error>
+```
+
+grep 'LIVEPROBE-1-1' TestResults/hook-log/hooks.jsonl:
+```
+{"ts":"2026-09-25T21:38:03.899Z","hook":"path-guard","decision":"block","reason":"protected segment \"obj\" (build output, IDE state and VCS internals are off-limits)","tool_name":"Write","target":"C:\\projects\\envanex\\obj\\LIVEPROBE-1-1.txt","session_id":"ce3ad68b-44c2-4948-b6f4-d0a7bf8f6bda","project_dir_raw":"C:/projects/envanex"}
+```
+
+## P1.2
+
+Tool call: Write file_path=`obj/LIVEPROBE-1-2.txt`
+
+Tool result:
+```
+<error>PreToolUse:Write hook error: [node "$CLAUDE_PROJECT_DIR/.claude/hooks/path-guard.js" || exit 2]: Blocked by path-guard: protected segment "obj" (build output, IDE state and VCS internals are off-limits) -> C:\projects\envanex\obj\LIVEPROBE-1-2.txt
+</error>
+```
+
+grep 'LIVEPROBE-1-2' TestResults/hook-log/hooks.jsonl:
+```
+{"ts":"2026-09-25T21:38:15.188Z","hook":"path-guard","decision":"block","reason":"protected segment \"obj\" (build output, IDE state and VCS internals are off-limits)","tool_name":"Write","target":"C:\\projects\\envanex\\obj\\LIVEPROBE-1-2.txt","session_id":"ce3ad68b-44c2-4948-b6f4-d0a7bf8f6bda","project_dir_raw":"C:/projects/envanex"}
+```
+
+## P1.3
+
+Tool call: Write file_path=`C:\projects\envanex\src\Envanex.Web\bin\LIVEPROBE-1-3.txt`
+
+Tool result:
+```
+<error>PreToolUse:Write hook error: [node "$CLAUDE_PROJECT_DIR/.claude/hooks/path-guard.js" || exit 2]: Blocked by path-guard: protected segment "bin" (build output, IDE state and VCS internals are off-limits) -> C:\projects\envanex\src\Envanex.Web\bin\LIVEPROBE-1-3.txt
+</error>
+```
+
+grep 'LIVEPROBE-1-3' TestResults/hook-log/hooks.jsonl:
+```
+{"ts":"2026-09-25T21:38:26.884Z","hook":"path-guard","decision":"block","reason":"protected segment \"bin\" (build output, IDE state and VCS internals are off-limits)","tool_name":"Write","target":"C:\\projects\\envanex\\src\\Envanex.Web\\bin\\LIVEPROBE-1-3.txt","session_id":"ce3ad68b-44c2-4948-b6f4-d0a7bf8f6bda","project_dir_raw":"C:/projects/envanex"}
+```
+
+## P1.4
+
+Tool call: Write file_path=`.env.local`
+
+Tool result:
+```
+<error>PreToolUse:Write hook error: [node "$CLAUDE_PROJECT_DIR/.claude/hooks/path-guard.js" || exit 2]: Blocked by path-guard: protected file name (secret and local configuration files are off-limits) -> C:\projects\envanex\.env.local
+</error>
+```
+
+Target has no tag. Newest path-guard line whose target ends in .env.local:
+grep 'path-guard' TestResults/hook-log/hooks.jsonl | grep '\.env\.local"' | tail -1:
+```
+{"ts":"2026-09-25T21:38:56.554Z","hook":"path-guard","decision":"block","reason":"protected file name (secret and local configuration files are off-limits)","tool_name":"Write","target":"C:\\projects\\envanex\\.env.local","session_id":"ce3ad68b-44c2-4948-b6f4-d0a7bf8f6bda","project_dir_raw":"C:/projects/envanex"}
+```
+
+## P1.5
+
+Tool call 1: Edit `C:\projects\envanex\.env.example`, old_string=`MSSQL_SA_PASSWORD=\n`, new_string=`MSSQL_SA_PASSWORD=\n# LIVEPROBE-1-5\n`
+
+Tool result 1:
+```
+The file C:\projects\envanex\.env.example has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+
+Tool call 2 (inverse): Edit `C:\projects\envanex\.env.example`, old_string=`MSSQL_SA_PASSWORD=\n# LIVEPROBE-1-5\n`, new_string=`MSSQL_SA_PASSWORD=\n`
+
+Tool result 2:
+```
+The file C:\projects\envanex\.env.example has been updated successfully. (file state is current in your context — no need to Read it back)
+```
+
+`git diff --exit-code -- .env.example; echo "exit=$?"`:
+```
+exit=0
+```
+
+grep 'LIVEPROBE-1-5' TestResults/hook-log/hooks.jsonl:
+```
+(no output)
+```
+
+**Evidence limitation:** `grep 'LIVEPROBE-1-5'` returns nothing. The tag was in the Edit content, but the log records only the target path (`.env.example`). The functional PASS rests on the two Edit tool results and `exit=0` from `git diff --exit-code`. The two untagged path-guard `allow` lines below (this session's session_id) are supporting evidence only. The path-guard lines for the two Edits (grep 'path-guard' TestResults/hook-log/hooks.jsonl | grep '\.env\.example"' | tail -2):
+```
+{"ts":"2026-09-25T21:39:09.899Z","hook":"path-guard","decision":"allow","reason":"","tool_name":"Edit","target":"C:\\projects\\envanex\\.env.example","session_id":"ce3ad68b-44c2-4948-b6f4-d0a7bf8f6bda","project_dir_raw":"C:/projects/envanex"}
+{"ts":"2026-09-25T21:39:15.168Z","hook":"path-guard","decision":"allow","reason":"","tool_name":"Edit","target":"C:\\projects\\envanex\\.env.example","session_id":"ce3ad68b-44c2-4948-b6f4-d0a7bf8f6bda","project_dir_raw":"C:/projects/envanex"}
+```
+
+## P1.6
+
+Tool call: Write file_path=`TestResults/LIVEPROBE-1-6.txt`
+
+Tool result:
+```
+File created successfully at: TestResults/LIVEPROBE-1-6.txt (file state is current in your context — no need to Read it back)
+```
+
+Delete: `rm TestResults/LIVEPROBE-1-6.txt; echo "rm exit=$?"; ls TestResults/LIVEPROBE-1-6.txt 2>&1`
+```
+Exit code 2
+rm exit=0
+ls: cannot access 'TestResults/LIVEPROBE-1-6.txt': No such file or directory
+```
+
+grep 'LIVEPROBE-1-6' TestResults/hook-log/hooks.jsonl:
+```
+{"ts":"2026-09-25T21:39:43.805Z","hook":"path-guard","decision":"allow","reason":"","tool_name":"Write","target":"C:\\projects\\envanex\\TestResults\\LIVEPROBE-1-6.txt","session_id":"ce3ad68b-44c2-4948-b6f4-d0a7bf8f6bda","project_dir_raw":"C:/projects/envanex"}
+```
+
+## C1.3
+
+Command: `echo "${CLAUDE_CODE_EFFORT_LEVEL-unset}"; grep -n maxEffortLevel .claude/settings.json .claude/settings.local.json /c/Users/jesus/.claude/settings.json; echo "grep exit=$?"`
+```
+unset
+grep exit=1
+```
+
+Command: `wc -l /c/Users/jesus/.claude/settings.json; grep -n -A4 "modelSettings\|effortLevel" /c/Users/jesus/.claude/settings.json`
+```
+62 /c/Users/jesus/.claude/settings.json
+57:  "modelSettings": {
+58-    "claude-opus-5-5": {
+59:      "effortLevel": "medium"
+60-    }
+61-  }
+62-}
+```
+
+Note: the plan cites lines 62-66. The block is now at lines 57-61 (the file is 62 lines long). The line shift is consistent with H1.1 removing allow entries from this file. The content matches: modelSettings.claude-opus-5-5.effortLevel = "medium". P2.1 confirms the frontmatter override.
+
+## C1.6
+
+project_dir_raw from the P1.1 log line (grep LIVEPROBE-1-1 TestResults/hook-log/hooks.jsonl | grep -o "\"project_dir_raw\":\"[^\"]*\""):
+```
+"project_dir_raw":"C:/projects/envanex"
+```
+Form: `C:/…` (drive letter plus forward slashes).
+
+## C1.1
+
+Human report: the prompt footer shows "auto mode on" during the Phase 1 probes. P1.7 and P1.8 (deny probes) run in auto mode.
+
+## P1.7
+
+Mode: auto mode on (C1.1). Each command below was its own Bash tool call, run exactly as written.
+
+Tool call: Bash `git stash list`
+```
+<error>Permission to use Bash with command git stash list has been denied.</error>
+```
+
+Tool call: Bash `git stash`
+```
+<error>Permission to use Bash with command git stash has been denied.</error>
+```
+
+Tool call: Bash `git clean -n`
+```
+<error>Permission to use Bash with command git clean -n has been denied.</error>
+```
+
+Tool call: Bash `git reset --hard -h`
+```
+<error>Permission to use Bash with command git reset --hard -h has been denied.</error>
+```
+
+Tool call: Bash `git checkout -- CLAUDE.md`
+```
+<error>Permission to use Bash with command git checkout -- CLAUDE.md has been denied.</error>
+```
+
+Tool call: Bash `git restore CLAUDE.md`
+```
+<error>Permission to use Bash with command git restore CLAUDE.md has been denied.</error>
+```
+
+Tool call: Bash `git rebase -h`
+```
+<error>Permission to use Bash with command git rebase -h has been denied.</error>
+```
+
+Tool call: Bash `git push --force --dry-run`
+```
+<error>Permission to use Bash with command git push --force --dry-run has been denied.</error>
+```
+
+Tool call: Bash `git push -f --dry-run`
+```
+<error>Permission to use Bash with command git push -f --dry-run has been denied.</error>
+```
+
+Tool call: Bash `git push origin HEAD --force --dry-run`
+```
+<error>Permission to use Bash with command git push origin HEAD --force --dry-run has been denied.</error>
+```
+
+Tool call: Bash `cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && docker compose down -v --help`
+```
+<error>Permission to use Bash with command cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && docker compose down -v --help has been denied.</error>
+```
+
+Tool call: Bash `cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && docker compose down --volumes --help`
+```
+<error>Permission to use Bash with command cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && docker compose down --volumes --help has been denied.</error>
+```
+
+Tool call: Bash `cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && dotnet ef database drop --help`
+```
+<error>Permission to use Bash with command cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && dotnet ef database drop --help has been denied.</error>
+```
+
+Tool call: Bash `git status && git stash list`
+```
+<error>Permission to use Bash with command git status && git stash list has been denied.</error>
+```
+
+Evidence (2), human's note: "No permission prompts appeared during P1.7 or P1.8."
+
+grep 'LIVEPROBE-1-7' TestResults/hook-log/hooks.jsonl:
+```
+(no output)
+```
+Note: the plan's P1.7 commands carry no LIVEPROBE tag, and a deny rule stops the call before any PreToolUse hook runs, so no hook line is expected.
+
+### P1.7-ctl
+
+Tool call: Bash `git status --short`
+```
+(Bash completed with no output)
+```
+
+## P1.8
+
+Mode: auto mode on (C1.1). Each command was its own PowerShell tool call.
+
+Tool call: PowerShell `git stash list`
+```
+<error>Permission to use PowerShell with command git stash list has been denied.</error>
+```
+
+Tool call: PowerShell `git clean -n`
+```
+<error>Permission to use PowerShell with command git clean -n has been denied.</error>
+```
+
+Evidence (2), human's note: "No permission prompts appeared during P1.7 or P1.8."
+
+grep 'LIVEPROBE-1-8' TestResults/hook-log/hooks.jsonl:
+```
+(no output)
+```
+
+## P1.10
+
+Run before P1.9, which waits on a mode switch. The order has no effect on this shell-level check.
+
+Tool call: Bash `CLAUDE_PROJECT_DIR=/c/projects/envanex bash -c 'node "$CLAUDE_PROJECT_DIR/.claude/hooks/missing.js" || exit 2'; echo "exit=$?"`
+```
+node:internal/modules/cjs/loader:1459
+  throw err;
+  ^
+
+Error: Cannot find module 'C:\projects\envanex\.claude\hooks\missing.js'
+    at Module._resolveFilename (node:internal/modules/cjs/loader:1456:15)
+    at defaultResolveImpl (node:internal/modules/cjs/loader:1066:19)
+    at resolveForCJSWithHooks (node:internal/modules/cjs/loader:1071:22)
+    at Module._load (node:internal/modules/cjs/loader:1242:25)
+    at wrapModuleLoad (node:internal/modules/cjs/loader:255:19)
+    at Module.executeUserEntryPoint [as runMain] (node:internal/modules/run_main:154:5)
+    at node:internal/main/run_main_module:33:47 {
+  code: 'MODULE_NOT_FOUND',
+  requireStack: []
+}
+
+Node.js v24.14.1
+exit=2
+```
+
+grep 'LIVEPROBE-1-10' TestResults/hook-log/hooks.jsonl:
+```
+(no output)
+```
+Note: the plan's P1.10 command carries no tag and runs no hook, so no log line is expected.
+
+## P1.9
+
+Mode: human report: Shift+Tab offers "manual mode on", "accept edits on", "plan mode on" and "auto mode on"; there is no option labelled "default". The footer shows "manual mode on", which is the mode that prompts for permission. P1.9 runs in it.
+
+Each command below was its own Bash tool call, run exactly as written.
+
+Tool call: Bash `git status --short`
+```
+(Bash completed with no output)
+```
+
+Tool call: Bash `git log --oneline -1`
+```
+ac397c9 chore(agents): extract the path-guard hook and tighten permission rules
+```
+
+Tool call: Bash `docker compose ps`
+```
+NAME      IMAGE     COMMAND   SERVICE   CREATED   STATUS    PORTS
+```
+
+Tool call: Bash `node --test .claude/hooks/tests/path-guard.test.js`
+```
+✔ blocks a backslash obj path (128.0476ms)
+✔ blocks a forward-slash obj path (88.8815ms)
+✔ blocks a nested bin path (83.205ms)
+✔ blocks a git-bash style path (88.914ms)
+✔ blocks with a git-bash-style CLAUDE_PROJECT_DIR (81.1749ms)
+✔ blocks an uppercase OBJ segment (105.1225ms)
+✔ blocks .git, .vs, .idea and packages segments (304.1012ms)
+✔ blocks .env (77.1041ms)
+✔ blocks .env.local (73.3094ms)
+✔ blocks .env.example.bak (76.4501ms)
+✔ blocks settings.local.json (79.3707ms)
+✔ blocks appsettings.Development.Local.json (77.4952ms)
+✔ blocks .user (80.8933ms)
+✔ blocks .pfx (79.7035ms)
+✔ blocks .snk (78.3924ms)
+✔ blocks secrets.json (84.4333ms)
+✔ blocks on malformed JSON (75.2152ms)
+✔ blocks on an empty file path (77.5493ms)
+✔ blocks when no project dir can be determined (91.4818ms)
+✔ block writes the reason to stderr before exiting (90.3358ms)
+✔ redacts the block message on stderr (79.8882ms)
+✔ allows .env.example (158.915ms)
+✔ allows src\Envanex.Web\Program.cs (93.3692ms)
+✔ allows a segment that only contains obj (176.0138ms)
+✔ allows .github/workflows/ci.yml (74.3889ms)
+✔ allows .gitignore (74.8038ms)
+✔ allows .gitattributes (79.3486ms)
+✔ allows thoughts/shared/plans/x.md (75.8457ms)
+✔ writes one hook-log line per decision (93.3427ms)
+ℹ tests 29
+ℹ suites 0
+ℹ pass 29
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3001.8884
+```
+
+Human note: "The four P1.9 commands—git status --short, git log --oneline -1, docker compose ps, and node --test .claude/hooks/tests/path-guard.test.js—all ran without permission prompts. The prompts I approved were for writing evidence and recording cleanup."
+
+Tool call: Bash `git commit --dry-run -m LIVEPROBE-1-9`
+```
+<error>The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.</error>
+```
+Human note: "I selected \"No\" for the git commit --dry-run -m LIVEPROBE-1-9 permission prompt, and the turn stopped with \"Interrupted\"."
+
+Tool call: Bash `docker compose down --help`
+```
+<error>The user doesn't want to proceed with this tool use. The tool use was rejected (eg. if it was a file edit, the new_string was NOT written to the file). STOP what you are doing and wait for the user to tell you how to proceed.</error>
+```
+Human note: "The permission prompt for docker compose down --help appeared, and I selected \"No\". ... Both P1.9 permission prompts appeared, and I declined both."
+
+The git commit prompt appeared, so the user-level settings do not allow it (consistent with H1.1).
+
+grep 'LIVEPROBE-1-9' TestResults/hook-log/hooks.jsonl:
+```
+(no output)
+```
+
+## Cleanup
+
+No probe file survived: the P1.1-P1.4 writes were blocked, P1.5 was reverted, and the P1.6 file was deleted.
+```
+$ git status --short
+$ ls obj/LIVEPROBE-*
+ls: cannot access 'obj/LIVEPROBE-*': No such file or directory
+$ ls TestResults/LIVEPROBE-* src/Envanex.Web/bin/LIVEPROBE-* .env.local
+ls: cannot access 'TestResults/LIVEPROBE-*': No such file or directory
+ls: cannot access 'src/Envanex.Web/bin/LIVEPROBE-*': No such file or directory
+ls: cannot access '.env.local': No such file or directory
+```
+
+## Summary
+
+| Probe | Outcome |
+|---|---|
+| P1.1 | PASS |
+| P1.2 | PASS |
+| P1.3 | PASS |
+| P1.4 | PASS |
+| P1.5 | PASS (functional); evidence limitation: no LIVEPROBE-1-5 log line, untagged allow lines kept as support |
+| P1.6 | PASS |
+| P1.7 (+ P1.7-ctl) | PASS |
+| P1.8 | PASS |
+| P1.9 | PASS |
+| P1.10 | PASS |
+
+PASS: 10  FAIL: 0  INCONCLUSIVE: 0
+
+Named checks: C1.1 = auto mode (P1.7/P1.8), manual mode (P1.9; no mode labelled "default"). C1.3 = unset; no maxEffortLevel; effortLevel "medium" at user settings lines 57-61 (plan cites 62-66). C1.6 = `C:/…`.
+
+### Mutation proofs (against ac397c9, then 726338a)
+
+| ID | Mutation | Observed |
+|---|---|---|
+| M1.1 | drop `\` → `/` in `toSlashForm`, which the target and the project dir share | First run: 14 red, but `blocks a backslash obj path` and `blocks a nested bin path` stayed green, passing on the guard error with status 2. The block tests now assert their reason (726338a). Rerun: 31 red, every spawned test failing closed on "project dir is not absolute", so this mutation cannot separate the target's normalization from the project dir's. |
+| M1.1' | skip `toSlashForm` for the target only | 12 of 57 tests failed, not 3. All 3 expected tests went red on their own assertions. The two block tests failed because the hook allowed the write (exit 0, empty stderr), not on a guard error. No failure contains "project dir is not absolute" (grep count 0), so `normalizeProjectDir` still worked. 9 more tests went red: M1.1' is wider than planned because skipping `toSlashForm` in `normalizePath` removes both of its steps, not just one: the `/c/` → `c:/` drive mapping, and the `\` → `/` replacement. The 9 extra reds are `normalizePath maps /c/ to c:/`, `maps an uppercase /C/ drive`, `joins a relative path to the project dir`, `collapses . and .. segments`, `lowercases and strips a trailing slash`, `blocks with a git-bash-style CLAUDE_PROJECT_DIR`, `blocks an uppercase OBJ segment`, `blocks .git, .vs, .idea and packages segments` and `blocks secrets.json`. To isolate backslash handling for the target alone, the mutation would have to drop only the `.replace(/\/g, '/')` step in `normalizePath` and keep the drive mapping. That would be a new plan decision, so I did not run it. |
+| M1.2 | remove the `.env.example` exception | red: `allows .env.example` |
+| M1.3 | `process.exit(0)` before `block` in `runGuard`'s catch | red: `blocks on malformed JSON`, `blocks on an empty file path`, `blocks when no project dir can be determined` |
+| M1.4 | remove `.toLowerCase()` in `collapseAbsolute` | red: `blocks an uppercase OBJ segment`, and seven normalization tests |
+| M1.5 | remove both `redactSecrets` calls in `logDecision` | red: all 12 redaction tests |
+| M1.6 | remove `redactSecrets` around `block`'s stderr | red: `redacts the block message on stderr` |
+| M1.7 | ignore `ENVANEX_HOOK_LOG_DIR` | red: `does not write to the project hook log when the override is set`, and 14 tests that read the temp log. The mutated run wrote 45 lines to the real hook log; none carries LIVEPROBE or a secret. |
+| M1.8 | rule 1's value without the quoted alternatives | red: `redacts a quoted MSSQL_SA_PASSWORD assignment`, `redacts a double-quoted SA_PASSWORD assignment`, `redacts before truncating to 300 characters` |
+| M1.9 | remove rule 2 (`sqlcmd -P`) | red: `redacts the sqlcmd -P value` |
+
+Every red is the test's own assertion, and every restore left `git diff --exit-code` at 0.
+
+Other facts from Phase 1:
+- Gates at ac397c9: 57 hook tests and 638 .NET tests green. The integration suite took 61 s, one more sample over ADR 0007's 60 s line.
+- C1.4: every new file is `i/lf` in the index.
+- H1.1: the user-level settings hold no `git add` or `git commit` allow. The local settings hold no `git:*`, no `node:*` and no `Password=` entry, and the current `.env` password does not appear in them.
+- Lesson: a block test that asserts only the exit status passes on any fail-closed error. Every block test now asserts its reason too.
+
 ## Phase 2: agents — tiers, tools, per-role hooks, write contracts, LSP and Learn (F3, F9, F1, F4, F11, F10, F14, F7 checklist, F8 agent trims)
 
 ### Human steps (before the coder turn)
