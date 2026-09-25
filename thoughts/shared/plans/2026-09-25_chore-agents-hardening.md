@@ -123,7 +123,7 @@ Everything the two reviews did not question is unchanged.
 - **L. Dotnet allowlist details.**
   - One shared token list serves all three entries. A flag that doesn't apply to a command makes that command fail harmlessly.
   - The `-v`/`--verbosity` values are listed explicitly.
-  - The `--filter` argument must not start with `-`.
+  - The `--filter` argument must not start with `-` or `/`.
   - Added block tests: `-o`, `-bl`, `--no-build`, `--filter -p:…` and a `..` project path.
   - P2.5 gains a tester item, `5f`.
   - C2.6 runs the review's echo command, plus a file side effect, so the result doesn't depend on log verbosity.
@@ -134,6 +134,17 @@ Everything the two reviews did not question is unchanged.
 - **N. Extra mutation proofs M1.8 and M1.9** for the new redaction branches, following Revision 1's addition F. M2.8 is required by change 9.
 - **O. `allows the Phase 1 base-check command line`.** This tests finding 2's exact command string, alongside the required test.
 - **P. The general pipeline rule.** The rule from required change 1 also goes into `CLAUDE.md` Orchestration: the human commits each review file before the tester runs. Without it, every future feature phase would hit finding 1: a dirty `status` section, so NEEDS_FIXES.
+
+## Revision 3
+
+These seven edits are the r3 recipe from the plan-reviewer's focused review of Revision 2. As the human decided, they are applied without a further review round.
+1. `gate.sh` `run_step`: a newline is appended only to non-empty output that lacks one, so an empty section is the `$ <command>` line immediately followed by the `exit=` line.
+2. `/pr` precondition 3: the line after `$ git status --short` must be exactly `exit=0 step=status kind=info`.
+3. Tester steps: the `status` section is not empty when the line after `$ git status --short` is not `exit=0 step=status kind=info`.
+4. P3.1: a new bullet checks, with `grep -A1`, that the line after `$ git status --short` in `gates.txt` is exactly `exit=0 step=status kind=info`.
+5. `redactSecrets`: every rule replaces every occurrence (global flag).
+6. Phase 1 redaction tests: a new test, `redacts every Password occurrence`.
+7. `--filter`: its argument may start with neither `-` nor `/`. This applies in the dotnet token list and in Revision 2's note L, and the single `--filter -p:…` block test becomes two tests, for `-p:` and `/p:`.
 
 ---
 
@@ -296,7 +307,7 @@ C2.6 steps: the human runs these in an external Git Bash, outside the repo and o
   6. Strip a trailing `/` unless the result is a bare root.
 - `getTargetPath(input: object): string` — the target extractor for file-tool hooks: `tool_input.file_path ?? tool_input.path ?? tool_input.notebook_path`. Throws if empty. It never reads `tool_input.command`, so a path hook attached to a Bash matcher by mistake fails closed.
 - `getCommand(input: object): string` — the target extractor for Bash-matcher hooks: `tool_input.command`. Throws if it is missing, not a string, or empty.
-- `redactSecrets(s: string): string` — applies these rules in order and replaces each secret value with `***`. Every rule is case-insensitive unless stated otherwise:
+- `redactSecrets(s: string): string` — applies these rules in order and replaces each secret value with `***`. Every rule replaces every occurrence (global flag). Every rule is case-insensitive unless stated otherwise:
   1. **Password assignments:** `(password|pwd)(\s*=\s*)(?:'[^']*'|"[^"]*"|[^;'"\s]+)` becomes `$1$2***`. It keeps the key and redacts a quoted or unquoted value. This covers connection strings, `export MSSQL_SA_PASSWORD='…'` and `SA_PASSWORD="…"` (`.env.example:21`, `docker-compose.yml:8`).
   2. **sqlcmd `-P`:** applies only when the string contains `sqlcmd`. `(\s-P\s*)(?:'[^']*'|"[^"]*"|\S+)` becomes `$1***`. The `-P` is matched **case-sensitively**, because sqlcmd's `-p` is a different option. This covers `docker-compose.yml:16`'s form `sqlcmd … -P "<pw>"`.
   3. **user-secrets:** applies only when the string contains `user-secrets`. Everything after the first whitespace-delimited `set` token that follows `user-secrets` is replaced with ` ***`, up to the next `&&`, `;`, `|`, newline or end of string. Losing the key from the log is harmless. Options before or after `set`, and every value form, are all covered. A quoted value that itself contains `;`, `|` or `&&` is redacted only up to that character (residual risk, Phase 4).
@@ -396,6 +407,7 @@ No test file contains the string `LIVEPROBE` (C1.7). Test targets use `guard-tes
   - `getTargetPath throws on a Bash-shaped input` — the same input as the first case; the call throws
 - **redaction:**
   - `redacts Password in a connection string` — `logDecision` with target `export ENVANEX_CONNECTION_STRING='Server=x;Password=S3cretValue1;TrustServerCertificate=True'`. The log line lacks `S3cretValue1` and contains `Password=***`.
+  - `redacts every Password occurrence` — the target is `a Password=S3cretValue10; b Password=S3cretValue11`, and the log line contains neither value.
   - `redacts a quoted MSSQL_SA_PASSWORD assignment` — target `export MSSQL_SA_PASSWORD='S3cretValue4'`. The log line lacks `S3cretValue4` and contains `MSSQL_SA_PASSWORD=***`.
   - `redacts a double-quoted SA_PASSWORD assignment` — target `SA_PASSWORD="S3cretValue8" docker compose up -d`. The log line lacks `S3cretValue8` and still contains `docker compose up -d`.
   - `redacts the sqlcmd -P value` — target `docker exec envanex-sql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "S3cretValue7" -C -Q "SELECT 1"`. The log line lacks `S3cretValue7` and still contains `-U sa`.
@@ -602,7 +614,7 @@ Each hook logs under a name that carries its argument, so a mis-attached hook is
 - **Dotnet entries (fixed-token):** the leading tokens are `dotnet build`, `dotnet test` or `dotnet format --verify-no-changes`. Every further token in that segment must be one of:
   - `-warnaserror`
   - `--no-restore`
-  - `--filter`, followed by exactly one argument token that does not start with `-`
+  - `--filter`, followed by exactly one argument token that does not start with `-` or `/`
   - `-v` or `--verbosity`, followed by exactly one of `q`, `quiet`, `m`, `minimal`, `n`, `normal`, `d`, `detailed`, `diag`, `diagnostic`
   - a project path matching `^(src|tests)/[A-Za-z0-9_./-]+$` with no `..` segment
   - `2>&1`
@@ -772,7 +784,8 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
     - `blocks dotnet build -o src/x`
     - `blocks dotnet build -bl`
     - `blocks dotnet test --no-build`
-    - `blocks dotnet test --filter -p:PreBuildEvent=x` (the filter argument may not start with `-`)
+    - blocks `dotnet test --filter -p:PreBuildEvent=x`
+    - blocks `dotnet test --filter /p:PreBuildEvent=x`
     - `blocks dotnet build src/../../x.csproj` (`..` in a project path)
 - **explainer profile:** allows `git diff main...HEAD --stat`, `git log --oneline`, `dotnet list package`; blocks `dotnet build`, `echo x > docs/journal/x.md`, `git add .`.
 - **General:** `blocks an unknown profile`, `blocks a missing profile`, `blocks on malformed JSON`.
@@ -927,7 +940,7 @@ From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 
       - appends `$ <command>` to `gates.txt`
       - evaluates the command string with `eval` in the script's own shell, so it can call the script's functions
       - appends the command's full stdout and stderr
-      - if that output does not end with a newline, appends one, so the next line always starts at column 0
+      - if that output is non-empty and does not end with a newline, appends one. Empty output appends nothing, so an empty section is the `$ <command>` line immediately followed by the `exit=` line.
       - appends one line `exit=<n> step=<name> kind=<required|info>`
     - `tools_check` — for each name in `git node dotnet sha256sum`, runs `command -v "<name>"` on its own. It prints the path for each name it finds and `missing: <name>` for each it doesn't, and returns 1 if any name is missing, else 0. Because each name is checked separately, it doesn't matter how `command -v a b c` treats a partial miss.
     - `base_check` — prints the two merge-bases. It returns 1 with a reason line when `origin/main` is missing, when either `git merge-base` fails, or when `git merge-base main HEAD` ≠ `git merge-base origin/main HEAD`. Otherwise it returns 0.
@@ -1010,7 +1023,7 @@ From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 
     2. The working tree is clean (`git status --short` is empty).
     3. `TestResults/<slug>/gates.txt` meets three conditions:
        - its header `head=` equals `git rev-parse HEAD`
-       - its `status` section is empty: no line between the `$ git status --short` line and the `exit=0 step=status kind=info` line
+       - its `status` section is empty: no line between the `$ git status --short` line and the `exit=0 step=status kind=info` line, meaning the line after `$ git status --short` is exactly `exit=0 step=status kind=info`
        - its last line is `gate-exit=0 failed=`
     4. `TestResults/<slug>/tester-verdict.md` has `Verdict: READY_TO_PUSH`, and its `Head:` **equals** `git rev-parse HEAD`. An in-session verdict alone no longer suffices.
     5. **Branch code review:** a review file of this branch with `Reviewer: code-reviewer` and `Verdict: APPROVED`, satisfying rule R, that either:
@@ -1049,7 +1062,7 @@ From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 
   - Steps become:
     - run `bash .claude/skills/gate/scripts/gate.sh` and paste its stdout verbatim
     - take the file list from the `files` section of `gates.txt` (`git diff --name-only main...HEAD`), ignoring any list typed in the prompt (F13)
-    - return **NEEDS_FIXES** when the `status` section of `gates.txt` is not empty, or when `gate-exit` is not 0
+    - return **NEEDS_FIXES** when the `status` section of `gates.txt` is not empty (the line after `$ git status --short` is not `exit=0 step=status kind=info`), or when `gate-exit` is not 0
     - grep for the plan's named tests and confirm they assert something
     - write `tester-verdict.md` with `Verdict:`, `Head:`, `Branch:` and `Gates-sha256: <the sha256 gate.sh printed>`
 
@@ -1067,6 +1080,7 @@ None automated. Each script run takes minutes (a full `dotnet test`), so the scr
   - The last line is `gate-exit=0 failed=`.
   - The header carries `main=`, `origin_main=`, `base_main=` and `base_origin=`, with the two bases equal.
   - The total printed is 638.
+  - In gates.txt, the line after `$ git status --short` is exactly `exit=0 step=status kind=info`: `grep -A1 -x '\$ git status --short' TestResults/chore-agents-hardening/gates.txt` shows those two lines and nothing else.
 - **P3.2 (`/gate` catches a failure through `final_status`):**
   - Edit `.claude/hooks/tests/path-guard.test.js` so one assertion expects 0 instead of 2.
   - Run `bash .claude/skills/gate/scripts/gate.sh; echo "gate=$?"`.
