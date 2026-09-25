@@ -1,6 +1,6 @@
 # Plan: chore(agents) — enforce the pipeline's rules and tier models by risk
 
-Date: 2026-09-25. Branch: `chore/agents-hardening`. Research: `thoughts/shared/research/2026-09-24_agent-workflow-hardening.md` (F1-F21). Roadmap: the `chore(agents)` row and the two Known gaps rows at `docs/roadmap.md:197-198`. Carried-forward notes: `thoughts/shared/plans/2026-09-24_fix-db-compose-sa-password.md:47,74-76,85`. Review: `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review.md` (NEEDS_REVISION).
+Date: 2026-09-25. Branch: `chore/agents-hardening`. Research: `thoughts/shared/research/2026-09-24_agent-workflow-hardening.md` (F1-F21). Roadmap: the `chore(agents)` row and the two Known gaps rows at `docs/roadmap.md:197-198`. Carried-forward notes: `thoughts/shared/plans/2026-09-24_fix-db-compose-sa-password.md:47,74-76,85`. Reviews: `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review.md` (NEEDS_REVISION) and `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review-r2.md` (NEEDS_REVISION, on Revision 1).
 
 ## Revision 1
 
@@ -71,6 +71,70 @@ H1.1 deletes the `settings.local.json` allow entry that holds an SA password lit
   - The git match is case-insensitive, because `GIT` runs on Windows.
   - There are extra mutation proofs (M1.5-M1.7, M2.6, M2.7) for the new branches, so that each new branch has a test that goes red.
 
+## Revision 2
+
+This revision applies the re-review (`thoughts/shared/reviews/2026-09-25_chore-agents-plan-review-r2.md`). The human accepted the following, as written:
+- the rulings on deviations A-F, including the conditions attached to A, B, C, D and E
+- required changes 1-11, with these choices:
+  - change 2: add `merge-base` to coder-bash-guard's read allowlist, with the test `allows git merge-base main HEAD`
+  - change 9: the fixed-token allowlist for `dotnet build`, `dotnet test` and `dotnet format`, with its tests and its mutation proof; PreBuildEvent is marked UNVERIFIED, with its settling command
+  - change 11: both minor fixes
+
+Everything the two reviews did not question is unchanged.
+
+### Required changes
+
+| # | Required change | Plan section that now carries it |
+|---|---|---|
+| 1 | Commit the review file between code-reviewer and tester; the tester's `Head:` is that commit | Probe protocol step 1 (sub-steps 9-11 and the paragraph below them); Phase 4 `CLAUDE.md` Orchestration (addition P) |
+| 2 | `merge-base` in coder-bash-guard's read allowlist | Phase 2 Signatures (coder-bash-guard step 4); Phase 2 Tests (`allows git merge-base main HEAD`, plus `allows the Phase 1 base-check command line`); Phase 2 Validation |
+| 3 | `redactSecrets`: quoted values, sqlcmd `-P`, simpler user-secrets rule | Phase 1 Signatures (`redactSecrets` rules 1-4); Phase 1 Tests (`redacts a quoted MSSQL_SA_PASSWORD assignment`, `redacts the sqlcmd -P value`, `redacts user-secrets set with a --verbose flag before the key`, and additions); M1.8, M1.9; Phase 4 Residual risks (a value containing `;`) |
+| 4 | Target source for Bash hooks | Phase 1 Signatures (`getCommand`, and the `extractTarget` parameter of `runGuard`); Phase 1 Tests (`getCommand returns tool_input.command for a Bash-shaped input` and two more); Phase 2 Signatures (intro) and Tests (input shape) |
+| 5 | Precondition 7: no schema path after the newest db-review | Phase 3 `pr/SKILL.md` precondition 7 |
+| 6 | Precondition 3: the `status` section of `gates.txt` is empty | Phase 3 `pr/SKILL.md` precondition 3 |
+| 7 | Security-review file starts as `Verdict: PENDING`; only the human changes it | Phase 3 `pr/SKILL.md` precondition 6 and Rules; Phase 4 `CLAUDE.md` PR-end step 2; Phase 4 `docs/ai-workflow.md` "Verdict files" |
+| 8 | "verify all four" becomes seven; a `git` error in rule R fails the precondition | Phase 3 `pr/SKILL.md` (heading, Definitions: Head rule R, and the "git errors" rule) |
+| 9 | Fixed-token allowlist for the tester's dotnet entries; tests; mutation proof; PreBuildEvent UNVERIFIED | Phase 2 Signatures (tester profile, "dotnet entries"); Phase 2 Tests; M2.8; C2.6; P2.5 (item 5f) |
+| 10 | Residual risk: Windows path aliasing, UNVERIFIED | Phase 4 `docs/roadmap.md` residual-risks row and `docs/ai-workflow.md` Residual risks |
+| 11 | `tools-check` loops over the names; `final_status` regex anchored to the full line | Phase 3 `gate.sh` (`tools_check`, `run_step`, `final_status`) |
+
+### Rulings on the six deviations, and where their conditions now live
+
+- **A (reviewer `Head:`):** accepted. Condition: a `git diff` or `git merge-base` error, including an unknown SHA, fails the check. See required change 8 (Head rule R, step 1, and the "git errors" rule).
+- **B (db-review `Head:` as an ancestor):** accepted. Condition: no schema path may change after the newest db-review. See required change 5.
+- **C (`Gates-sha256:` recorded, not compared):** accepted. Condition: precondition 3 also checks the `status` section. See required change 6.
+- **D (tester verdict file required):** accepted. Condition: the heading "verify all four" becomes seven. See required change 8.
+- **E (the human sets the security `Verdict:`):** accepted. Clarification: the main session writes `Verdict: PENDING`. See required change 7.
+- **F (additions):** accepted; unchanged.
+
+### Interpretations and additions for the next review
+
+- **G. Target extractor.** Required change 4 allowed either `?? tool_input.command` in `getTargetPath` or a target extractor in `runGuard`. The plan uses the extractor. With it, a path hook attached to the Bash matcher by mistake fails closed, rather than treating a command string as a path. The test `getTargetPath throws on a Bash-shaped input` pins that down.
+- **H. Redaction details beyond the review.**
+  - The user-secrets rule starts at the first `set` token after `user-secrets`, not only directly after it. That also covers options placed before `set`, which finding 3(c) names.
+  - Added tests:
+    - `redacts user-secrets set when options precede set`
+    - `redacts user-secrets set only up to the next &&`
+    - `redacts a double-quoted SA_PASSWORD assignment`
+  - Because the user-secrets rule stops at `;`, `|` or `&&`, a quoted value containing one of those is only partly redacted. The rest of the value is covered only by the other rules. This is recorded as a residual risk.
+- **I. `-P` is case-sensitive.** In sqlcmd, `-p` is a different option.
+- **J. The precondition 7 trigger is aligned.** The trigger gains `src/Envanex.Infrastructure/Persistence/`, the same set of paths the post-review diff check uses. The "newest db-review Head" is defined as the Head that every other db-review Head is an ancestor of. If no single such Head exists, the precondition fails.
+- **K. Rule R verifies the SHA first:** `git rev-parse --verify --quiet "<Head>^{commit}"`.
+- **L. Dotnet allowlist details.**
+  - One shared token list serves all three entries. A flag that doesn't apply to a command makes that command fail harmlessly.
+  - The `-v`/`--verbosity` values are listed explicitly.
+  - The `--filter` argument must not start with `-`.
+  - Added block tests: `-o`, `-bl`, `--no-build`, `--filter -p:…` and a `..` project path.
+  - P2.5 gains a tester item, `5f`.
+  - C2.6 runs the review's echo command, plus a file side effect, so the result doesn't depend on log verbosity.
+- **M. `gate.sh` robustness, which follows from required change 11.**
+  - `run_step` evaluates its command with `eval`, so `tools_check` and `base_check` can be script functions.
+  - `run_step` guarantees a newline before its `exit=` line.
+  - `final_status` requires exactly one anchored `exit=` line for each required step; a missing or duplicated line counts as a failure. Without this, the anchored regex would miss an `exit=` line glued to step output that lacks a final newline, and the gate would pass.
+- **N. Extra mutation proofs M1.8 and M1.9** for the new redaction branches, following Revision 1's addition F. M2.8 is required by change 9.
+- **O. `allows the Phase 1 base-check command line`.** This tests finding 2's exact command string, alongside the required test.
+- **P. The general pipeline rule.** The rule from required change 1 also goes into `CLAUDE.md` Orchestration: the human commits each review file before the tester runs. Without it, every future feature phase would hit finding 1: a dirty `status` section, so NEEDS_FIXES.
+
 ---
 
 ## Goal
@@ -106,6 +170,7 @@ Every guard is proven by a probe with raw output. A probe is a mutation proof: i
 - Hook tests are not added to CI. They run locally and through `gate.sh`. This is recorded as a Known-gaps row (Phase 4). `normalizePath` is pure string logic, so a CI step on ubuntu can be added later without a rewrite.
 - The coder's per-phase max override (F3) is documented in `docs/ai-workflow.md`, not automated.
 - `gate.sh` never runs `git fetch`.
+- Windows path aliasing (a trailing `.` or space, NTFS stream suffixes) is not handled by `normalizePath`. It is recorded as a residual risk, marked UNVERIFIED (Phase 4).
 
 ## Touches schema? (yes/no — db-reviewer required if yes)
 
@@ -126,9 +191,11 @@ No (Q5): this is process, not product architecture. `docs/ai-workflow.md` takes 
    6. Cleanup, then `git status --short` is empty.
    7. The main session copies the evidence file into this plan under `## As built — Phase N`.
    8. The human commits that as a separate `docs(agents)` commit.
-   9. code-reviewer, then tester, both on that commit.
+   9. code-reviewer runs on the evidence commit. Its `Head:` is that commit.
+   10. **The human commits the review file, whatever its verdict.** This keeps the tree clean for the tester's `status` section and for the next phase's probes. In Phase 1 the reviewers still work under their old contract and write no file, so this step does nothing there.
+   11. The tester runs on the review-file commit. **The tester's `Head:` is that commit** (in Phase 1, the evidence commit). The code-review file's `Head:` still satisfies Head rule R, because the only paths changed since it are under `thoughts/shared/reviews/`.
 
-   A failing probe sends the phase back to the coder before any review. Every evidence and doc commit lands before the reviewers run and before the PR-end sequence. A commit made after the tester ran invalidates its verdict (Phase 3, `/pr`).
+   A failing probe sends the phase back to the coder before any review. A NEEDS_REVISION from code-reviewer does the same, after step 10. Every evidence and doc commit lands before the reviewers run and before the PR-end sequence. The only commit between code-reviewer and tester is the review-file commit from step 10. Any other commit after the tester ran invalidates its verdict (Phase 3, `/pr`).
 2. **Preconditions:** `git status --short` is empty, and `git rev-parse HEAD` is recorded.
    - Every probe command is chosen so that, if the guard fails, it does no harm on a clean tree: `-h`/`--help`, `--dry-run`, `-n`, and `git stash` on a clean tree.
    - The three probes whose `--help` behaviour is UNVERIFIED (C1.5) also run inside the empty scratch dir from H1.2.
@@ -160,6 +227,7 @@ No (Q5): this is process, not product architecture. `docs/ai-workflow.md` takes 
 | C2.3 | The hook log shows whether `agent_type`/`agent_id` appear in hook input for subagent calls. Record present or absent. | Phase 2 |
 | C2.4 | Order of deny rule and PreToolUse hook: on the coder's `git stash list --grep=LIVEPROBE-2e`, record whether a `coder-bash-guard` line with that target appears in the log. | Phase 2 |
 | C2.5 | `grep -n "model: haiku" .claude/agents/*.md` returns nothing, which makes F3's "Haiku ignores effort" moot. | Phase 2 |
+| C2.6 | Whether `dotnet build -p:PreBuildEvent=<cmd>` runs `<cmd>` (UNVERIFIED; the tester allowlist blocks `-p:` either way, so the result only records whether the risk was real). See the steps below this table. | Phase 2 |
 | C3.1 | `ls ~/.claude/skills` has no `commit`, `pr`, `gate`, `mutate` or `verify` (F5). | Phase 3 |
 | C3.2 | Whether a skill's `effort: low` can be observed while it runs. Record "observed at …" or "set, not observable". | Phase 3 |
 | C3.3 | `command -v sha256sum` prints a path in Git Bash. `gate.sh`'s `tools-check` step fails the gate otherwise. | Phase 3 |
@@ -173,6 +241,12 @@ C1.5 steps: the human runs these in an external Git Bash inside `SCRATCH=/c/User
    - `docker compose down -v --help; echo "exit=$?"`
    - `docker compose down --volumes --help; echo "exit=$?"`
    - `dotnet ef database drop --help; echo "exit=$?"`
+
+C2.6 steps: the human runs these in an external Git Bash, outside the repo and outside the H1.2 scratch dir.
+1. `D=/c/Users/jesus/AppData/Local/Temp/envanex-prebuild-check && dotnet new console -o "$D" && cd "$D"`
+2. The review's settling command: `dotnet build -p:PreBuildEvent="echo PWNED" 2>&1 | grep -n PWNED`. Record the raw output.
+3. A file side effect, so the result doesn't depend on log verbosity: `dotnet build -p:PreBuildEvent="echo PWNED > pwned.txt"; test -f pwned.txt; echo "prebuild-exec=$?"`. `prebuild-exec=0` means the command ran.
+4. `cd / && rm -r "$D"`. Record "exec: yes" or "exec: no" under As built.
 
 ---
 
@@ -193,10 +267,10 @@ C1.5 steps: the human runs these in an external Git Bash inside `SCRATCH=/c/User
 
 ### Files
 
-- `.claude/hooks/lib/guard-common.js` — created. Shared stdin, path, redaction, log and fail-closed helpers. Exports every function listed below, so the unit tests can `require` them.
+- `.claude/hooks/lib/guard-common.js` — created. Shared helpers for stdin, paths, targets, redaction, logging and failing closed. Exports every function listed below, so the unit tests can `require` them.
 - `.claude/hooks/path-guard.js` — created. Replaces the inline PreToolUse `node -e` guard.
 - `.claude/hooks/tests/run-hook.js` — created. Test helper that spawns a hook script with JSON on stdin and an isolated log dir.
-- `.claude/hooks/tests/guard-common.test.js` — created. In-process unit tests for `normalizePath`, `redactSecrets` and `logDecision`.
+- `.claude/hooks/tests/guard-common.test.js` — created. In-process unit tests for `normalizePath`, `getTargetPath`, `getCommand`, `redactSecrets` and `logDecision`.
 - `.claude/hooks/tests/path-guard.test.js` — created.
 - `.claude/settings.json` — modified:
   - `permissions.allow` narrowed and converted to the space-wildcard form
@@ -220,11 +294,13 @@ C1.5 steps: the human runs these in an external Git Bash inside `SCRATCH=/c/User
   4. Split on `/`. Drop empty segments (except the root) and `.` segments. A `..` removes the previous segment but never the root (`c:` or the leading `/`), so a `..` at the root is dropped.
   5. Lowercase, because Windows paths are case-insensitive.
   6. Strip a trailing `/` unless the result is a bare root.
-- `getTargetPath(input: object): string` — `tool_input.file_path ?? tool_input.path ?? tool_input.notebook_path`. Throws if empty.
-- `redactSecrets(s: string): string` — replaces secret values with `***`, case-insensitively:
-  - `(password|pwd)\s*=\s*[^;'"\s]+` — keeps the key, redacts the value
-  - the value argument of `dotnet user-secrets set <key> <value>`, quoted or not; options of the form `--opt value` or `-p value` are skipped when finding it
-  - `(secret|token|api[_-]?key)\s*[=:]\s*\S+`
+- `getTargetPath(input: object): string` — the target extractor for file-tool hooks: `tool_input.file_path ?? tool_input.path ?? tool_input.notebook_path`. Throws if empty. It never reads `tool_input.command`, so a path hook attached to a Bash matcher by mistake fails closed.
+- `getCommand(input: object): string` — the target extractor for Bash-matcher hooks: `tool_input.command`. Throws if it is missing, not a string, or empty.
+- `redactSecrets(s: string): string` — applies these rules in order and replaces each secret value with `***`. Every rule is case-insensitive unless stated otherwise:
+  1. **Password assignments:** `(password|pwd)(\s*=\s*)(?:'[^']*'|"[^"]*"|[^;'"\s]+)` becomes `$1$2***`. It keeps the key and redacts a quoted or unquoted value. This covers connection strings, `export MSSQL_SA_PASSWORD='…'` and `SA_PASSWORD="…"` (`.env.example:21`, `docker-compose.yml:8`).
+  2. **sqlcmd `-P`:** applies only when the string contains `sqlcmd`. `(\s-P\s*)(?:'[^']*'|"[^"]*"|\S+)` becomes `$1***`. The `-P` is matched **case-sensitively**, because sqlcmd's `-p` is a different option. This covers `docker-compose.yml:16`'s form `sqlcmd … -P "<pw>"`.
+  3. **user-secrets:** applies only when the string contains `user-secrets`. Everything after the first whitespace-delimited `set` token that follows `user-secrets` is replaced with ` ***`, up to the next `&&`, `;`, `|`, newline or end of string. Losing the key from the log is harmless. Options before or after `set`, and every value form, are all covered. A quoted value that itself contains `;`, `|` or `&&` is redacted only up to that character (residual risk, Phase 4).
+  4. **Tokens and keys:** `(secret|token|api[_-]?key)\s*[=:]\s*\S+` (unchanged).
 - `resolveLogDir(projectDir: string): string` — `process.env.ENVANEX_HOOK_LOG_DIR` if set and non-empty, else `<projectDir>/TestResults/hook-log`.
 - `logDecision(ctx, entry: {hook, decision, reason, tool_name, target, agent_type?, agent_id?, session_id?}): void`
   - appends one JSON line to `<resolveLogDir>/hooks.jsonl` with `fs.mkdirSync(…, {recursive: true})` and `fs.appendFileSync`, both synchronous
@@ -236,9 +312,13 @@ C1.5 steps: the human runs these in an external Git Bash inside `SCRATCH=/c/User
   2. writes `Blocked by <hook>: <reason> -> <target>`, passed through `redactSecrets`, to stderr with the synchronous `fs.writeSync(2, …)`
   3. `process.exit(2)`
 - `allow(ctx): never` — logs, exits 0.
-- `runGuard(hookName: string, decide: (input, ctx) => void): void` — the entry point every guard uses. It builds `ctx = {hook, projectDirRaw, projectDir, input, target}`. Any throw or rejection becomes `block` with `guard error: <message>`: fail closed.
+- `runGuard(hookName: string, decide: (input, ctx) => void, extractTarget: (input: object) => string = getTargetPath): void` — the entry point every guard uses.
+  - It builds `ctx = {hook, projectDirRaw, projectDir, input, target}`, with `target = extractTarget(input)`.
+  - File-tool hooks (`path-guard`, `write-scope`) use the default.
+  - Bash hooks (`coder-bash-guard`, `bash-allowlist`) pass `getCommand`.
+  - Any throw or rejection, including one from `extractTarget`, becomes `block` with `guard error: <message>`: fail closed.
 
-`.claude/hooks/path-guard.js` blocks when the normalized path has:
+`.claude/hooks/path-guard.js` calls `runGuard('path-guard', decide)` with the default extractor. It blocks when the normalized path has:
 
 - **a segment equal to** one of `bin`, `obj`, `packages`, `.vs`, `.idea`, `.git`
 - **a basename that is:**
@@ -295,7 +375,7 @@ PreToolUse hook command, JSON-escaped in the file:
 
 ### Tests to add
 
-No test file contains the string `LIVEPROBE` (C1.7). Test targets use `guard-test.txt`, `x` and similar.
+No test file contains the string `LIVEPROBE` (C1.7). Test targets use `guard-test.txt`, `x` and similar. Every secret in a test is a distinct `S3cretValueN` string, so a test that leaks one secret can't pass because of another test's line.
 
 `.claude/hooks/tests/guard-common.test.js` (`node:test`, in-process `require`; each test sets `process.env.ENVANEX_HOOK_LOG_DIR` to its own `fs.mkdtempSync` directory):
 
@@ -310,9 +390,19 @@ No test file contains the string `LIVEPROBE` (C1.7). Test targets use `guard-tes
   - `normalizePath lowercases and strips a trailing slash`
   - `normalizeProjectDir gives the same result for C:\, C:/ and /c/ forms`
   - `normalizeProjectDir rejects a relative dir`
+- **target extractors:**
+  - `getCommand returns tool_input.command for a Bash-shaped input` — `{"tool_name":"Bash","tool_input":{"command":"git status"}}` → `git status`
+  - `getCommand throws on a missing or empty command` — two sub-cases: `tool_input: {}` and `command: ""`
+  - `getTargetPath throws on a Bash-shaped input` — the same input as the first case; the call throws
 - **redaction:**
   - `redacts Password in a connection string` — `logDecision` with target `export ENVANEX_CONNECTION_STRING='Server=x;Password=S3cretValue1;TrustServerCertificate=True'`. The log line lacks `S3cretValue1` and contains `Password=***`.
-  - `redacts the user-secrets set value` — `logDecision` with target `dotnet user-secrets set "Jwt:SigningKey" "S3cretValue3" --project src/Envanex.Web`. The log line lacks `S3cretValue3`.
+  - `redacts a quoted MSSQL_SA_PASSWORD assignment` — target `export MSSQL_SA_PASSWORD='S3cretValue4'`. The log line lacks `S3cretValue4` and contains `MSSQL_SA_PASSWORD=***`.
+  - `redacts a double-quoted SA_PASSWORD assignment` — target `SA_PASSWORD="S3cretValue8" docker compose up -d`. The log line lacks `S3cretValue8` and still contains `docker compose up -d`.
+  - `redacts the sqlcmd -P value` — target `docker exec envanex-sql /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P "S3cretValue7" -C -Q "SELECT 1"`. The log line lacks `S3cretValue7` and still contains `-U sa`.
+  - `redacts the user-secrets set value` — target `dotnet user-secrets set "Jwt:SigningKey" "S3cretValue3" --project src/Envanex.Web`. The log line lacks `S3cretValue3`.
+  - `redacts user-secrets set with a --verbose flag before the key` — target `dotnet user-secrets set --verbose "Jwt:SigningKey" "S3cretValue5"`. The log line lacks `S3cretValue5`.
+  - `redacts user-secrets set when options precede set` — target `dotnet user-secrets --project src/Envanex.Web set "Jwt:SigningKey" "S3cretValue6"`. The log line lacks `S3cretValue6`.
+  - `redacts user-secrets set only up to the next &&` — target `dotnet user-secrets set k S3cretValue9 && dotnet build`. The log line lacks `S3cretValue9` and contains `&& dotnet build`.
   - `redacts a token or api key assignment` — `GH_TOKEN=abc123` and `api_key: abc123`
   - `leaves a command without secrets unchanged` — `dotnet test --filter Category=Unit`
   - `redacts before truncating to 300 characters` — a `Password=` value starting at character 290 does not survive in the log line
@@ -367,6 +457,8 @@ Each proof follows the same steps:
 | M1.5 | remove the `redactSecrets` call in `logDecision` | `redacts Password in a connection string` |
 | M1.6 | remove the `redactSecrets` call in `block`'s stderr write | `redacts the block message on stderr` |
 | M1.7 | make `resolveLogDir` ignore `ENVANEX_HOOK_LOG_DIR` | `does not write to the project hook log when the override is set` |
+| M1.8 | in `redactSecrets` rule 1, drop the two quoted alternatives, leaving `[^;'"\s]+` | `redacts a quoted MSSQL_SA_PASSWORD assignment` |
+| M1.9 | remove `redactSecrets` rule 2 (sqlcmd `-P`) | `redacts the sqlcmd -P value` |
 
 ### Probes (fresh session after restart; main session)
 
@@ -452,6 +544,7 @@ git status --short
     - that the `LSP` tool appears
 
   The coder uses those recorded names verbatim. Any name not recorded is not added.
+- **H2.2:** run C2.6 and record the result under As built.
 
 ### Files
 
@@ -473,32 +566,59 @@ git status --short
 
 ### Signatures
 
-Every Phase 2 hook uses `runGuard` and therefore redaction, the log override and fail-closed behaviour from Phase 1. Each logs under a hook name that carries its argument, so a mis-attached hook is visible in the log: `coder-bash-guard`, `bash-allowlist:<profile>`, `write-scope:<dir>`.
+Every Phase 2 hook uses `runGuard`, and with it the redaction, the log override and the fail-closed behaviour from Phase 1:
+- The two Bash hooks call `runGuard(<name>, decide, getCommand)`, so their `ctx.target` is `tool_input.command`.
+- `write-scope` uses the default `getTargetPath`.
 
-`.claude/hooks/coder-bash-guard.js` (Bash matcher):
+Each hook logs under a name that carries its argument, so a mis-attached hook is visible in the log: `coder-bash-guard`, `bash-allowlist:<profile>`, `write-scope:<dir>`.
+
+`.claude/hooks/coder-bash-guard.js` (Bash matcher; `runGuard('coder-bash-guard', decide, getCommand)`):
 
 - Scans the **whole** command string, not just command position, for every case-insensitive `\bgit(\.exe)?\b` occurrence. This catches `bash -c "…"`, `node -e "…"`, `$(…)` and `&&` chains. For each occurrence:
   1. Skip one `"` or `'` immediately after the match.
   2. If the next character is end of string, block (bare `git`). If it is not whitespace, block as unparseable. This is what blocks `.git/hooks`, `tools/git/x` and `--git-dir=x`.
   3. Skip whitespace, then the global options `-C <arg>`, `-c <arg>`, `--no-pager` and `-P`. Any other token starting with `-` blocks. `--git-dir=*` and `--work-tree=*` are **not** skipped; they block through step 2.
-  4. Take the next whitespace-delimited token and strip leading and trailing `"` and `'`. It must be in the read allowlist: `status`, `diff`, `log`, `show`, `ls-files`, `ls-tree`, `rev-parse`, `blame`, `grep`, `cat-file`, `shortlog`, `describe`. `branch` is allowed only bare or with `--show-current`, `--list`, `-a`, `-r`, `-v` or `-vv`. Anything else blocks.
+  4. Take the next whitespace-delimited token and strip leading and trailing `"` and `'`. It must be in the read allowlist:
+     - `status`, `diff`, `log`, `show`, `ls-files`, `ls-tree`, `rev-parse`
+     - `merge-base`, which has no write mode, so the Phase 1 base-check line passes
+     - `blame`, `grep`, `cat-file`, `shortlog`, `describe`
+
+     `branch` is allowed only bare or with `--show-current`, `--list`, `-a`, `-r`, `-v` or `-vv`. Anything else blocks.
 - Also blocks any case-insensitive `\bgh\b` token.
 - **Documented false positives (fail closed):** any command that mentions `git` as a word outside a git call blocks: `ls .git/hooks`, `ls tools/git/x`, `grep -rn "git" docs`. Words that merely contain `git` (`digit`, `.gitignore`, `.github`) do not match `\b`.
-- Exports nothing; the entry point is `runGuard('coder-bash-guard', decide)`.
+- Exports nothing.
 
-`.claude/hooks/bash-allowlist.js <profile>` (Bash matcher):
+`.claude/hooks/bash-allowlist.js <profile>` (Bash matcher; `runGuard('bash-allowlist:<profile>', decide, getCommand)`):
 
 - **Pre-check (quote-unaware, fails closed):** blocks outright when the command contains `;`, `&&`, `||`, a bare `&`, a backtick, `$(`, `<(`, `>(`, a newline, or any `>`/`>>` other than the exact token `2>&1`. Characters inside quotes count too, so `grep "a;b" x` blocks.
 - **Split:** on every `|`, quote-unaware, so `grep -E "Passed!|Failed!"` blocks. This is documented and fails closed.
 - **Tokens:** each segment is split on whitespace. Any token beginning with `--output` blocks (`--output=f`, `--output f`).
-- **Token-wise matching:** the first segment's leading tokens must equal an entry's tokens exactly, so `git diff` matches `git diff --stat` but not `git difftool`. Entries marked *exact* allow no further tokens. Every later segment's first token must be `grep`, `head`, `tail` or `wc`.
+- **Token-wise matching:** the first segment's leading tokens must equal an entry's tokens exactly, so `git diff` matches `git diff --stat` but not `git difftool`.
+  - *Exact* entries allow no further tokens.
+  - *Prefix* entries allow any further tokens that pass the pre-check and the `--output` rule.
+  - *Fixed-token* entries allow only the further tokens listed for them.
+  - Every later segment's first token must be `grep`, `head`, `tail` or `wc`.
 - **`node --test`:** at least one further token, and every further token must match `^\.claude/hooks/tests/([A-Za-z0-9_-]+|\*)\.test\.js$` and contain no `..`. No other flags.
+- **Dotnet entries (fixed-token):** the leading tokens are `dotnet build`, `dotnet test` or `dotnet format --verify-no-changes`. Every further token in that segment must be one of:
+  - `-warnaserror`
+  - `--no-restore`
+  - `--filter`, followed by exactly one argument token that does not start with `-`
+  - `-v` or `--verbosity`, followed by exactly one of `q`, `quiet`, `m`, `minimal`, `n`, `normal`, `d`, `detailed`, `diag`, `diagnostic`
+  - a project path matching `^(src|tests)/[A-Za-z0-9_./-]+$` with no `..` segment
+  - `2>&1`
+
+  Tokens are matched exactly and case-sensitively. Anything else blocks, including:
+  - `-p:*`, `/p:*` and `-property:*`
+  - `-o`/`--output`, `--results-directory`, `--report`, `-bl`/`/bl`
+  - `--no-build`, `--logger`, `--diag`, `-c`
+
+  **UNVERIFIED:** whether `-p:PreBuildEvent=<cmd>` actually runs `<cmd>` (C2.6). The block does not depend on the answer.
 - A missing or unknown profile blocks.
 - `tester` profile:
   - exact: `bash .claude/skills/gate/scripts/gate.sh` (included now so Phase 3 doesn't touch the hook)
   - prefix: `git status`, `git diff`, `git log`, `git show`, `git ls-files`, `git rev-parse`
   - exact: `git branch --show-current`
-  - prefix: `dotnet format --verify-no-changes`, `dotnet build`, `dotnet test`
+  - fixed-token: `dotnet build`, `dotnet test`, `dotnet format --verify-no-changes` (the dotnet rule above)
   - `node --test` (the rule above)
   - prefix: `docker compose ps`
   - prefix: `grep`, `cat`, `ls`, `wc`, `head`, `tail`
@@ -507,7 +627,7 @@ Every Phase 2 hook uses `runGuard` and therefore redaction, the log override and
   - prefix: `dotnet list package`
   - prefix: `grep`, `cat`, `ls`, `wc`, `head`, `tail`
 
-`.claude/hooks/write-scope.js <relative dir>` (matcher `Write|Edit|MultiEdit|NotebookEdit`):
+`.claude/hooks/write-scope.js <relative dir>` (matcher `Write|Edit|MultiEdit|NotebookEdit`; `runGuard('write-scope:<dir>', decide)` with the default extractor):
 
 - Allows only when `normalizePath(target, projectDir)` starts with `normalizePath(<dir>, projectDir) + '/'`, where `projectDir = normalizeProjectDir(raw)`. This rejects `reviews-evil` and `..` traversal.
 - A missing argument or a path outside the project blocks.
@@ -585,16 +705,16 @@ No agent sets `memory` (F4).
   Branch: <branch>
   ```
 
-  Phase 3 adds `Gates-sha256:`. Paste raw output; never compose it.
+  Phase 3 adds `Gates-sha256:`. Paste raw output; never compose it. The tester's `dotnet` commands take only the flags the allowlist lists: `-warnaserror`, `--no-restore`, `--filter`, `-v`/`--verbosity`, a `src/` or `tests/` path, and `2>&1`.
 - **coder:**
-  - State that git writes and `gh` are blocked by hook.
+  - State that git writes and `gh` are blocked by hook. Read-only git, including `git merge-base`, is allowed.
   - Document the false-positive class: any command naming `git` as a word, such as `ls .git/hooks` or `grep -rn "git" docs`, is blocked. Use the Grep or Glob tool instead.
   - Restore mutations with the inverse Edit plus `git diff --exit-code`, never `git checkout --`.
 - **explainer:** state that Write and Bash are hook-scoped.
 
 ### Tests to add
 
-All tests go through `runHook`, so each one uses a temp log dir. No test contains `LIVEPROBE`.
+All tests go through `runHook`, so each one uses a temp log dir. No test contains `LIVEPROBE`. Every coder-bash-guard and bash-allowlist case sends the Bash shape `{"tool_name":"Bash","tool_input":{"command":"<case>"},"cwd":"C:\\projects\\envanex"}`, so every allow case also proves that `runGuard` reads the target through `getCommand` (required change 4). Every write-scope case sends the file shape `{"tool_name":"Write","tool_input":{"file_path":"<case>"}}`.
 
 `.claude/hooks/tests/coder-bash-guard.test.js`:
 
@@ -615,6 +735,8 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
 - **Allows:**
   - `git status`, `git status --short`, `git diff --stat`, `git diff --exit-code -- src/x.cs`, `git log --oneline -5`
   - `git show HEAD:x`, `git ls-files`, `git branch --show-current`, `git rev-parse HEAD`
+  - `allows git merge-base main HEAD`
+  - `allows the Phase 1 base-check command line` — the exact string `git rev-parse --verify origin/main && test "$(git merge-base main HEAD)" = "$(git merge-base origin/main HEAD)"; echo "base-check=$?"`
   - `allows bash -c "git status"` (the quotes are stripped from the next token)
   - `dotnet build -warnaserror`, `dotnet test --filter X`
   - words that merely contain `git`: `grep -rn "digit" src`, `cat .gitignore`, `ls .github`
@@ -626,6 +748,9 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
   - `grep -rn "Fact" tests/Envanex.IntegrationTests`, `dotnet test 2>&1 | tail -20`
   - `cat TestResults/x/gates.txt`, `docker compose ps`, `dotnet format --verify-no-changes`
   - `node --test .claude/hooks/tests/path-guard.test.js`, `node --test .claude/hooks/tests/*.test.js`
+  - `allows dotnet build -warnaserror`
+  - `allows dotnet test --no-restore --filter Category=Unit tests/Envanex.Domain.Tests`
+  - `allows dotnet test -v minimal`
 - **tester profile blocks:**
   - `echo x > src/a.cs`, `cat a >> b`, `tee x`, `sed -i s/a/b/ x`
   - `dotnet format` (without `--verify-no-changes`)
@@ -640,6 +765,15 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
   - `blocks git difftool` (token-wise matching)
   - `blocks bash .claude/skills/gate/scripts/gate.sh --extra` (exact entry)
   - `blocks grep -E "Passed!|Failed!" (documented quote-unaware split)`
+  - dotnet fixed-token entries:
+    - `blocks dotnet build -p:PreBuildEvent=x`
+    - `blocks dotnet test --results-directory src`
+    - `blocks dotnet format --verify-no-changes --report x`
+    - `blocks dotnet build -o src/x`
+    - `blocks dotnet build -bl`
+    - `blocks dotnet test --no-build`
+    - `blocks dotnet test --filter -p:PreBuildEvent=x` (the filter argument may not start with `-`)
+    - `blocks dotnet build src/../../x.csproj` (`..` in a project path)
 - **explainer profile:** allows `git diff main...HEAD --stat`, `git log --oneline`, `dotnet list package`; blocks `dotnet build`, `echo x > docs/journal/x.md`, `git add .`.
 - **General:** `blocks an unknown profile`, `blocks a missing profile`, `blocks on malformed JSON`.
 
@@ -673,6 +807,7 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
 | M2.5 | in bash-allowlist, drop the `>` check | `echo x > src/a.cs` |
 | M2.6 | in bash-allowlist, drop the `node --test` argument check | `blocks node --test with .. traversal` |
 | M2.7 | in bash-allowlist, match entries by string prefix instead of token-wise | `blocks git difftool` |
+| M2.8 | in bash-allowlist, accept any further token after a dotnet entry's leading tokens | `blocks dotnet build -p:PreBuildEvent=x`, `blocks dotnet test --results-directory src` and `blocks dotnet format --verify-no-changes --report x` |
 
 Each is restored by the inverse Edit, proven with `git diff --exit-code -- <file>`.
 
@@ -722,7 +857,7 @@ Every probe prompt states that this is an authorized guard probe, asks the agent
   - Afterwards, delete every probe file. `git status --short` is empty.
 - **P2.5 (tester and explainer allowlists):**
   - tester:
-    - must be blocked: `echo probe > src/LIVEPROBE-5a.txt` and `dotnet format --include src/LIVEPROBE-5b.cs`
+    - must be blocked: `echo probe > src/LIVEPROBE-5a.txt`, `dotnet format --include src/LIVEPROBE-5b.cs` and `dotnet build -p:Probe=LIVEPROBE-5f`
     - must run: `git log --oneline -1 --grep=LIVEPROBE-5c` and `node --test .claude/hooks/tests/write-scope.test.js`
   - explainer:
     - must be blocked: `dotnet build -p:Probe=LIVEPROBE-5d`
@@ -731,6 +866,7 @@ Every probe prompt states that this is an authorized guard probe, asks the agent
     - each blocked command: the tool result `Blocked by bash-allowlist:<profile>:` **and** a `bash-allowlist:<profile>` `block` line whose target carries the tag
     - each allowed command: its output plus an `allow` line with the matching profile. The `node --test` allow line is identified by hook name and profile; the tests themselves log only to temp dirs.
     - `git status --short -- src` is empty
+  - If the guard were missing, 5f would only build the solution with an unused property, which is harmless: `bin/` and `obj/` are gitignored.
   - The same inconclusive rule as P2.4 applies.
 - **P2.6 (LSP and Learn):**
   - code-reviewer: "Use LSP go-to-definition on `Result` in `src/Envanex.Domain`." The expected location is under `src/Envanex.Domain/Common/`.
@@ -744,6 +880,8 @@ The Phase 1 block, plus:
 - C1.7 over the new test files
 - C2.2 and C2.5
 - `grep -c $'\r'` over the new files
+
+From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 1 block's base-check line passes it because the read allowlist has `merge-base`, and the test `allows the Phase 1 base-check command line` pins that down.
 
 ---
 
@@ -785,15 +923,28 @@ The Phase 1 block, plus:
     gate.sh <ISO ts> branch=<b> head=<sha> main=<sha|missing> origin_main=<sha|missing> base_main=<sha|missing> base_origin=<sha|missing>
     ```
   - **Shell functions:**
-    - `run_step <name> <required|info> <command string>` — appends `$ <command>`, its full stdout and stderr, then one line `exit=<n> step=<name> kind=<required|info>` to `gates.txt`
-    - `final_status` — reads every `^exit=` line with `kind=required` back **from `gates.txt`**, appends `gate-exit=<0|1> failed=<comma-separated step names>` as the file's last line, and returns that code. The script's exit status is `final_status`'s return value. No step's exit code is consulted any other way.
+    - `run_step <name> <required|info> <command string>`:
+      - appends `$ <command>` to `gates.txt`
+      - evaluates the command string with `eval` in the script's own shell, so it can call the script's functions
+      - appends the command's full stdout and stderr
+      - if that output does not end with a newline, appends one, so the next line always starts at column 0
+      - appends one line `exit=<n> step=<name> kind=<required|info>`
+    - `tools_check` — for each name in `git node dotnet sha256sum`, runs `command -v "<name>"` on its own. It prints the path for each name it finds and `missing: <name>` for each it doesn't, and returns 1 if any name is missing, else 0. Because each name is checked separately, it doesn't matter how `command -v a b c` treats a partial miss.
+    - `base_check` — prints the two merge-bases. It returns 1 with a reason line when `origin/main` is missing, when either `git merge-base` fails, or when `git merge-base main HEAD` ≠ `git merge-base origin/main HEAD`. Otherwise it returns 0.
+    - `final_status`:
+      - reads back **from `gates.txt`** every line matching the full, anchored `grep -E '^exit=[0-9]+ step=[^ ]+ kind=required$'`
+      - for each required step in the fixed list `tools-check`, `base-check`, `node`, `format`, `build` and `test`, requires exactly one such line
+      - a step fails when its line has a non-zero `exit=`, when its line is missing, or when its line appears more than once
+      - appends `gate-exit=<0|1> failed=<comma-separated step names>` as the file's last line, and returns that code
+
+      The script's exit status is `final_status`'s return value. No step's exit code is consulted any other way.
   - **Steps, in order:**
 
     | # | Step | Kind | Command |
     |---|---|---|---|
-    | 1 | `tools-check` | required | `command -v git node dotnet sha256sum` |
+    | 1 | `tools-check` | required | `tools_check` |
     | 2 | `status` | info | `git status --short` |
-    | 3 | `base-check` | required | exits 1 with a reason line when `origin/main` is missing, or when `git merge-base main HEAD` ≠ `git merge-base origin/main HEAD` |
+    | 3 | `base-check` | required | `base_check` |
     | 4 | `files` | info | `git diff --name-only main...HEAD` (the tester's file list) |
     | 5 | `log` | info | `git log --oneline main..HEAD` |
     | 6 | `docker` | info | `docker compose ps` |
@@ -850,11 +1001,17 @@ The Phase 1 block, plus:
     - `<slug>` = the current branch with `/` replaced by `-`
     - A review file "belongs to this branch" when its name matches `thoughts/shared/reviews/*_<slug>-*.md`.
     - When `-rN` revisions exist, only the highest N counts.
-    - **Head rule R:** the file's `Head:` equals `git rev-parse HEAD`, **or** every path in `git diff --name-only <Head> HEAD` is under `thoughts/shared/reviews/`. This covers the commit of the review files themselves.
-  - **Preconditions — verify all, STOP if any fails:**
+    - **Head rule R:**
+      1. `git rev-parse --verify --quiet "<Head>^{commit}"` exits 0. An unknown or mistyped SHA fails here.
+      2. The file's `Head:` equals `git rev-parse HEAD`, **or** `git diff --name-only <Head> HEAD` exits 0 and every path it prints is under `thoughts/shared/reviews/`. This covers the commit of the review files themselves.
+    - **Git errors:** any non-zero exit from `git rev-parse`, `git diff` or `git merge-base` during a precondition check fails that precondition. The output of a failed command is never read as an empty list. The one exception is `git merge-base --is-ancestor`, where exit 1 means "not an ancestor"; that also fails the precondition.
+  - **Preconditions — verify all seven, STOP if any fails.** This replaces the heading "verify all four" at `.claude/skills/pr/SKILL.md:10`.
     1. The current branch is NOT `main`.
     2. The working tree is clean (`git status --short` is empty).
-    3. The header `head=` of `TestResults/<slug>/gates.txt` equals `git rev-parse HEAD`, and its last line is `gate-exit=0 failed=`.
+    3. `TestResults/<slug>/gates.txt` meets three conditions:
+       - its header `head=` equals `git rev-parse HEAD`
+       - its `status` section is empty: no line between the `$ git status --short` line and the `exit=0 step=status kind=info` line
+       - its last line is `gate-exit=0 failed=`
     4. `TestResults/<slug>/tester-verdict.md` has `Verdict: READY_TO_PUSH`, and its `Head:` **equals** `git rev-parse HEAD`. An in-session verdict alone no longer suffices.
     5. **Branch code review:** a review file of this branch with `Reviewer: code-reviewer` and `Verdict: APPROVED`, satisfying rule R, that either:
        - has `code-review-branch` in its name, or
@@ -862,20 +1019,32 @@ The Phase 1 block, plus:
     6. **Security review:** required unless every path in the `files` section of `gates.txt` starts with `docs/` or `thoughts/`. The exemption is computed from that list, not from the lane the plan declares. It needs `thoughts/shared/reviews/*_<slug>-security-review.md` with `Verdict: SECURITY_CLEAR`, satisfying rule R. The file's first five lines are exact:
 
        ```
-       Verdict: SECURITY_CLEAR | SECURITY_FINDINGS
+       Verdict: PENDING | SECURITY_CLEAR | SECURITY_FINDINGS
        Reviewer: /security-review
        Scope: whole branch
        Range: <git merge-base main HEAD>..<head>
        Head: <sha>
        ```
 
-       The verbatim `/security-review` output follows. The human sets the `Verdict:` line after reading the output.
-    7. **DB review:** required when the plan's `Touches schema?` is yes, or when the `files` section has a path under `db/` or `src/Envanex.Infrastructure/Migrations/`. It needs at least one `*_<slug>-db-review-*.md`, and every such file has `Verdict: DB_APPROVED`. Its `Head:` must be an ancestor of HEAD (`git merge-base --is-ancestor <Head> HEAD` exits 0), because db-review runs per phase.
+       The verbatim `/security-review` output follows the header.
+       - The main session writes `Verdict: PENDING` when it saves the file. It never writes any other value.
+       - Only the human changes the line, by editing the file after reading the output, to `SECURITY_CLEAR` or `SECURITY_FINDINGS`.
+       - `/pr` accepts only `SECURITY_CLEAR`, so `PENDING` and `SECURITY_FINDINGS` both stop it.
+    7. **DB review:**
+       - **When it is required:**
+         - the plan's `Touches schema?` is yes, or
+         - the `files` section has a path under `db/`, `src/Envanex.Infrastructure/Migrations/` or `src/Envanex.Infrastructure/Persistence/`
+       - **What it needs:**
+         - at least one `*_<slug>-db-review-*.md`, and every such file (highest `-rN` per phase) has `Verdict: DB_APPROVED`
+         - each file's `Head:` passes step 1 of rule R and is an ancestor of HEAD (`git merge-base --is-ancestor <Head> HEAD` exits 0), because db-review runs per phase
+         - **the newest db-review Head** is the Head that every other db-review file's Head is an ancestor of (`git merge-base --is-ancestor <other> <this>` exits 0). If no single such Head exists, the precondition fails.
+         - no path under `db/`, `src/Envanex.Infrastructure/Migrations/` or `src/Envanex.Infrastructure/Persistence/` appears in `git diff --name-only <newest db-review Head> HEAD`. A schema change after the last db-review needs a new db-review.
   - The Verdicts section of the body cites each review file's path and its `Verdict:` and `Head:` lines, plus the tester's `Gates-sha256:`. Plan-review files are cited, not gated. The Validation section pastes the summary from `gate.sh`.
   - The body goes through `gh pr create --body-file TestResults/PR_BODY.md`, written with Write (the same quoting fix as F16).
   - **Rules:**
     - Line 57 becomes: "NEVER merge a PR whose body cites a verdict that no file satisfying preconditions 3-7 carries."
     - New rule: "Evidence and doc commits land before the PR-end sequence. A commit after the tester ran invalidates its verdict (precondition 4). Re-run the tester."
+    - New rule: "No agent writes `SECURITY_CLEAR` or `SECURITY_FINDINGS`. The saved security-review file starts as `Verdict: PENDING`, and only the human changes it."
 - **`tester.md`:**
   - Steps become:
     - run `bash .claude/skills/gate/scripts/gate.sh` and paste its stdout verbatim
@@ -894,6 +1063,7 @@ None automated. Each script run takes minutes (a full `dotnet test`), so the scr
   - `/gate` prints a sha256.
   - `sha256sum TestResults/chore-agents-hardening/gates.txt` gives the same hash.
   - `grep '^exit=' TestResults/chore-agents-hardening/gates.txt` shows the same codes the skill printed, including `step=tools-check` and `step=base-check` at 0.
+  - The `tools-check` section shows one path for each of `git`, `node`, `dotnet` and `sha256sum`, and no `missing:` line.
   - The last line is `gate-exit=0 failed=`.
   - The header carries `main=`, `origin_main=`, `base_main=` and `base_origin=`, with the two bases equal.
   - The total printed is 638.
@@ -920,7 +1090,7 @@ None automated. Each script run takes minutes (a full `dotnet test`), so the scr
   - Trailer lines added outside the file are noted, not treated as a failure.
 - **P3.6 (tester list and header):**
   - The tester's reported file list is byte-for-byte the `files` section of `gates.txt`.
-  - The `Head:` in `tester-verdict.md` equals `git rev-parse HEAD`.
+  - The `Head:` in `tester-verdict.md` equals `git rev-parse HEAD`, which is the review-file commit from Probe protocol step 10.
   - Its `Gates-sha256:` equals the hash `gate.sh` printed in that run.
 - **C3.2:** skill effort observable or not.
 - **C3.3:** `command -v sha256sum`.
@@ -958,9 +1128,13 @@ The Phase 1 block, plus:
   - **Key Patterns:** the Outbox bullet becomes "deferred: no dispatcher exists; see docs/roadmap.md".
   - **Orchestration:**
     - the pipeline, and a **light lane**: small non-feature PRs (docs, fix, chore) with no schema change and no new public behavior. A short plan file, then coder, code-reviewer, tester, `/gate` and `/pr`, with no researcher, planner or plan-reviewer. In the light lane, the code-review file whose `Range:` starts at `git merge-base main HEAD` counts as the branch review.
+    - **per phase, in both lanes:** the human commits each review file, whatever its verdict, before the tester runs. The tester's `Head:` is that commit. An uncommitted review file makes the `status` section of `gates.txt` non-empty, and the tester returns NEEDS_FIXES.
     - the **PR-end sequence, in both lanes:**
       1. whole-branch code-reviewer (light lane: the merge-base-range review above)
-      2. `/security-review`. Its output is saved verbatim under the five-line header from `pr/SKILL.md` to `thoughts/shared/reviews/YYYY-MM-DD_<branch-slug>-security-review.md`, before anything else. The human sets its `Verdict:` line. It is skipped only when every changed file is under `docs/` or `thoughts/`, which `/pr` computes from `gates.txt`.
+      2. `/security-review`:
+         - Before anything else, the main session saves its output verbatim to `thoughts/shared/reviews/YYYY-MM-DD_<branch-slug>-security-review.md`, under the five-line header from `pr/SKILL.md`, with `Verdict: PENDING`.
+         - Only the human changes that line, to `SECURITY_CLEAR` or `SECURITY_FINDINGS`, after reading the output. No agent writes either value.
+         - The step is skipped only when every changed file is under `docs/` or `thoughts/`, which `/pr` computes from `gates.txt`.
       3. the human commits the review files
       4. tester
       5. `/gate`
@@ -987,6 +1161,8 @@ The Phase 1 block, plus:
     - coder-bash-guard has a false-positive class: any command naming `git` as a word, such as `ls .git/hooks`, `ls tools/git/x` or `grep -rn "git" docs`, is blocked
     - bash-allowlist splits without regard to quotes, so `grep -E "a|b"` is blocked
     - the path guard doesn't see Bash writes
+    - **Windows path aliasing (UNVERIFIED):** `normalizePath` is pure string logic and doesn't model Win32 path normalization. That normalization strips a trailing `.` or space from a segment, so `obj.\x` could reach `obj\x`. It also accepts NTFS stream suffixes, so `.env::$DATA` could reach `.env`. Either could alias a protected path past the path guard. Whether Claude Code's Write tool reaches Win32 normalization is UNVERIFIED; to settle it, Write `TestResults\x.` and then `ls TestResults`. This plan does not run that check.
+    - **Redaction of user-secrets values:** a quoted `user-secrets set` value that contains `;`, `|` or `&&` is redacted only up to that character. The rest is covered only by the password, sqlcmd and token rules.
     - agents can edit `.claude/` itself, taking effect after a restart
     - user-level settings sit outside the repository; `Bash(find *)` there allows `find -delete`
     - the `base-check` failure path of `gate.sh` is not probed
@@ -999,18 +1175,18 @@ The Phase 1 block, plus:
     - the "Agent models" paragraph at 236-237 becomes the F3 tier table, or a link to `docs/ai-workflow.md` (F17)
   - The `chore(agents)` status stays blank; the next PR fills it in.
 - **`docs/ai-workflow.md` — created,** English, reader-facing. Sections:
-  - **The pipeline and the light lane** — why the human drives every transition, and why the security review applies in both lanes (fix(db) was a security fix with no `src/` change).
+  - **The pipeline and the light lane** — why the human drives every transition, and why the security review applies in both lanes (fix(db) was a security fix with no `src/` change). The per-phase review-file commit before the tester.
   - **Roles and tiers** — the Phase 2 table and F3's principle: judges at max, executors at xhigh, mechanical steps at low. The coder stays at xhigh because a usage-limit cutoff leaves a half-written phase. Raising it to max for one phase is done by editing `coder.md` in its own commit, followed by a restart.
-  - **The guards:** deny list, path guard, coder git block, tester and explainer allowlists, write scopes. For each, what it blocks and the incident behind it:
+  - **The guards:** deny list, path guard, coder git block, tester and explainer allowlists (including the fixed-token dotnet entries and why: PreBuildEvent, `--results-directory`, `--report`), write scopes. For each, what it blocks and the incident behind it:
     - the PR 6b stash
     - the `.env.example` block in fix(db)
     - the Haiku tester's narrated gates
     - `docker compose down -v`
   - **Why hooks fail closed** — the exit-1 trap.
-  - **What the hook log holds** — redacted, `LIVEPROBE` tags, and tests writing to a temp dir.
-  - **Verdict files and `/gate` evidence** — branch slug in the name, `Head:`, Head rule R, and `gate-exit`.
+  - **What the hook log holds** — redacted (the four rules), `LIVEPROBE` tags, and tests writing to a temp dir.
+  - **Verdict files and `/gate` evidence** — branch slug in the name, `Head:`, Head rule R (including SHA verification and git errors), `gate-exit`, the empty `status` section, the security-review file's `Verdict: PENDING` until the human sets it, and the newest-db-review check.
   - **How to re-run the probes** — `node --test`, plus the P-list of this plan.
-  - **Residual risks** — the same list as the roadmap row, including the coder-bash-guard false-positive class.
+  - **Residual risks** — the same list as the roadmap row, including the coder-bash-guard false-positive class, Windows path aliasing (UNVERIFIED) and the user-secrets redaction gap.
   - **What is deliberately not used** — Fable, `superpowers`, memory plugins, `maxTurns`.
 
 ### Tests to add
@@ -1026,7 +1202,7 @@ None (docs only).
 - **P4.3:** every relative link in `docs/ai-workflow.md` resolves (`ls` each target).
 - **P4.4 (end-to-end):** after the restart and after the Phase 4 evidence commit, this PR's own PR-end sequence runs as the Phase 4 probe:
   1. whole-branch code-reviewer (writes `…_chore-agents-hardening-code-review-branch.md` with `Head:`)
-  2. `/security-review`, saved with the header. This PR touches `.claude/`, so it is not exempt.
+  2. `/security-review`, saved with the header and `Verdict: PENDING`; the human sets the verdict line. This PR touches `.claude/`, so it is not exempt.
   3. the human commits both files
   4. tester (uses `gate.sh`; `Head:` equals HEAD)
   5. `/gate`
@@ -1042,11 +1218,12 @@ The Phase 1 block, plus C4.1 and P4.1-P4.3.
 
 ## Rollback notes
 
-- Each phase is one or two commits on the branch, plus its evidence commit. The human reverts with `git revert <sha>`, which is not denied. `git reset --hard` is denied by design.
-- **If a hook blocks everything** (a fail-closed misfire, for example `$CLAUDE_PROJECT_DIR` not expanding): edit `.claude/settings.json` or the agent file in an external editor, or set `"disableAllHooks": true` in `.claude/settings.local.json`, then restart. If that switch is ever used, record it. The switch is documented but not probed here.
+- Each phase is one or two commits on the branch, plus its evidence commit and its review-file commit. The human reverts with `git revert <sha>`, which is not denied. `git reset --hard` is denied by design.
+- **If a hook blocks everything** (a fail-closed misfire, for example `$CLAUDE_PROJECT_DIR` not expanding, or a Bash hook wired to the wrong extractor): edit `.claude/settings.json` or the agent file in an external editor, or set `"disableAllHooks": true` in `.claude/settings.local.json`, then restart. If that switch is ever used, record it. The switch is documented but not probed here.
 - **If a full model ID is rejected:** switch that agent's frontmatter to `opus`/`sonnet` and record it (P2.1). `opus` resolves to the main session's Opus, since `~/.claude/settings.json` sets `"model": "opus"`.
 - **If a subagent won't write its report file:** revert that agent to "present content, the main agent saves it" (P2.4 fallback). `/pr` preconditions 5-7 then need the main session to save that reviewer's output under the same five-line header.
+- **If the tester's dotnet allowlist blocks a flag the tester genuinely needs:** add that exact token to the fixed list in `bash-allowlist.js`, with an allow test and a note in `docs/ai-workflow.md`. Never turn the entry back into a prefix entry.
 - **If `csharp-lsp` fails:** remove `LSP` from `tools`, and uninstall the plugin at project scope, which removes its `enabledPlugins` key.
 - **If redaction hides evidence a probe needs:** no probe target contains a secret pattern, so this should not occur. If it does, change the probe target, not the redaction.
 - H1.1's edits to the local and user settings files are outside the PR. Undoing them is a manual edit. The deleted SA-password allow entry is not restored by any rollback.
-- The scratch dir from H1.2 is outside the repo. Delete it by hand after Phase 1.
+- The scratch dir from H1.2 and the C2.6 scratch project are outside the repo. Delete them by hand after Phases 1 and 2.
