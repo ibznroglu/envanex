@@ -121,14 +121,44 @@ function getCommand(input) {
   return command;
 }
 
+// Key words that mark a value as secret (rules 5, 6 and 7).
+const SENSITIVE =
+  'password|passwd|pwd|secret|token|api[_-]?key|signing[_-]?key|access[_-]?key|private[_-]?key|credential';
+
+// One or more of: a single-quoted run (closed or unterminated), a double-quoted run with
+// backslash escapes (closed or unterminated), or one unquoted character other than `;`,
+// whitespace or a quote. The alternatives start with different characters, so backtracking
+// stays linear. A quote right after a value extends the redaction (errs toward redacting more).
+const VALUE = String.raw`(?:'[^']*(?:'|$)|"(?:[^"\\]|\\.)*(?:"|$)|[^;\s'"])+`;
+
+const LINE_CONTINUATION = /[\\`]\r?\n/g;
+const PASSWORD_ASSIGNMENT = new RegExp(String.raw`(password|pwd)(\s*=\s*)${VALUE}`, 'gi');
+const SENSITIVE_KEY_ASSIGNMENT = new RegExp(
+  String.raw`([A-Za-z0-9_.:-]*(?:${SENSITIVE})[A-Za-z0-9_.:-]*)(\s*[=:]\s*)${VALUE}`,
+  'gi',
+);
+const SENSITIVE_JSON_MEMBER = new RegExp(
+  String.raw`("[^"]*(?:${SENSITIVE})[^"]*"\s*:\s*)(?:"(?:[^"\\]|\\.)*"|[^,}\s]+)`,
+  'gi',
+);
+const SENSITIVE_OPTION = new RegExp(
+  String.raw`((?:^|\s)--?[A-Za-z0-9_-]*(?:${SENSITIVE})[A-Za-z0-9_-]*)(\s+)(?:'[^']*(?:'|$)|"(?:[^"\\]|\\.)*(?:"|$)|\S+)`,
+  'gi',
+);
+const AUTHORIZATION_HEADER = /(authorization\s*[:=]\s*(?:(?:bearer|basic|token|digest)\s+)?)[^\s'"]+/gi;
+const URL_USERINFO = /([a-z][a-z0-9+.-]*:\/\/[^\s/@:'"]*:)[^\s/@'"]+@/gi;
+
 function redactSecrets(s) {
   if (typeof s !== 'string') {
     return s;
   }
   let out = s;
 
-  // Rule 1: password assignments, quoted or unquoted value.
-  out = out.replace(/(password|pwd)(\s*=\s*)(?:'[^']*'|"[^"]*"|[^;'"\s]+)/gi, '$1$2***');
+  // Rule 0: join line continuations (bash `\`, PowerShell backtick) before any other rule.
+  out = out.replace(LINE_CONTINUATION, ' ');
+
+  // Rule 1: password assignments, quoted, unterminated or unquoted value.
+  out = out.replace(PASSWORD_ASSIGNMENT, '$1$2***');
 
   // Rule 2: sqlcmd -P. The -P itself is case-sensitive; sqlcmd's -p is another option.
   if (/sqlcmd/i.test(out)) {
@@ -146,23 +176,46 @@ function redactSecrets(s) {
   // Rule 4: tokens and keys.
   out = out.replace(/(secret|token|api[_-]?key)(\s*[=:]\s*)\S+/gi, '$1$2***');
 
+  // Rule 5: assignments to a key that contains a sensitive word (env vars, config keys, --key=).
+  out = out.replace(SENSITIVE_KEY_ASSIGNMENT, '$1$2***');
+
+  // Rule 6: JSON members whose name contains a sensitive word.
+  out = out.replace(SENSITIVE_JSON_MEMBER, '$1"***"');
+
+  // Rule 7: space-separated options whose name contains a sensitive word.
+  out = out.replace(SENSITIVE_OPTION, '$1$2***');
+
+  // Rule 8: Authorization headers, with or without a scheme.
+  out = out.replace(AUTHORIZATION_HEADER, '$1***');
+
+  // Rule 9: URL userinfo passwords.
+  out = out.replace(URL_USERINFO, '$1***@');
+
   return out;
 }
 
-function resolveLogDir(projectDir) {
+// The raw project dir (or CLAUDE_PROJECT_DIR) in slash form, keeping its case.
+// Early guard errors have no ctx.projectDirRaw yet, so they still log under CLAUDE_PROJECT_DIR.
+function resolveLogDir(projectDirRaw) {
   const override = process.env.ENVANEX_HOOK_LOG_DIR;
   if (typeof override === 'string' && override !== '') {
     return override;
   }
-  if (typeof projectDir !== 'string' || projectDir === '') {
+  const raw =
+    typeof projectDirRaw === 'string' && projectDirRaw !== '' ? projectDirRaw : process.env.CLAUDE_PROJECT_DIR;
+  if (typeof raw !== 'string' || raw === '') {
     throw new Error('no project dir for the hook log');
   }
-  return `${projectDir}/TestResults/hook-log`;
+  const base = toSlashForm(raw);
+  if (!isAbsoluteSlashForm(base)) {
+    throw new Error(`project dir for the hook log is not absolute: ${raw}`);
+  }
+  return `${base.replace(/\/$/, '')}/TestResults/hook-log`;
 }
 
 function logDecision(ctx, entry) {
   try {
-    const dir = resolveLogDir(ctx && ctx.projectDir);
+    const dir = resolveLogDir(ctx && ctx.projectDirRaw);
     const target = redactSecrets(String(entry.target ?? '')).slice(0, TARGET_LOG_LIMIT);
     const line = {
       ts: new Date().toISOString(),
@@ -226,7 +279,8 @@ function runGuard(hookName, decide, extractTarget = getTargetPath) {
     ctx.projectDirRaw = getProjectDir(ctx.input);
     ctx.projectDir = normalizeProjectDir(ctx.projectDirRaw);
     ctx.target = extractTarget(ctx.input);
-    decide(ctx.input, ctx);
+    // decide may be async: a rejection becomes a block, and an async block exits before allow.
+    await decide(ctx.input, ctx);
     allow(ctx);
   };
   run().catch((err) => {

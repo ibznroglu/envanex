@@ -3,6 +3,7 @@
 const { test, after } = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('fs');
+const os = require('os');
 const path = require('path');
 
 const { runHook: spawnHook } = require('./run-hook');
@@ -20,6 +21,9 @@ function runHook(...args) {
 
 after(() => {
   for (const dir of logDirs) {
+    if (dir === undefined) {
+      continue;
+    }
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
@@ -129,10 +133,31 @@ test('blocks secrets.json', () => {
 test('blocks on malformed JSON', () => {
   const result = runHook(SCRIPT, [], '{not json', { CLAUDE_PROJECT_DIR: DEFAULT_PROJECT_DIR });
   assertBlocked(result, GUARD_ERROR);
+  assert.ok(result.stderr.includes('invalid hook input'), result.stderr);
 });
 
 test('blocks on an empty file path', () => {
-  assertBlocked(runWrite(''), GUARD_ERROR);
+  const result = runWrite('');
+  assertBlocked(result, GUARD_ERROR);
+  assert.ok(result.stderr.includes('target path is missing or empty'), result.stderr);
+});
+
+test('blocks a NotebookEdit notebook_path under obj', () => {
+  const stdin = JSON.stringify({ tool_name: 'NotebookEdit', tool_input: { notebook_path: 'obj/x.ipynb' } });
+  const result = runHook(SCRIPT, [], stdin, { CLAUDE_PROJECT_DIR: DEFAULT_PROJECT_DIR });
+  assertBlocked(result, protectedSegment('obj'));
+});
+
+test('blocks a UNC path with an obj segment', () => {
+  assertBlocked(runWrite('\\\\server\\share\\obj\\x'), protectedSegment('obj'));
+});
+
+test('blocks a \\\\?\\ device path to .env', () => {
+  assertBlocked(runWrite('\\\\?\\C:\\projects\\envanex\\.env'), PROTECTED_FILE_NAME);
+});
+
+test('blocks a \\\\.\\ device path with an obj segment', () => {
+  assertBlocked(runWrite('\\\\.\\C:\\projects\\envanex\\obj\\x'), protectedSegment('obj'));
 });
 
 test('blocks when no project dir can be determined', () => {
@@ -190,6 +215,11 @@ test('allows thoughts/shared/plans/x.md', () => {
   assertAllowed(runWrite('thoughts/shared/plans/x.md'));
 });
 
+test('allows a NotebookEdit notebook_path', () => {
+  const stdin = JSON.stringify({ tool_name: 'NotebookEdit', tool_input: { notebook_path: 'docs/x.ipynb' } });
+  assertAllowed(runHook(SCRIPT, [], stdin, { CLAUDE_PROJECT_DIR: DEFAULT_PROJECT_DIR }));
+});
+
 // Log
 
 test('writes one hook-log line per decision', () => {
@@ -205,4 +235,22 @@ test('writes one hook-log line per decision', () => {
   assert.ok(raw.includes('"decision":"block"'), raw);
   assert.ok(raw.includes('"hook":"path-guard"'), raw);
   assert.ok(raw.includes('"project_dir_raw"'), raw);
+});
+
+test('logs an early guard error under CLAUDE_PROJECT_DIR', () => {
+  const projectA = fs.mkdtempSync(path.join(os.tmpdir(), 'envanex-project-'));
+  try {
+    const result = runHook(SCRIPT, [], '{not json', {
+      CLAUDE_PROJECT_DIR: projectA,
+      ENVANEX_HOOK_LOG_DIR: undefined,
+    });
+    assertBlocked(result, 'invalid hook input');
+    const logFile = path.join(projectA, 'TestResults', 'hook-log', 'hooks.jsonl');
+    const lines = fs.readFileSync(logFile, 'utf8').trim().split('\n');
+    assert.equal(lines.length, 1);
+    assert.ok(lines[0].includes('"decision":"block"'), lines[0]);
+    assert.ok(lines[0].includes('invalid hook input'), lines[0]);
+  } finally {
+    fs.rmSync(projectA, { recursive: true, force: true });
+  }
 });
