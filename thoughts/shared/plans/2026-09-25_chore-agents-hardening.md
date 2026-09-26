@@ -1,6 +1,6 @@
 # Plan: chore(agents) — enforce the pipeline's rules and tier models by risk
 
-Date: 2026-09-25. Branch: `chore/agents-hardening`. Research: `thoughts/shared/research/2026-09-24_agent-workflow-hardening.md` (F1-F21). Roadmap: the `chore(agents)` row and the two Known gaps rows at `docs/roadmap.md:197-198`. Carried-forward notes: `thoughts/shared/plans/2026-09-24_fix-db-compose-sa-password.md:47,74-76,85`. Reviews: `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review.md` (NEEDS_REVISION) and `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review-r2.md` (NEEDS_REVISION, on Revision 1).
+Date: 2026-09-25. Branch: `chore/agents-hardening`. Research: `thoughts/shared/research/2026-09-24_agent-workflow-hardening.md` (F1-F21). Roadmap: the `chore(agents)` row and the two Known gaps rows at `docs/roadmap.md:197-198`. Carried-forward notes: `thoughts/shared/plans/2026-09-24_fix-db-compose-sa-password.md:47,74-76,85`. Reviews: `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review.md` (NEEDS_REVISION) and `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review-r2.md` (NEEDS_REVISION, on Revision 1). Phase 1 code review: `thoughts/shared/reviews/2026-09-26_chore-agents-code-review-phase-1.md` (NEEDS_REVISION on `f6df221..de44869`; applied as Revision 4).
 
 ## Revision 1
 
@@ -146,6 +146,57 @@ These seven edits are the r3 recipe from the plan-reviewer's focused review of R
 6. Phase 1 redaction tests: a new test, `redacts every Password occurrence`.
 7. `--filter`: its argument may start with neither `-` nor `/`. This applies in the dotnet token list and in Revision 2's note L, and the single `--filter -p:…` block test becomes two tests, for `-p:` and `/p:`.
 
+## Revision 4
+
+This revision applies the Phase 1 code review (`thoughts/shared/reviews/2026-09-26_chore-agents-code-review-phase-1.md`, NEEDS_REVISION), with the human's decisions. Everything the review did not question is unchanged. The Phase 1 text stays as the record of what `ac397c9` and `726338a` built. Where they differ, the new "Phase 1 amendments" subsection wins.
+
+### Threat model (every decision below follows from it)
+
+- The guards stop accidental destructive actions by a cooperative agent.
+- They are not a boundary against code the model writes and runs itself (`dotnet run`/`test`/`build`, `node`). That class is a residual risk.
+
+What follows from it:
+- An allow entry that reopens a deny is removed, not patched with more denies.
+- The deny list covers the forms a cooperative agent commonly types. Every other form is a named residual risk.
+- Redaction covers the secret forms this repository's commands and files actually carry.
+
+### Items and where they now live
+
+| # | Item | Decision | Where it lives now |
+|---|---|---|---|
+| 1 | Threat model | stated | Goal ("Threat model"); Phase 4 `docs/ai-workflow.md` section "Threat model" |
+| 2 | Finding 1: two block tests pass on the wrong guard error | coder-level | Phase 1 amendments A1; M1.10, M1.11 |
+| 3 | Finding 2: `decide` not awaited | coder-level | A2 (signature, fixture, two tests); M1.12 |
+| 4 | Finding 3: `NotebookEdit` untested | coder-level | A3 (two tests); M1.13; P1.15 |
+| 5 | Finding 4: early guard errors write no log line | coder-level | A4 (`resolveLogDir` fallback to `CLAUDE_PROJECT_DIR`, spawned test); M1.14; P1.14 |
+| 6 | Finding 5: fallback log dir built from the lowercased project dir | coder-level | A5 (`resolveLogDir(projectDirRaw)`); M1.15, M1.16, M1.27 |
+| 7 | UNC and device-path tests | coder-level | A6 (three tests); M1.17 |
+| 8 | Finding 6: `git switch *` reopens the switch denies | allow entry removed | B1 (`git switch -c *`, `git switch main`); B2 entries 4-9; P1.11d-i; P1.13a-b; Phase 3 `pr/SKILL.md` `allowed-tools` (interpretation U) |
+| 9 | Finding 7: `dotnet ef database update *` | allow entry removed; now prompts | B1; P1.13c; Phase 4 `docs/ai-workflow.md` "What prompts on purpose" |
+| 10 | Finding 8: `dotnet new *`, and `--output` on `git log`/`diff`/`show` | `dotnet new *` removed; `--output` denied; `git log *`/`diff *`/`show *` kept | B1; B2 entries 14-19; P1.11n-s; P1.13d, P1.13h |
+| 11 | Finding 9: `node --test .claude/hooks/tests/*` | narrowed to the exact test files plus the literal gate command | B1; P1.13e-g; Phase 2 Files (exact entries for the Phase 2 test files); Phase 4 residual "code the model runs" |
+| 12 | Finding 10: deny patterns miss common forms | `git -C *` and `git -c *` denied entirely, plus the listed forms; the rest are named residual risks | B2 entries 1-27; P1.11a-aa (Bash); P1.12 (PowerShell); C1.9 (mirror check); Phase 4 residual list "Deny forms not covered" |
+| 13 | Finding 11: redaction gaps | a rule, a test and a mutation proof for every form, before Phase 2 logs commands | A7 (rules 0, 1 amended, 5-9); 16 tests; M1.18-M1.26 |
+| 14 | Finding 12: path-alias classes | residual risk, UNVERIFIED, with a settling command | Phase 4 roadmap row and `docs/ai-workflow.md` Residual risks |
+| 15 | Finding 13: hook timeout, rule 3 backtracking | residual risk, UNVERIFIED, with a settling command | same as 14 |
+| 16 | New probes and checks | added | H1.3, C1.8, C1.9, P1.11-P1.15 (Phase 1 amendments) |
+
+### Interpretations and additions for the next review
+
+- **Q. `docker compose * down -v*` rather than one entry each for `-f` and `-p`.** One wildcard entry covers `-f` and `-p`, plus `--file`, `--project-name`, `--env-file` and `--profile`. The probes exercise `-f` (P1.11t) and `-p` (P1.11u). The same applies to `docker-compose`.
+- **S. Paired `--output` denies.** `git diff --output*` covers the flag in first position, and `git diff * --output*` covers it anywhere later. It is not established whether `*` matches an empty string, so both forms are listed.
+- **T. First-position switch forms.** `git switch --force*` and `git switch -C*` are added next to their after-a-positional forms. The existing prefix denies cover only `-f` and `--discard-changes`.
+- **U. `/pr` `allowed-tools`.** The skill's own allow list had the same hole as finding 6. Phase 3 narrows `Bash(git switch *)` to `Bash(git switch main)` and `Bash(git branch *)` to `Bash(git branch --show-current)`. `/commit` already uses `Bash(git switch -c *)`.
+- **V. Rule 1 errs toward over-redacting.** A quote directly after a value (a mid-value quote, or the closing quote of an enclosing string) extends the redaction to the matching quote or to the end of the string. This is a lexical ambiguity, and the rule resolves it toward redacting more. The log only loses context, never a secret.
+- **W. Rule 0 applies to every rule.** Line continuations are joined before all rules run, not only before rule 3.
+- **X. Case sensitivity of the rule matcher is UNVERIFIED.** If the matcher folds case, the deny `git switch -C*` would also deny the allowed `git switch -c *`. P1.13a settles it, and Rollback notes give the fallback. `git branch -D*` could then also deny `git branch -d`. No allow entry or skill uses `-d` (`/pr` deletes the branch through `gh pr merge --delete-branch`), so that outcome is only recorded.
+- **Y. `Bash(node --test .claude/hooks/tests/*.test.js)` still contains a rule wildcard.** It is the literal gate command, but to the matcher its `*` is a wildcard and may cross `/` and `..`. P1.13g records whether it does. Either way the risk falls inside the threat model's residual class.
+- **Z. `git switch main` is not probed live.** Switching branches mid-session swaps `.claude/` under the running session: the hook scripts don't exist on `main`, and settings may be reread (F21). P4.4 exercises it through `/pr` step 7.
+- **Z2. `git branch -D*` only.** As decided, there is no after-a-positional form. `git branch <b> -D`, `--delete --force`, `-df`, `-f` and `-M` are residual risks.
+- **Z3. Bare `git rebase`** stays a residual risk, as decided. Denying it would take one entry pair, `Bash(git rebase)` and `PowerShell(git rebase)`, if the human wants to reconsider.
+
+Human decisions (2026-09-26): Q, U, V and Z3 accepted as written; X and Z stand; no plan-review round for Revision 4, because the amendments' code review and probes check the same specifics.
+
 ---
 
 ## Goal
@@ -171,6 +222,13 @@ On top of that:
 
 Every guard is proven by a probe with raw output. A probe is a mutation proof: it shows the guard blocks what it should and allows what it should. Each probe's evidence is something only the guard can produce.
 
+### Threat model
+
+- The guards stop accidental destructive actions by a cooperative agent.
+- They are not a boundary against code the model writes and runs itself (`dotnet run`/`test`/`build`, `node`). That class is a residual risk (Phase 4).
+
+Every guard decision in this plan follows from this model. Allow entries that reopen a deny are removed, not patched. The deny list covers the forms commonly typed, and every other form is a named residual risk. Redaction covers the secret forms this repository actually carries.
+
 ## Non-goals
 
 - No product change. `src/`, `tests/`, `db/`, the migrations and `.github/workflows/ci.yml` stay untouched. `dotnet test` stays at **638**.
@@ -181,7 +239,8 @@ Every guard is proven by a probe with raw output. A probe is a mutation proof: i
 - Hook tests are not added to CI. They run locally and through `gate.sh`. This is recorded as a Known-gaps row (Phase 4). `normalizePath` is pure string logic, so a CI step on ubuntu can be added later without a rewrite.
 - The coder's per-phase max override (F3) is documented in `docs/ai-workflow.md`, not automated.
 - `gate.sh` never runs `git fetch`.
-- Windows path aliasing (a trailing `.` or space, NTFS stream suffixes) is not handled by `normalizePath`. It is recorded as a residual risk, marked UNVERIFIED (Phase 4).
+- Windows path aliasing (a trailing `.` or space, NTFS stream suffixes) is not handled by `normalizePath`. The same holds for the alias classes from the Phase 1 code review: 8.3 short names, junctions and links, drive-relative paths and case folding. Each is recorded as a residual risk, marked UNVERIFIED with its settling command (Phase 4).
+- The guards are no boundary against code the model writes and runs itself (Goal, "Threat model"). Closing that gap needs a sandbox, not more patterns.
 
 ## Touches schema? (yes/no — db-reviewer required if yes)
 
@@ -232,7 +291,9 @@ No (Q5): this is process, not product architecture. `docs/ai-workflow.md` takes 
 | C1.4 | `grep -c $'\r'` is 0 for every new `.js`/`.sh` file. After staging, `git ls-files --eol <file>` shows `i/lf`. | Every phase |
 | C1.5 | `--help` after the destructive commands (UNVERIFIED, never relied on). See the steps below this table. Every outcome is harmless there. | Phase 1 |
 | C1.6 | The form of `CLAUDE_PROJECT_DIR` on Windows: the `project_dir_raw` field of P1.1's log line, recorded as `C:\…`, `C:/…` or `/c/…`. All three are unit-tested; the check records which one runs. | Phase 1 |
-| C1.7 | `grep -c LIVEPROBE .claude/hooks/tests/*.js` prints 0 for every file. | Every phase |
+| C1.7 | `grep -c LIVEPROBE .claude/hooks/tests/*.js .claude/hooks/tests/fixtures/*.js` prints 0 for every file. | Every phase |
+| C1.8 | The behaviour of the Revision 4 probe commands when run for real (UNVERIFIED, never relied on): whether `-h`/`--help` is honored late, and whether `docker-compose` and `dotnet-ef` exist. See the steps below this table. Every outcome is harmless there. | Phase 1 amendments |
+| C1.9 | Mirror check: every `Bash(<p>)` deny entry has a `PowerShell(<p>)` twin, and the reverse. The command below prints `mirror-ok 47`. | Phase 1 amendments, every later phase |
 | C2.1 | Workspace trust was accepted for `C:\projects\envanex`, which frontmatter hooks require (F1). The path guard firing in fix(db) implies it; record the `/status` or trust state. | Phase 2 |
 | C2.2 | `/agents` lists all eight project agents with no load error. This proves the YAML frontmatter parses; that the hooks are nested correctly is proven by P2.2, P2.4 and P2.5. | Phase 2 |
 | C2.3 | The hook log shows whether `agent_type`/`agent_id` appear in hook input for subagent calls. Record present or absent. | Phase 2 |
@@ -252,6 +313,20 @@ C1.5 steps: the human runs these in an external Git Bash inside `SCRATCH=/c/User
    - `docker compose down -v --help; echo "exit=$?"`
    - `docker compose down --volumes --help; echo "exit=$?"`
    - `dotnet ef database drop --help; echo "exit=$?"`
+
+C1.8 steps: the human runs these in an external Git Bash, after H1.3. Let `G=/c/Users/jesus/AppData/Local/Temp/envanex-probe-git` and `SCRATCH=/c/Users/jesus/AppData/Local/Temp/envanex-probe-empty`.
+1. In `$G`, run each of these and record whether it printed usage (git exits 129) or did something:
+   - `git reset HEAD --hard -h; echo "exit=$?"`
+   - `git switch -C lp -h; echo "exit=$?"`
+   - `git switch main -C lp -h; echo "exit=$?"`
+   - `git switch -c lp -h; echo "exit=$?"`
+2. In `$G`, `git branch --list lp` prints nothing.
+3. In `$SCRATCH`, run `docker system prune --help; echo "exit=$?"`.
+4. In `$SCRATCH`, run `command -v docker-compose; echo "exit=$?"` and `command -v dotnet-ef; echo "exit=$?"`.
+5. For each binary step 4 found, run in `$SCRATCH`: `docker-compose down -v --help; echo "exit=$?"`, `docker-compose down --volumes --help; echo "exit=$?"`, `dotnet-ef database drop --help; echo "exit=$?"`.
+
+C1.9 command:
+`node -e "const d=require('./.claude/settings.json').permissions.deny;const b=d.filter(x=>x.startsWith('Bash(')).map(x=>x.slice(5));const p=d.filter(x=>x.startsWith('PowerShell(')).map(x=>x.slice(11));const ok=b.length===p.length&&b.every(x=>p.includes(x))&&b.length+p.length===d.length;console.log(ok?'mirror-ok '+b.length:'mirror-FAIL');process.exit(ok?0:1)"`
 
 C2.6 steps: the human runs these in an external Git Bash, outside the repo and outside the H1.2 scratch dir.
 1. `D=/c/Users/jesus/AppData/Local/Temp/envanex-prebuild-check && dotnet new console -o "$D" && cd "$D"`
@@ -531,6 +606,311 @@ node --test .claude/hooks/tests/*.test.js
 grep -c LIVEPROBE .claude/hooks/tests/*.js                     # 0 for every file (C1.7)
 node -e "JSON.parse(require('fs').readFileSync('.claude/settings.json','utf8'))"
 grep -c $'\r' .claude/hooks/lib/guard-common.js .claude/hooks/path-guard.js .claude/hooks/tests/*.js
+dotnet format --verify-no-changes
+dotnet build -warnaserror
+dotnet test            # 638 passed in total
+git rev-parse --verify origin/main && test "$(git merge-base main HEAD)" = "$(git merge-base origin/main HEAD)"; echo "base-check=$?"   # base-check=0
+git diff --name-only main...HEAD -- src tests db   # empty
+git status --short
+```
+
+### Phase 1 amendments (Revision 4)
+
+These amend Phase 1 after its code review. The text above records what `ac397c9` and `726338a` built. Where an amendment differs, the amendment wins.
+
+**Order.** The amendments run as one round of the Probe protocol:
+1. The coder implements A1-A7, B1 and B2 in one turn, ending with PHASE_COMPLETE.
+2. The human runs `/commit`.
+3. A separate coder turn runs M1.10-M1.27 against that commit, using Phase 1's four mutation steps.
+4. The human runs H1.3 and C1.8 in an external Git Bash, then restarts Claude Code.
+5. In the fresh session, the main session runs C1.9 and P1.11-P1.15. It appends raw evidence, as it happens, to `TestResults/chore-agents-hardening/evidence/phase-1-amendments.md`.
+6. Cleanup, as in Probe protocol step 4. In addition:
+   - `git branch --list 'LIVEPROBE*'` prints nothing
+   - `ls TestResults/LIVEPROBE-*` answers "No such file"
+7. The evidence is copied into this plan under `## As built — Phase 1 amendments`, placed after `## As built — Phase 1`, and the human commits it as `docs(agents)`.
+8. code-reviewer re-reviews Phase 1 with `Range: <the commit that records Revision 4>..<the amendments evidence commit>`.
+   - Under the old contract it writes no file. The main session saves its output verbatim as `thoughts/shared/reviews/2026-09-DD_chore-agents-code-review-phase-1-r2.md`.
+   - The human commits that file, whatever its verdict.
+9. The tester runs on that commit.
+
+Phase 2 starts only after this round ends with READY_TO_PUSH, because Phase 2's hooks log whole commands and need A7 in place first.
+
+#### Human steps
+
+- **H1.3:** create a scratch git repo outside the repository:
+  `G=/c/Users/jesus/AppData/Local/Temp/envanex-probe-git && git init -b main "$G" && cd "$G" && git commit --allow-empty -m init`
+  Then run C1.8.
+
+#### Files
+
+- `.claude/hooks/lib/guard-common.js` — modified: A2 (`await decide`), A4 and A5 (`resolveLogDir`, `logDecision`), A7 (`redactSecrets`).
+- `.claude/hooks/tests/fixtures/async-decide-guard.js` — created (A2). CommonJS, LF, no `LIVEPROBE`.
+- `.claude/hooks/tests/path-guard.test.js` — modified:
+  - A1, A3, A4 (the spawned test) and A6
+  - the `after` cleanup skips an undefined `logDir`
+- `.claude/hooks/tests/guard-common.test.js` — modified:
+  - A2, A4, A5 and A7 tests
+  - saves and restores `process.env.CLAUDE_PROJECT_DIR` around the tests that set it
+- `.claude/settings.json` — modified: B1 (the `allow` list, replaced) and B2 (27 deny patterns appended, each as a `Bash(…)` and `PowerShell(…)` pair)
+
+`.claude/hooks/path-guard.js` and `.claude/hooks/tests/run-hook.js` are not changed. M1.17 mutates `path-guard.js` only temporarily.
+
+#### Signatures and rules
+
+- **A1 (finding 1):** no code change. `blocks on malformed JSON` asserts `invalid hook input`, and `blocks on an empty file path` asserts `target path is missing or empty`.
+- **A2 (finding 2):**
+  - Signature: `runGuard(hookName: string, decide: (input: object, ctx: object) => void | Promise<void>, extractTarget: (input: object) => string = getTargetPath): void`.
+  - The inner function awaits `decide` before it calls `allow`. A rejected promise becomes `block` with `guard error: <message>`, and an async `block` exits 2 before `allow` can run.
+  - Fixture `.claude/hooks/tests/fixtures/async-decide-guard.js <mode>`: calls `runGuard('async-decide-fixture', decide)` with the default extractor. `decide` is async and first awaits `Promise.resolve()`. Then:
+    - mode `reject` throws `Error('async decide rejected')`
+    - mode `block` calls `block(ctx, 'async decide blocked')`
+    - any other mode throws `Error('unknown fixture mode')`
+  - The fixture's name doesn't end in `.test.js`, so `node --test .claude/hooks/tests/*.test.js` doesn't run it as a test.
+- **A3 (finding 3):** no code change; tests only.
+- **A4 and A5 (findings 4 and 5):** `resolveLogDir(projectDirRaw?: string): string`:
+  1. Return `ENVANEX_HOOK_LOG_DIR` if it is set and non-empty (unchanged).
+  2. Otherwise the base is `projectDirRaw` if that is a non-empty string, else `process.env.CLAUDE_PROJECT_DIR`. If neither exists, throw.
+  3. Convert the base with steps 1 and 2 of `normalizePath` only: `\` → `/`, and `/<letter>/` → `<letter>:/`. Don't lowercase it and don't collapse `..`. Strip a trailing `/`. If the result doesn't match `^[A-Za-z]:/` or `^/`, throw.
+  4. Return `<base>/TestResults/hook-log`.
+
+  `logDecision` calls `resolveLogDir(ctx && ctx.projectDirRaw)` and never uses `ctx.projectDir`. As a result:
+  - A guard error raised before `getProjectDir` runs (empty or malformed stdin) still logs under `CLAUDE_PROJECT_DIR`.
+  - The fallback log dir keeps the raw case.
+  - A relative raw project dir writes no log line. The block still happens.
+  - Decisions don't change, and `logDecision` still swallows its own errors.
+  - In production the log stays at `C:/projects/envanex/TestResults/hook-log/hooks.jsonl` (C1.6). P1.14 confirms this.
+- **A6:** tests only. They pin the current behaviour: every one of these forms still reaches a protected segment or basename after `normalizePath`.
+- **A7 (finding 11): `redactSecrets(s: string): string`.** Rules run in the order below. Every rule replaces every occurrence and is case-insensitive unless stated otherwise. Shared definitions:
+  - `SENSITIVE` = `password|passwd|pwd|secret|token|api[_-]?key|signing[_-]?key|access[_-]?key|private[_-]?key|credential`
+  - `VALUE` = `(?:'[^']*(?:'|$)|"(?:[^"\\]|\\.)*(?:"|$)|[^;\s'"])+`. That is, one or more of:
+    - a single-quoted run, closed or unterminated
+    - a double-quoted run with backslash escapes, closed or unterminated
+    - a single unquoted character other than `;`, whitespace or a quote
+
+    The three alternatives start with different characters, so backtracking stays linear.
+
+  The rules:
+  - **Rule 0 (new), line continuations:** each `\` or `` ` `` immediately followed by `\r?\n` becomes one space before any other rule runs.
+  - **Rule 1 (value amended), password assignments:** `(password|pwd)(\s*=\s*)VALUE` → `$1$2***`. The old value was `'[^']*'|"[^"]*"|[^;'"\s]+`. With the new value:
+    - an unterminated quote is redacted to the end of the string
+    - `\"` doesn't end a double-quoted value
+    - a quote inside an unquoted value continues the value
+
+    The rule redacts more rather than less (interpretation V).
+  - **Rules 2, 3 and 4:** unchanged. Rule 0 now covers rule 3's line-continuation gap.
+  - **Rule 5 (new), sensitive key assignments:** `([A-Za-z0-9_.:-]*(?:SENSITIVE)[A-Za-z0-9_.:-]*)(\s*[=:]\s*)VALUE` → `$1$2***`. This covers:
+    - `AWS_SECRET_ACCESS_KEY=x`
+    - `Jwt__SigningKey=x`
+    - `Jwt:SigningKey=x`
+    - `--Jwt:SigningKey=x` (the `--` stays outside the key)
+  - **Rule 6 (new), JSON members:** `("[^"]*(?:SENSITIVE)[^"]*"\s*:\s*)(?:"(?:[^"\\]|\\.)*"|[^,}\s]+)` → `$1"***"`.
+  - **Rule 7 (new), space-separated options:** `((?:^|\s)--?[A-Za-z0-9_-]*(?:SENSITIVE)[A-Za-z0-9_-]*)(\s+)(?:'[^']*(?:'|$)|"(?:[^"\\]|\\.)*(?:"|$)|\S+)` → `$1$2***`.
+  - **Rule 8 (new), Authorization headers:** `(authorization\s*[:=]\s*(?:(?:bearer|basic|token|digest)\s+)?)[^\s'"]+` → `$1***`.
+  - **Rule 9 (new), URL userinfo:** `([a-z][a-z0-9+.-]*://[^\s/@:'"]*:)[^\s/@'"]+@` → `$1***@`.
+
+  Truncation to 300 characters still happens after redaction.
+
+#### B1: `permissions.allow` (exact; replaces the whole list)
+
+```
+Bash(dotnet build), Bash(dotnet build *), Bash(dotnet test), Bash(dotnet test *), Bash(dotnet format *),
+Bash(dotnet restore), Bash(dotnet restore *), Bash(dotnet list *), Bash(dotnet package *), Bash(dotnet run *),
+Bash(dotnet sln *), Bash(dotnet add *), Bash(dotnet tool restore),
+Bash(dotnet ef migrations add *), Bash(dotnet ef migrations list *),
+Bash(docker compose ps), Bash(docker compose ps *), Bash(docker compose up -d *), Bash(docker compose up -d),
+Bash(docker compose logs *),
+Bash(git status), Bash(git status *), Bash(git log *), Bash(git diff), Bash(git diff *), Bash(git show *),
+Bash(git ls-files *), Bash(git rev-parse *), Bash(git branch --show-current),
+Bash(git switch -c *), Bash(git switch main), Bash(git checkout -b *), Bash(git pull), Bash(git pull *),
+Bash(gh pr view *), Bash(gh pr list *), Bash(gh pr checks *), Bash(gh run list *), Bash(gh run view *),
+Bash(node --test .claude/hooks/tests/guard-common.test.js), Bash(node --test .claude/hooks/tests/path-guard.test.js),
+Bash(node --test .claude/hooks/tests/*.test.js)
+```
+
+Removed:
+- `Bash(git switch *)` (finding 6)
+- `Bash(dotnet ef database update *)` (finding 7; it now prompts)
+- `Bash(dotnet new *)` (finding 8; it now prompts)
+- `Bash(node --test .claude/hooks/tests/*)` (finding 9)
+
+Every later test file gets its own exact entry (Phase 2).
+
+#### B2: `permissions.deny` additions
+
+The 40 existing entries stay. Each pattern below is appended twice, as `Bash(<p>)` and as `PowerShell(<p>)`, which makes 47 patterns and 94 entries in total.
+
+```
+ 1 git -C *                          15 git log * --output*
+ 2 git -c *                          16 git diff --output*
+ 3 git reset * --hard*               17 git diff * --output*
+ 4 git switch --force*               18 git show --output*
+ 5 git switch -C*                    19 git show * --output*
+ 6 git switch * -f*                  20 docker compose * down -v*
+ 7 git switch * --force*             21 docker compose * down --volumes*
+ 8 git switch * --discard-changes*   22 docker-compose down -v*
+ 9 git switch * -C*                  23 docker-compose down --volumes*
+10 git checkout * -- *               24 docker-compose * down -v*
+11 git push +*                       25 docker-compose * down --volumes*
+12 git push * +*                     26 dotnet-ef database drop*
+13 git branch -D*                    27 docker system prune*
+14 git log --output*
+```
+
+### Tests to add (amendments)
+
+No test file contains `LIVEPROBE` (C1.7). Each secret is a distinct `S3cretValueN`, continuing from 13. New redaction tests assert on the parsed `target` field (`JSON.parse(line).target`), because the raw log line JSON-escapes quotes.
+
+`.claude/hooks/tests/path-guard.test.js`:
+- **modified (A1):**
+  - `blocks on malformed JSON` asserts `invalid hook input`
+  - `blocks on an empty file path` asserts `target path is missing or empty`
+- **A3:**
+  - `blocks a NotebookEdit notebook_path under obj` — stdin `{"tool_name":"NotebookEdit","tool_input":{"notebook_path":"obj/x.ipynb"}}`, asserting `protected segment "obj"`
+  - `allows a NotebookEdit notebook_path` — `docs/x.ipynb`, exit 0
+- **A4:** `logs an early guard error under CLAUDE_PROJECT_DIR`
+  - setup: stdin `{not json`; env `CLAUDE_PROJECT_DIR=<temp dir A>` and `ENVANEX_HOOK_LOG_DIR: undefined`
+  - asserts exit 2 and stderr `invalid hook input`
+  - asserts that `A/TestResults/hook-log/hooks.jsonl` has one line with `"decision":"block"` and `invalid hook input`
+  - removes temp dir A afterwards
+- **A6:**
+  - `blocks a UNC path with an obj segment` — `\\server\share\obj\x`, `protected segment "obj"`
+  - `blocks a \\?\ device path to .env` — `\\?\C:\projects\envanex\.env`, `protected file name`
+  - `blocks a \\.\ device path with an obj segment` — `\\.\C:\projects\envanex\obj\x`, `protected segment "obj"`
+
+`.claude/hooks/tests/guard-common.test.js`:
+- **A2** (spawned through `runHook` against the fixture, with stdin `{"tool_name":"Write","tool_input":{"file_path":"docs/x.md"}}` and `CLAUDE_PROJECT_DIR=C:\projects\envanex`):
+  - `runGuard blocks when an async decide rejects` — mode `reject`; exit 2; stderr contains `guard error: async decide rejected`
+  - `runGuard waits for an async decide that blocks` — mode `block`; exit 2; stderr contains `async decide blocked`
+- **A4 and A5** (override set to `''`):
+  - `resolveLogDir keeps the raw project dir's case in slash form` — `C:\Projects\Envanex` → `C:/Projects/Envanex/TestResults/hook-log`; `/c/Projects/Envanex` → `c:/Projects/Envanex/TestResults/hook-log`
+  - `resolveLogDir falls back to CLAUDE_PROJECT_DIR when no project dir is given` — env `C:\Temp\Envanex-X`, argument `undefined` → `C:/Temp/Envanex-X/TestResults/hook-log`
+  - `resolveLogDir throws on a relative project dir` — `projects/envanex`, with `CLAUDE_PROJECT_DIR` deleted
+  - `logDecision builds the fallback log dir from projectDirRaw` — ctx `{projectDirRaw: <temp A>, projectDir: <temp B in slash form>}`; A has the line and B has no `TestResults`
+- **A7:**
+  - `joins a backslash line continuation before redacting` — `dotnet user-secrets set k \` + `\n` + `S3cretValue13`
+  - ``joins a PowerShell backtick continuation before redacting`` — ``dotnet user-secrets set k ` `` + `\r\n` + `S3cretValue14`
+  - `redacts an unterminated quoted Password value` — `Password='S3cretValue15 and the rest`
+  - `redacts a Password value with a mid-value quote` — `Password=ab'S3cretValue16`
+  - `redacts a Password value with an escaped double quote` — `Password="ab\" S3cretValue17"` (note the space after `\"`)
+  - `redacts AWS_SECRET_ACCESS_KEY` — `AWS_SECRET_ACCESS_KEY=S3cretValue18 aws s3 ls`; target keeps `aws s3 ls`
+  - `redacts a Jwt__SigningKey assignment` — `export Jwt__SigningKey='S3cretValue19'`
+  - `redacts a --Jwt:SigningKey= argument` — `dotnet run --project src/Envanex.Web --Jwt:SigningKey=S3cretValue20`; target keeps `--project src/Envanex.Web`
+  - `redacts a Jwt:SigningKey= assignment` — `Jwt:SigningKey=S3cretValue21`
+  - `redacts a JSON Password member` — `{"Password": "S3cretValue22"}`; target contains `"Password": "***"`
+  - `redacts a JSON SigningKey member` — `{"Jwt": {"SigningKey": "S3cretValue23"}}`
+  - `redacts a space-separated --password value` — `tool --password S3cretValue24 --verbose`; target keeps `--verbose`
+  - `redacts an Authorization Bearer header` — `curl -H "Authorization: Bearer S3cretValue25" https://example.test/x`; target keeps `https://example.test/x`
+  - `redacts URL userinfo` — `git clone https://user:S3cretValue26@example.test/x.git`; target keeps `@example.test/x.git`
+  - `leaves a URL without userinfo unchanged` — `git clone https://example.test/x.git` (exact)
+  - `leaves git show HEAD:path unchanged` — `git show HEAD:src/Envanex.Web/Program.cs` (exact)
+
+Total after the amendments: 85 hook tests (57 + 28).
+
+### Mutation proofs (amendments; separate coder turn after `/commit`)
+
+Same four steps as Phase 1. Each restore ends with `git diff --exit-code -- <file>` at 0.
+
+| ID | Mutation | Expected red |
+|---|---|---|
+| M1.10 | drop the `\` → `/` replacement in `toSlashForm` (the M1.1 mutation) | `blocks on an empty file path`, on its own assertion (the reason is now `project dir is not absolute`) |
+| M1.11 | in `readHookInput`, resolve `{}` instead of rejecting on a JSON parse error | `blocks on malformed JSON`, `logs an early guard error under CLAUDE_PROJECT_DIR` |
+| M1.12 | remove `await` before `decide` in `runGuard` | `runGuard blocks when an async decide rejects`, `runGuard waits for an async decide that blocks` |
+| M1.13 | remove `?? toolInput.notebook_path` in `getTargetPath` | `allows a NotebookEdit notebook_path`, `blocks a NotebookEdit notebook_path under obj` |
+| M1.14 | in `resolveLogDir`, drop the `CLAUDE_PROJECT_DIR` fallback | `logs an early guard error under CLAUDE_PROJECT_DIR`, `resolveLogDir falls back to CLAUDE_PROJECT_DIR when no project dir is given` |
+| M1.15 | in `logDecision`, pass `ctx.projectDir` instead of `ctx.projectDirRaw` | `logDecision builds the fallback log dir from projectDirRaw` |
+| M1.16 | in `resolveLogDir`, lowercase the base | `resolveLogDir keeps the raw project dir's case in slash form` |
+| M1.17 | in `path-guard.js` `decide`, return (allow) when the normalized path does not start with `ctx.projectDir + '/'` | the three A6 tests, and `blocks secrets.json` |
+| M1.18 | remove rule 0 | both continuation tests |
+| M1.19 | in `VALUE`, the single-quoted alternative requires its closing quote (`'[^']*'`) | `redacts an unterminated quoted Password value` |
+| M1.20 | in `VALUE`, drop the `\\.` escape (`"[^"]*(?:"\|$)`) | `redacts a Password value with an escaped double quote` |
+| M1.21 | replace `VALUE` with one unrepeated alternative, with an unquoted run `[^;\s'"]+` | `redacts a Password value with a mid-value quote` |
+| M1.22 | remove rule 5 | `redacts AWS_SECRET_ACCESS_KEY`, `redacts a Jwt__SigningKey assignment`, `redacts a --Jwt:SigningKey= argument`, `redacts a Jwt:SigningKey= assignment` |
+| M1.23 | remove rule 6 | both JSON member tests |
+| M1.24 | remove rule 7 | `redacts a space-separated --password value` |
+| M1.25 | remove rule 8 | `redacts an Authorization Bearer header` |
+| M1.26 | remove rule 9 | `redacts URL userinfo` |
+| M1.27 | in `resolveLogDir`, drop the absolute check | `resolveLogDir throws on a relative project dir` |
+
+### Probes (amendments; fresh session after restart)
+
+Unless noted, every item is its own tool call, run exactly as written.
+
+- **P1.11 (deny, Bash tool, auto mode as in C1.1).**
+  - Evidence per command is the same three-part evidence as P1.7:
+    1. Claude Code's permission-denied text
+    2. the human's note that no prompt appeared
+    3. no command output
+  - Each command is chosen so that, under case-sensitive matching, no other deny entry matches it, and so that it does no harm on a clean tree if the deny were missing (C1.8).
+
+  | id | Command | Pattern |
+  |---|---|---|
+  | a | `git -C . stash list` | 1 |
+  | b | `git -c core.pager=cat stash list` | 2 |
+  | c | `git reset HEAD --hard -h` | 3 |
+  | d | `git switch --force chore/agents-hardening` | 4 |
+  | e | `git switch -C LIVEPROBE-1-11e -h` | 5 |
+  | f | `git switch chore/agents-hardening -f` | 6 |
+  | g | `git switch chore/agents-hardening --force` | 7 |
+  | h | `git switch chore/agents-hardening --discard-changes` | 8 |
+  | i | `git switch chore/agents-hardening -C LIVEPROBE-1-11i -h` | 9 |
+  | j | `git checkout HEAD -- CLAUDE.md` | 10 |
+  | k | `git push +LIVEPROBE-1-11k --dry-run` | 11 |
+  | l | `git push origin +LIVEPROBE-1-11l --dry-run` | 12 |
+  | m | `git branch -D LIVEPROBE-1-11m` | 13 |
+  | n | `git log --output=TestResults/LIVEPROBE-1-11n.txt -1` | 14 |
+  | o | `git log -1 --output=TestResults/LIVEPROBE-1-11o.txt` | 15 |
+  | p | `git diff --output=TestResults/LIVEPROBE-1-11p.txt` | 16 |
+  | q | `git diff HEAD --output=TestResults/LIVEPROBE-1-11q.txt` | 17 |
+  | r | `git show --output=TestResults/LIVEPROBE-1-11r.txt HEAD` | 18 |
+  | s | `git show HEAD --output=TestResults/LIVEPROBE-1-11s.txt` | 19 |
+  | t | `docker compose -f /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty/compose.yml down -v --help` | 20 |
+  | u | `docker compose -p liveprobe-1-11u -f /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty/compose.yml down --volumes --help` | 21 |
+  | v | `cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && docker-compose down -v --help` | 22 |
+  | w | `cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && docker-compose down --volumes --help` | 23 |
+  | x | `docker-compose -f /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty/compose.yml down -v --help` | 24 |
+  | y | `docker-compose -p liveprobe-1-11y -f /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty/compose.yml down --volumes --help` | 25 |
+  | z | `cd /c/Users/jesus/AppData/Local/Temp/envanex-probe-empty && dotnet-ef database drop --help` | 26 |
+  | aa | `docker system prune --filter label=liveprobe-1-11aa --help` | 27 |
+
+  The `compose.yml` in t, u, x and y does not exist, so even if one of those ran, it would only report a missing file.
+
+  Extra evidence:
+  - `ls TestResults/LIVEPROBE-1-11*.txt` answers "No such file" (n-s)
+  - `git branch --list 'LIVEPROBE*'` prints nothing (e, i, k, l, m)
+  - **P1.11-ctl:** `git status --short` returns without a prompt
+- **P1.12 (deny, PowerShell tool, auto mode):**
+  - Run the same 27 commands through the PowerShell tool, with IDs `P1.12a`-`P1.12aa` and tags renamed to `LIVEPROBE-1-12…`.
+  - In PowerShell, drop the `cd … &&` prefix from v, w and z, and write paths as `C:\Users\jesus\AppData\Local\Temp\envanex-probe-empty\compose.yml`.
+  - v, w and z then run in the repo directory. They run only if C1.8 showed that the binary is absent or prints help for that form. Otherwise that item is skipped and recorded, and C1.9 covers its mirror entry.
+  - Same three-part evidence as P1.11.
+- **P1.13 (allow and prompt, manual mode as in P1.9):**
+  - a. `git switch -c LIVEPROBE-1-13a -h` runs without a prompt and prints git's usage text (see C1.8 step 1). A permission-denied result means the matcher folds case; apply Rollback fallback R4-1. Afterwards `git branch --list 'LIVEPROBE*'` prints nothing.
+  - b. `git switch chore/agents-hardening` prompts, because `git switch *` is gone. The human declines.
+  - c. `dotnet ef database update --help` prompts; declined.
+  - d. `dotnet new --help` prompts; declined.
+  - e. `node --test .claude/hooks/tests/guard-common.test.js` runs without a prompt, all green.
+  - f. `node --test .claude/hooks/tests/*.test.js` runs without a prompt, 85 green.
+  - g. `node --test .claude/hooks/tests/../tests/path-guard.test.js`: record whether a prompt appears (finding 9's settling command). There is no expected outcome. Record it as `wildcard crosses ..: yes|no` under As built; Phase 4's residual list cites it. If a prompt appears, the human declines.
+  - h. `git diff --stat`, `git log --oneline -1` and `git show --stat HEAD` run without a prompt. The kept entries still allow, and the `--output` denies don't catch them.
+- **P1.14 (path guard after A2, A4 and A5):**
+  - Write `obj\LIVEPROBE-1-14.txt`: blocked, and `grep 'LIVEPROBE-1-14' TestResults/hook-log/hooks.jsonl` shows the `block` line with `project_dir_raw`.
+  - Write `TestResults/LIVEPROBE-1-14b.txt`: allowed, with an `allow` line. Then delete the file.
+  - This proves that production logging still lands in `TestResults/hook-log/hooks.jsonl` after the `resolveLogDir` change.
+- **P1.15 (NotebookEdit, live):** NotebookEdit on `obj/LIVEPROBE-1-15.ipynb`.
+  - Evidence: the tool result `Blocked by path-guard: protected segment "obj"`, plus a log line for `LIVEPROBE-1-15` with `"tool_name":"NotebookEdit"`.
+  - If the tool is unavailable, or rejects the call before the hook runs (no log line), the probe is **inconclusive** and recorded that way. The A3 unit tests carry the behaviour.
+- **C1.9:** the mirror command prints `mirror-ok 47`.
+
+### Validation (amendments)
+
+```bash
+node --version
+node --test .claude/hooks/tests/*.test.js                                          # 85 pass, 0 fail
+grep -c LIVEPROBE .claude/hooks/tests/*.js .claude/hooks/tests/fixtures/*.js       # 0 for every file (C1.7)
+grep -c $'\r' .claude/hooks/lib/guard-common.js .claude/hooks/path-guard.js .claude/hooks/tests/*.js .claude/hooks/tests/fixtures/*.js   # 0 each
+node -e "JSON.parse(require('fs').readFileSync('.claude/settings.json','utf8'))"
+node -e "<the C1.9 command>"                                                       # mirror-ok 47
+grep -cE 'Bash\((git switch \*|dotnet ef database update \*|dotnet new \*|node --test \.claude/hooks/tests/\*)\)' .claude/settings.json   # 0
 dotnet format --verify-no-changes
 dotnet build -warnaserror
 dotnet test            # 638 passed in total
@@ -1016,6 +1396,7 @@ Other facts from Phase 1:
 - `.claude/settings.json` — modified:
   - the plugin keys from H2.1 (the human's install writes them; the coder only confirms they are present)
   - `permissions.allow` gains `mcp__<server id recorded in H2.1>`
+  - `permissions.allow` gains the exact entries `Bash(node --test .claude/hooks/tests/coder-bash-guard.test.js)`, `Bash(node --test .claude/hooks/tests/bash-allowlist.test.js)` and `Bash(node --test .claude/hooks/tests/write-scope.test.js)` (Revision 4, B1: every test file has its own exact entry)
 - `CLAUDE.md` — modified, minimal. Only the Orchestration bullets that would otherwise contradict the new contracts:
   - code-reviewer: "no Bash tool, never edits files" becomes "writes only its verdict file under `thoughts/shared/reviews/`"
   - tester: "never writes files" becomes "writes only under `TestResults/`"
@@ -1341,6 +1722,7 @@ The Phase 1 block, plus:
 - C1.7 over the new test files
 - C2.2 and C2.5
 - `grep -c $'\r'` over the new files
+- C1.9 prints `mirror-ok 47` (Phase 2 adds no deny entry)
 
 From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 1 block's base-check line passes it because the read allowlist has `merge-base`, and the test `allows the Phase 1 base-check command line` pins that down.
 
@@ -1457,7 +1839,7 @@ From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 
   - Unstaging goes to the human, because `git restore` is denied.
 - **`pr/SKILL.md`:**
   - `effort: low`
-  - `allowed-tools` converted to the space form: `Read, Glob, Grep, Write, Bash(git status), Bash(git status *), Bash(git log *), Bash(git diff *), Bash(git rev-parse *), Bash(git merge-base *), Bash(git push *), Bash(git switch *), Bash(git pull), Bash(git pull *), Bash(git branch *), Bash(gh pr *), Bash(gh run *)`. The deny list still overrides `git push *`.
+  - `allowed-tools` converted to the space form: `Read, Glob, Grep, Write, Bash(git status), Bash(git status *), Bash(git log *), Bash(git diff *), Bash(git rev-parse *), Bash(git merge-base *), Bash(git push *), Bash(git switch main), Bash(git pull), Bash(git pull *), Bash(git branch --show-current), Bash(gh pr *), Bash(gh run *)`. The deny list still overrides `git push *`, including `+refspec` pushes. `git switch main` and `git branch --show-current` are the only forms `/pr` uses (Revision 4, interpretation U).
   - **Definitions:**
     - `<slug>` = the current branch with `/` replaced by `-`
     - A review file "belongs to this branch" when its name matches `thoughts/shared/reviews/*_<slug>-*.md`.
@@ -1619,6 +2001,7 @@ The Phase 1 block, plus:
   - line 58: `fix(db)` status becomes `done (#14)`
   - rows 197-198 are removed (closed by this PR)
   - **new Known gaps row, residual guard risks:**
+    - **Threat model:** the guards stop accidental destructive actions by a cooperative agent. They are not a boundary against code the model writes and runs itself: `dotnet run` (including .NET 10 file-based `dotnet run x.cs`), `dotnet test`, `dotnet build`, `node` or a script. Such code can call any denied command.
     - the Bash guards are string heuristics. Obfuscation bypasses them: a variable holding `git`, or script indirection (`bash x.sh` where the script calls git).
     - coder-bash-guard has a false-positive class: any command naming `git` as a word, such as `ls .git/hooks`, `ls tools/git/x` or `grep -rn "git" docs`, is blocked
     - bash-allowlist splits without regard to quotes, so `grep -E "a|b"` is blocked
@@ -1628,6 +2011,25 @@ The Phase 1 block, plus:
     - agents can edit `.claude/` itself, taking effect after a restart
     - user-level settings sit outside the repository; `Bash(find *)` there allows `find -delete`
     - the `base-check` failure path of `gate.sh` is not probed
+    - **Deny forms not covered (finding 10 of the Phase 1 code review; UNVERIFIED, because they concern the rule matcher; settle by probing each in auto mode, as P1.11 does):**
+      - global options before the subcommand other than `-C`/`-c`: `git --no-pager …`, `git --git-dir=… …`, `git --work-tree=… …`
+      - another binary name: `git.exe …`
+      - a flag after another flag: `docker compose down --remove-orphans -v`
+      - bare `git rebase`
+      - `git checkout <path>` (no `--`), `git checkout --force <b>`, `git checkout <b> -f`
+      - `git branch <b> -D`, `git branch --delete --force`, `git branch -df`, `git branch -f`, `git branch -M`
+    - **git long-option abbreviations (UNVERIFIED):** git accepts unambiguous prefixes of long options, so `git reset --har` or `git switch --forc` can slip past a prefix deny. Settle in the H1.3 scratch repo: `echo a > f && git add f && git commit -m f && echo b > f && git reset --har; git diff --quiet; echo "abbrev-honored=$?"` (0 means it reset).
+    - **The `*.test.js` allow entry:** its `*` is a rule wildcard. P1.13g recorded whether it crosses `..` (cite the As-built result).
+    - **Matcher case sensitivity:** P1.13a recorded whether `git switch -C*` also denies `git switch -c`. If R4-1 was applied, `git switch -C` is a residual risk.
+    - **Path-guard alias classes (finding 12; each UNVERIFIED; this plan runs none of the settling commands):**
+      - 8.3 short names (`GIT~1`, `ENV~1.LOC`, `SETTIN~1.JSO`): `fsutil 8dot3name query C:` and `cmd //c "dir /x C:\projects\envanex"`
+      - junctions, symlinks and hard links: `cmd //c "mklink /J C:\projects\envanex\TestResults\lp-junction C:\projects\envanex\obj"`, ask for a Write to `TestResults\lp-junction\LIVEPROBE-x.txt`, then `ls obj/LIVEPROBE-x.txt`; remove the junction with `cmd //c "rmdir C:\projects\envanex\TestResults\lp-junction"`
+      - drive-relative `C:obj\x`: ask for a Write to `C:obj\LIVEPROBE-x.txt` and read that call's `target` in the hook log (an absolute target means Claude Code resolves it before the hook)
+      - case folding against NTFS's upcase table (`packageſ`, `.gıt`): in a scratch dir, `mkdir packages .git && ls -d packageſ .gıt`
+    - **Hook timeouts and regex cost (finding 13; UNVERIFIED):**
+      - Whether a hook timeout fails open: in a scratch project with its own `.claude/settings.json`, whose PreToolUse hook is `node -e "setTimeout(()=>process.exit(2),10000)"` with `"timeout": 2`, ask for a Write of `x.txt`. If `x.txt` exists afterwards, a timeout fails open.
+      - Rule 3's lazy backtracking on long whitespace runs: `node -e "const {redactSecrets}=require('./.claude/hooks/lib/guard-common');for(const n of [1e3,1e4,1e5]){const s='dotnet user-secrets'+' '.repeat(n)+'x';const t=Date.now();redactSecrets(s);console.log(n,Date.now()-t,'ms')}"`. Growth faster than linear confirms it.
+    - **Redaction is pattern-based:** a secret under a key name outside `SENSITIVE`, or passed as a bare positional argument, is logged. Rule 1 and `VALUE` over-redact, by design, when a quote directly follows a value.
 
     Closes in: "not scheduled — recorded". If P2.6 failed, a further row covers the LSP failure.
   - **new Known gaps row, hook tests not run in CI:** `node --test .claude/hooks/tests/*.test.js` runs only locally and through `gate.sh`. `normalizePath` is pure string logic, so a step on the `ubuntu-latest` CI job can be added without a rewrite. Closes in: "not scheduled — recorded".
@@ -1639,16 +2041,25 @@ The Phase 1 block, plus:
 - **`docs/ai-workflow.md` — created,** English, reader-facing. Sections:
   - **The pipeline and the light lane** — why the human drives every transition, and why the security review applies in both lanes (fix(db) was a security fix with no `src/` change). The per-phase review-file commit before the tester.
   - **Roles and tiers** — the Phase 2 table and F3's principle: judges at max, executors at xhigh, mechanical steps at low. The coder stays at xhigh because a usage-limit cutoff leaves a half-written phase. Raising it to max for one phase is done by editing `coder.md` in its own commit, followed by a restart.
+  - **Threat model** — the two statements from the Goal. What follows from them:
+    - allow entries that reopen a deny were removed, not patched
+    - the deny list is not exhaustive, and its gaps are named
+    - the human-in-the-loop pipeline, not the guards, is the control against code the model runs
   - **The guards:** deny list, path guard, coder git block, tester and explainer allowlists (including the fixed-token dotnet entries and why: PreBuildEvent, `--results-directory`, `--report`), write scopes. For each, what it blocks and the incident behind it:
     - the PR 6b stash
     - the `.env.example` block in fix(db)
     - the Haiku tester's narrated gates
     - `docker compose down -v`
+    - **What prompts on purpose:**
+      - `dotnet ef database update` (`update 0` drops every table)
+      - `dotnet new` (`--force` and `-o` write past the path guard)
+      - `git switch` to any branch other than `main` or a new `-c` branch
+      - `git commit`
   - **Why hooks fail closed** — the exit-1 trap.
-  - **What the hook log holds** — redacted (the four rules), `LIVEPROBE` tags, and tests writing to a temp dir.
+  - **What the hook log holds** — redacted (rules 0-9, `SENSITIVE` and `VALUE`), `LIVEPROBE` tags, and tests writing to a temp dir.
   - **Verdict files and `/gate` evidence** — branch slug in the name, `Head:`, Head rule R (including SHA verification and git errors), `gate-exit`, the empty `status` section, the security-review file's `Verdict: PENDING` until the human sets it, and the newest-db-review check.
   - **How to re-run the probes** — `node --test`, plus the P-list of this plan.
-  - **Residual risks** — the same list as the roadmap row, including the coder-bash-guard false-positive class, Windows path aliasing (UNVERIFIED) and the user-secrets redaction gap.
+  - **Residual risks** — the same list as the roadmap row, starting with the threat model.
   - **What is deliberately not used** — Fable, `superpowers`, memory plugins, `maxTurns`.
 
 ### Tests to add
@@ -1689,3 +2100,6 @@ The Phase 1 block, plus C4.1 and P4.1-P4.3.
 - **If redaction hides evidence a probe needs:** no probe target contains a secret pattern, so this should not occur. If it does, change the probe target, not the redaction.
 - H1.1's edits to the local and user settings files are outside the PR. Undoing them is a manual edit. The deleted SA-password allow entry is not restored by any rollback.
 - The scratch dir from H1.2 and the C2.6 scratch project are outside the repo. Delete them by hand after Phases 1 and 2.
+- **R4-1, if P1.13a is denied** (the matcher folds case, so `git switch -C*` also denies `git switch -c`): with the human's approval, remove the `Bash`/`PowerShell` pairs for `git switch -C*` and `git switch * -C*`, restart, and re-run P1.13a. Record `git switch -C` as a residual risk (Phase 4). C1.9 then expects `mirror-ok 45`.
+- **If a Revision 4 redaction rule hides evidence a probe needs:** change the probe target, not the rule (the same policy as above).
+- The H1.3 scratch repo (`/c/Users/jesus/AppData/Local/Temp/envanex-probe-git`) is outside the repo. Delete it by hand after the Phase 1 amendments.
