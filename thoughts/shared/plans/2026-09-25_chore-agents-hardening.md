@@ -2505,6 +2505,12 @@ P1.13a ran, so the matcher did not fold case for `git switch -C*` against `git s
 - C1.1 for P1.13: the footer read "manual mode on". The record "<manuel mode on>" is my typing error; I kept the placeholder's angle brackets and used the Turkish spelling.
 - Two human rulings of 2026-09-29 are missing from the Summary's list: the manual-mode reference calls P1.11a-ref and P1.12a-ref were added for check (a), and P1.13g2 was added because g's path resolves back to an allowed file, so g alone could not separate the wildcard from path resolution. Both are recorded in "## P1.13".
 
+### After code review r2 (2026-09-29)
+
+- (a) conclusion, narrowed: the reference calls P1.11a-ref and P1.12a-ref show that a rule denial reads "Permission to use Bash (or PowerShell) with command … has been denied.", and all 27 + 27 results in P1.11 and P1.12 read the same. They do not show that an auto-mode classifier denial would read differently. So "rules denied those items", in the (a) conclusion and in the Summary, is an inference, not a proven fact. P1.11 and P1.12 pass on the plan's three-part evidence.
+- The count block under "(a) denial wording in P1.11 and P1.12" was produced from the repository root by `F=TestResults/chore-agents-hardening/evidence/phase-1-amendments.md; awk '/^## P1\.1[12]/{s=1; next} /^## /{s=0} s' "$F" | grep -o '<error>.*' | sed -E 's/(Permission to use [A-Za-z]+ with command ).*( has been denied\.)/\1<cmd>\2/' | sort | uniq -c`. On 2026-09-29 the human ran it again in an external Git Bash and got the same three lines.
+- The 85/85 hook-test gate: the raw result is P1.13f, `node --test .claude/hooks/tests/*.test.js` at HEAD cfdd893, with 85 pass and 0 fail. The Summary's "85 passed at baseline and after the last restore" otherwise rests on the coder's prose.
+
 ## Phase 2: agents — tiers, tools, per-role hooks, write contracts, LSP and Learn (F3, F9, F1, F4, F11, F10, F14, F7 checklist, F8 agent trims)
 
 ### Human steps (before the coder turn)
