@@ -2500,6 +2500,11 @@ P1.13a ran, so the matcher did not fold case for `git switch -C*` against `git s
 - P1.11 and P1.12 are not re-run on 2.1.284; the evidence records each session's version.
 - P1.15 gets a second attempt on a notebook the human created outside Claude's tools, because the first attempt was rejected by NotebookEdit's own read check before the hook ran.
 
+## Human's corrections (2026-09-29)
+
+- C1.1 for P1.13: the footer read "manual mode on". The record "<manuel mode on>" is my typing error; I kept the placeholder's angle brackets and used the Turkish spelling.
+- Two human rulings of 2026-09-29 are missing from the Summary's list: the manual-mode reference calls P1.11a-ref and P1.12a-ref were added for check (a), and P1.13g2 was added because g's path resolves back to an allowed file, so g alone could not separate the wildcard from path resolution. Both are recorded in "## P1.13".
+
 ## Phase 2: agents — tiers, tools, per-role hooks, write contracts, LSP and Learn (F3, F9, F1, F4, F11, F10, F14, F7 checklist, F8 agent trims)
 
 ### Human steps (before the coder turn)
