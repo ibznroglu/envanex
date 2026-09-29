@@ -231,14 +231,16 @@ test('leaves a command without secrets unchanged', () => {
 });
 
 test('redacts before truncating to 300 characters', () => {
-  // The quoted value starts at character 290 and its closing quote lies past 300,
-  // so truncating first would leave an unterminated quote that no rule redacts.
-  const prefix = 'x'.repeat(281) + 'Password=';
-  assert.equal(prefix.length, 290);
-  const target = `${prefix}'S3cretValue12 continues past the limit'`;
-  const line = logAndRead(target);
-  assert.ok(!line.includes('S3cretVal'), line);
-  assert.ok(JSON.parse(line).target.length <= 300);
+  // The secret starts at character 291 and its terminating '@' is at 304.
+  // Truncating first would leave 'https://u:S3cretVal' with no '@', which rule 9 needs
+  // and no other rule matches, so the secret survives only if truncation runs before redaction.
+  const target = 'x'.repeat(270) + ' git clone https://u:S3cretValue27@example.test/x';
+  assert.equal(target.indexOf('S3cretValue27'), 291);
+  assert.equal(target.indexOf('@'), 304);
+  const logged = logAndReadTarget(target);
+  assert.ok(!logged.includes('S3cretVal'), logged);
+  assert.ok(logged.includes('https://u:***@'), logged);
+  assert.ok(logged.length <= 300);
 });
 
 function logAndReadTarget(target) {
