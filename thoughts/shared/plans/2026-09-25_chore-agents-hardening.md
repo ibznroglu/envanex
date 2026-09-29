@@ -2589,6 +2589,75 @@ P1.13a ran, so the matcher did not fold case for `git switch -C*` against `git s
 - The count block under "(a) denial wording in P1.11 and P1.12" was produced from the repository root by `F=TestResults/chore-agents-hardening/evidence/phase-1-amendments.md; awk '/^## P1\.1[12]/{s=1; next} /^## /{s=0} s' "$F" | grep -o '<error>.*' | sed -E 's/(Permission to use [A-Za-z]+ with command ).*( has been denied\.)/\1<cmd>\2/' | sort | uniq -c`. On 2026-09-29 the human ran it again in an external Git Bash and got the same three lines.
 - The 85/85 hook-test gate: the raw result is P1.13f, `node --test .claude/hooks/tests/*.test.js` at HEAD cfdd893, with 85 pass and 0 fail. The Summary's "85 passed at baseline and after the last restore" otherwise rests on the coder's prose.
 
+## Mutation proof M1.28 (against ce3cd0d)
+
+Baseline summary lines (unmutated, exit 0):
+```
+ℹ tests 85
+ℹ suites 0
+ℹ pass 85
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 4022.7523
+```
+
+Mutated line, `.claude/hooks/lib/guard-common.js:219`, before: `const target = redactSecrets(String(entry.target ?? '')).slice(0, TARGET_LOG_LIMIT);`
+
+Mutate (Edit): `redactSecrets(String(entry.target ?? '')).slice(0, TARGET_LOG_LIMIT);` became `redactSecrets(String(entry.target ?? '').slice(0, TARGET_LOG_LIMIT));`
+
+Mutated run (`node --test .claude/hooks/tests/*.test.js`, exit 1), summary:
+```
+ℹ tests 85
+ℹ suites 0
+ℹ pass 84
+ℹ fail 1
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3370.3933
+```
+
+Failing test, raw:
+```
+✖ failing tests:
+
+test at .claude\hooks\tests\guard-common.test.js:233:1
+✖ redacts before truncating to 300 characters (3.4971ms)
+  AssertionError [ERR_ASSERTION]: xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx git clone https://u:S3cretVal
+      at TestContext.<anonymous> (C:\projects\envanex\.claude\hooks\tests\guard-common.test.js:241:10)
+      at Test.runInAsyncScope (node:async_hooks:228:14)
+      at Test.run (node:internal/test_runner/test:1118:25)
+      at async Test.processPendingSubtests (node:internal/test_runner/test:787:7) {
+    generatedMessage: false,
+    code: 'ERR_ASSERTION',
+    actual: false,
+    expected: true,
+    operator: '==',
+    diff: 'simple'
+  }
+```
+Line 241 of `guard-common.test.js` is `assert.ok(!logged.includes('S3cretVal'), logged);` (assertion 2).
+
+Other red tests: none. The run has only one `✖` test line, and every other test is `✔`.
+
+After restore (reverse Edit): `git diff --exit-code -- .claude/hooks/lib/guard-common.js`: diff_exit=0
+
+After-restore run (exit 0, no `✖` lines):
+```
+ℹ tests 85
+ℹ suites 0
+ℹ pass 85
+ℹ fail 0
+ℹ cancelled 0
+ℹ skipped 0
+ℹ todo 0
+ℹ duration_ms 3500.5228
+```
+
+Human ruling (2026-09-29): M1.28 PROVEN. The rewritten test failed on its own assertion 2, with the logged target ending in https://u:S3cretVal; no other test went red; after the restore, git diff --exit-code -- .claude/hooks/lib/guard-common.js exited 0 and the suite was 85/85.
+
 ## Phase 2: agents — tiers, tools, per-role hooks, write contracts, LSP and Learn (F3, F9, F1, F4, F11, F10, F14, F7 checklist, F8 agent trims)
 
 ### Human steps (before the coder turn)
