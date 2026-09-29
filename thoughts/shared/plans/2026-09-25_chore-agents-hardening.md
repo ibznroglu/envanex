@@ -1,6 +1,6 @@
 # Plan: chore(agents) — enforce the pipeline's rules and tier models by risk
 
-Date: 2026-09-25. Branch: `chore/agents-hardening`. Research: `thoughts/shared/research/2026-09-24_agent-workflow-hardening.md` (F1-F21). Roadmap: the `chore(agents)` row and the two Known gaps rows at `docs/roadmap.md:197-198`. Carried-forward notes: `thoughts/shared/plans/2026-09-24_fix-db-compose-sa-password.md:47,74-76,85`. Reviews: `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review.md` (NEEDS_REVISION) and `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review-r2.md` (NEEDS_REVISION, on Revision 1). Phase 1 code review: `thoughts/shared/reviews/2026-09-26_chore-agents-code-review-phase-1.md` (NEEDS_REVISION on `f6df221..de44869`; applied as Revision 4).
+Date: 2026-09-25. Branch: `chore/agents-hardening`. Research: `thoughts/shared/research/2026-09-24_agent-workflow-hardening.md` (F1-F21). Roadmap: the `chore(agents)` row and the two Known gaps rows at `docs/roadmap.md:197-198`. Carried-forward notes: `thoughts/shared/plans/2026-09-24_fix-db-compose-sa-password.md:47,74-76,85`. Reviews: `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review.md` (NEEDS_REVISION) and `thoughts/shared/reviews/2026-09-25_chore-agents-plan-review-r2.md` (NEEDS_REVISION, on Revision 1). Phase 1 code review: `thoughts/shared/reviews/2026-09-26_chore-agents-code-review-phase-1.md` (NEEDS_REVISION on `f6df221..de44869`; applied as Revision 4). Phase 1 re-review: `thoughts/shared/reviews/2026-09-29_chore-agents-code-review-phase-1-r2.md` (NEEDS_REVISION on `3d26eed..b8c796f`; applied as Revision 5).
 
 ## Revision 1
 
@@ -196,6 +196,76 @@ What follows from it:
 - **Z3. Bare `git rebase`** stays a residual risk, as decided. Denying it would take one entry pair, `Bash(git rebase)` and `PowerShell(git rebase)`, if the human wants to reconsider.
 
 Human decisions (2026-09-26): Q, U, V and Z3 accepted as written; X and Z stand; no plan-review round for Revision 4, because the amendments' code review and probes check the same specifics.
+
+## Revision 5
+
+This revision applies the Phase 1 re-review (`thoughts/shared/reviews/2026-09-29_chore-agents-code-review-phase-1-r2.md`, NEEDS_REVISION on `3d26eed..b8c796f`), with the human's decisions of 2026-09-29. Everything the re-review did not question is unchanged, and no "As built" section is edited by this revision.
+
+### Findings and decisions
+
+| # | Finding | Decision | Where it lives now |
+|---|---|---|---|
+| 1 | `redacts before truncating to 300 characters` became vacuous under A7 (`VALUE` now redacts an unterminated quote, so truncating first still redacts) | The reviewer's recipe: rewrite the test around URL userinfo whose `@` lies past character 300, fix its comment, and add M1.28 | Tests to add (amendments), "modified (Revision 5)"; M1.28; A7's truncation sentence |
+| 2 | Rule 5's key prefix `[A-Za-z0-9_.:-]*` has no bound and can start at every character | Recorded, not bounded. UNVERIFIED, with the reviewer's settling command, the same treatment rule 3 got (first review, finding 13) | Phase 4 roadmap row, "Hook timeouts and regex cost" |
+| 3 | `block` redacts after appending `\n`, so rule 0 can join a trailing `\` or `` ` `` with that newline | Not taken. It changes only the stderr text, not the exit code, and fixing it would need a new test and a new mutation proof | this row |
+| 4 | Evidence wording | Already applied by the human in the evidence file and in "As built — Phase 1 amendments" ("After code review r2") | nothing for this revision |
+
+The finding 1 claim marked UNVERIFIED (that the old test stays green with the order swapped) is not settled separately. The rewritten test and M1.28 guard the order either way.
+
+### The rewritten test (the only code change)
+
+- File: `.claude/hooks/tests/guard-common.test.js` — modified. Only the test `redacts before truncating to 300 characters` changes. Its name stays the same.
+- No other file changes. That includes `.claude/hooks/lib/guard-common.js`, `.claude/hooks/path-guard.js`, `.claude/settings.json` and the fixture. The hook count stays at 85.
+- Target: `'x'.repeat(270) + ' git clone https://u:S3cretValue27@example.test/x'`.
+- Assertions, in this order:
+  1. the input geometry: `target.indexOf('S3cretValue27') === 291` and `target.indexOf('@') === 304`
+  2. the parsed `target` field (through `logAndReadTarget`, or `JSON.parse(logAndRead(…)).target`) does not contain `S3cretVal`
+  3. the parsed target contains `https://u:***@`
+  4. the parsed target's length is at most 300
+- The comment, replacing the current two lines, says:
+  - the secret starts at character 291 and its terminating `@` is at 304
+  - truncating first would leave `https://u:S3cretVal` with no `@`, which rule 9 needs and no other rule matches
+  - so the secret survives only if truncation runs before redaction
+- The test no longer exercises rule 1. M1.8's recorded red on it (As built — Phase 1) and M1.26 are records at their own commits and are not re-run.
+
+### Mutation proof M1.28
+
+- Run Phase 1's four mutation steps.
+- Mutation: at `guard-common.js:219`, change `redactSecrets(String(entry.target ?? '')).slice(0, TARGET_LOG_LIMIT)` to `redactSecrets(String(entry.target ?? '').slice(0, TARGET_LOG_LIMIT))`.
+- Expected red: `redacts before truncating to 300 characters`.
+- PROVEN requires the test to fail on its own assertion 2 or 3, with the printed target ending in `https://u:S3cretVal`. A failure on the geometry assertions or on a thrown error does not count.
+- Extra reds: none expected. Record any that appear.
+- The restore ends with `git diff --exit-code -- .claude/hooks/lib/guard-common.js` at 0, and then 85/85.
+
+### Order of the round
+
+1. A coder turn for the test only, ending with PHASE_COMPLETE.
+2. The human runs `/commit`.
+3. A separate coder turn runs M1.28 against that commit, using Phase 1's four mutation steps. It reports the baseline and after-restore summary lines, the raw failing-test line with its file:line, and the diff exit code.
+4. M1.28's raw evidence is appended to:
+   - `TestResults/chore-agents-hardening/evidence/phase-1-amendments.md`
+   - the plan's "As built — Phase 1 amendments" section, as `## Mutation proof M1.28 (against <test commit sha>)`, placed immediately before `## Phase 2: agents — …`
+5. The human commits that as `docs(agents)`.
+6. The tester runs on that commit, with the "Validation (amendments)" block unchanged (85 hook tests, 638 dotnet tests).
+
+Phase 2 still starts only after READY_TO_PUSH.
+
+The human's decisions for this round:
+- There is no plan-review round for Revision 5 and no third code-review round. The fixes are recipe-level, M1.28 proves the only new test, and the whole-branch review at the end of the PR covers them.
+- There are no live probes. Only the test file changes; the hook code does not.
+
+### Validation (the test coder turn)
+
+    node --test .claude/hooks/tests/*.test.js                         # 85 pass, 0 fail, including "✔ redacts before truncating to 300 characters"
+    grep -c S3cretValue12 .claude/hooks/tests/guard-common.test.js     # 0
+    grep -c LIVEPROBE .claude/hooks/tests/*.js .claude/hooks/tests/fixtures/*.js   # 0 for every file (C1.7)
+    grep -c $'\r' .claude/hooks/tests/guard-common.test.js            # 0
+    git diff --exit-code -- .claude/hooks/lib/guard-common.js .claude/hooks/path-guard.js .claude/settings.json .claude/hooks/tests/fixtures   # exit 0
+    git status --short                                                 # only " M .claude/hooks/tests/guard-common.test.js"
+
+If the rewritten test is red on the unmutated code, the coder stops and reports. The hook code is not changed in this round.
+
+Human decisions (2026-09-29): Revision 5 accepted, with two additions. Assertions 2 and 3 pass the parsed target as their message, as the current test passes its log line, so M1.28's red prints the target. E1, E3 and E5 are applied in the human's wording, with the planner's content, to rule out the inline-code damage seen in the returned text.
 
 ---
 
@@ -708,7 +778,7 @@ Phase 2 starts only after this round ends with READY_TO_PUSH, because Phase 2's 
   - **Rule 8 (new), Authorization headers:** `(authorization\s*[:=]\s*(?:(?:bearer|basic|token|digest)\s+)?)[^\s'"]+` → `$1***`.
   - **Rule 9 (new), URL userinfo:** `([a-z][a-z0-9+.-]*://[^\s/@:'"]*:)[^\s/@'"]+@` → `$1***@`.
 
-  Truncation to 300 characters still happens after redaction.
+  Truncation to 300 characters still happens after redaction. The test `redacts before truncating to 300 characters`, as rewritten in Revision 5, and M1.28 pin this order.
 
 #### B1: `permissions.allow` (exact; replaces the whole list)
 
@@ -804,7 +874,14 @@ No test file contains `LIVEPROBE` (C1.7). Each secret is a distinct `S3cretValue
   - `leaves a URL without userinfo unchanged` — `git clone https://example.test/x.git` (exact)
   - `leaves git show HEAD:path unchanged` — `git show HEAD:src/Envanex.Web/Program.cs` (exact)
 
-Total after the amendments: 85 hook tests (57 + 28).
+`.claude/hooks/tests/guard-common.test.js`, **modified (Revision 5):**
+- `redacts before truncating to 300 characters`:
+  - target `'x'.repeat(270) + ' git clone https://u:S3cretValue27@example.test/x'`, with the secret at 291 and `@` at 304 (both asserted)
+  - the parsed target lacks `S3cretVal`, contains `https://u:***@`, and is at most 300 characters long
+  - the comment explains that truncating first leaves `https://u:S3cretVal` with no `@`, so rule 9 misses it
+  - this replaces the Phase 1 version (`Password=` at 290, `S3cretValue12`), which A7 made vacuous
+
+Total after the amendments: 85 hook tests (57 + 28). Revision 5 rewrites one existing test, so the total stays 85.
 
 ### Mutation proofs (amendments; separate coder turn after `/commit`)
 
@@ -830,6 +907,7 @@ Same four steps as Phase 1. Each restore ends with `git diff --exit-code -- <fil
 | M1.25 | remove rule 8 | `redacts an Authorization Bearer header` |
 | M1.26 | remove rule 9 | `redacts URL userinfo` |
 | M1.27 | in `resolveLogDir`, drop the absolute check | `resolveLogDir throws on a relative project dir` |
+| M1.28 | Revision 5: at `guard-common.js:219`, truncate before redacting (`redactSecrets(String(entry.target ?? '').slice(0, TARGET_LOG_LIMIT))`) | `redacts before truncating to 300 characters`, on its own `S3cretVal` or `https://u:***@` assertion |
 
 ### Probes (amendments; fresh session after restart)
 
@@ -3168,9 +3246,13 @@ The Phase 1 block, plus:
       - junctions, symlinks and hard links: `cmd //c "mklink /J C:\projects\envanex\TestResults\lp-junction C:\projects\envanex\obj"`, ask for a Write to `TestResults\lp-junction\LIVEPROBE-x.txt`, then `ls obj/LIVEPROBE-x.txt`; remove the junction with `cmd //c "rmdir C:\projects\envanex\TestResults\lp-junction"`
       - drive-relative `C:obj\x`: ask for a Write to `C:obj\LIVEPROBE-x.txt` and read that call's `target` in the hook log (an absolute target means Claude Code resolves it before the hook)
       - case folding against NTFS's upcase table (`packageſ`, `.gıt`): in a scratch dir, `mkdir packages .git && ls -d packageſ .gıt`
-    - **Hook timeouts and regex cost (finding 13; UNVERIFIED):**
+    - **Hook timeouts and regex cost (finding 13 of the Phase 1 code review, finding 2 of its re-review; UNVERIFIED):**
       - Whether a hook timeout fails open: in a scratch project with its own `.claude/settings.json`, whose PreToolUse hook is `node -e "setTimeout(()=>process.exit(2),10000)"` with `"timeout": 2`, ask for a Write of `x.txt`. If `x.txt` exists afterwards, a timeout fails open.
       - Rule 3's lazy backtracking on long whitespace runs: `node -e "const {redactSecrets}=require('./.claude/hooks/lib/guard-common');for(const n of [1e3,1e4,1e5]){const s='dotnet user-secrets'+' '.repeat(n)+'x';const t=Date.now();redactSecrets(s);console.log(n,Date.now()-t,'ms')}"`. Growth faster than linear confirms it.
+      - Rule 5's unbounded key prefix `[A-Za-z0-9_.:-]*`:
+        - A match can start at every character of a long run of key characters that holds no `SENSITIVE` word, so a backtracking engine may do roughly quadratic work.
+        - This is harmless in Phase 1: paths split on `/`, so no run is long. It matters from Phase 2 on, which logs whole commands.
+        - Settle it with `node -e "const {redactSecrets}=require('./.claude/hooks/lib/guard-common');for(const n of [1e3,1e4,1e5]){const s='a'.repeat(n);const t=Date.now();redactSecrets(s);console.log(n,Date.now()-t,'ms')}"`. Growth faster than linear confirms it.
     - **Redaction is pattern-based:** a secret under a key name outside `SENSITIVE`, or passed as a bare positional argument, is logged. Rule 1 and `VALUE` over-redact, by design, when a quote directly follows a value.
 
     Closes in: "not scheduled — recorded". If P2.6 failed, a further row covers the LSP failure.
