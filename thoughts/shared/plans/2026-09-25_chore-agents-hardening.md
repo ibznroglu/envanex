@@ -267,6 +267,43 @@ If the rewritten test is red on the unmutated code, the coder stops and reports.
 
 Human decisions (2026-09-29): Revision 5 accepted, with two additions. Assertions 2 and 3 pass the parsed target as their message, as the current test passes its log line, so M1.28's red prints the target. E1, E3 and E5 are applied in the human's wording, with the planner's content, to rule out the inline-code damage seen in the returned text.
 
+## Revision 6
+
+This revision applies the human's decisions of 2026-10-01, which were approved as plan text only, and the human's decisions on the review of this revision's earlier drafts. It follows H2.1 and the diagnostics C2.7 and C2.8. The evidence is cited by heading in `TestResults/chore-agents-hardening/evidence/phase-2.md`: "## H2.1"; "## H2.1 additions" at 2026-09-30T01:41:17+03:00 (the successful run); "## C2.7" at 2026-10-01T01:12:24+03:00; "## C2.7 transcripts"; "## C2.8"; "## C2.8 session start"; "## C2.8 transcripts"; and "## Baseline log check before the Revision 6 correction (human record)". Where a heading occurs more than once in that file, the citation names the occurrence by the time its heading shows. No transcript is copied into the plan. Everything the decisions do not touch is unchanged, and this revision edits no "As built" section.
+
+The record rules of this revision (Probe protocol, step 3) apply to records made after it is applied. Past As built sections and evidence records stay byte-for-byte unchanged. Nothing is reclassified retroactively; if needed, a dated note is added to the evidence file.
+
+### Decisions and changes
+
+| # | Change | Reason | Where it lives now |
+|---|---|---|---|
+| 1 | The tester's model becomes `claude-sonnet-5-5` with effort `low`. P2.1 verifies from the transcripts that this model runs and that the Agent call has no `model` field. A model warning is recorded when it appears; its absence does not show that the requested model ran. The alias fallback stays, and the model that actually ran is recorded from the transcript. The probe delegation wording adds "do not pass a model parameter". | The other rows use the current Opus 5.5, and the table gave no reason for pinning the previous Sonnet. The ID is documented, but its availability on this account and the model that actually runs are unverified. A per-invocation model parameter overrides the frontmatter model. The documented warning covers only a replacement through the `availableModels` allowlist. A model choice does not guarantee correct reporting. | frontmatter hooks block; model table and the notes after it; P2.1; probe preamble |
+| 2 | Phase 2 Validation becomes a numbered list of 17 commands: the 13 "Validation (amendments)" commands as run at 9a5f1db, followed by four Phase 2 additions. Each command has its expected exit code and a mechanically checkable output condition; command 9's build summary is checked by POSIX ERE line matches. The test baseline is the Phase 1 validation log, whose sha256 the human checked with `run`. Validation runs after all of Phase 2's commits, on a clean tree. The human runs the commands file with `run`, into one new log per run. READY_TO_PUSH is the human's decision on one run's log under the pass rule. In Phase 2, a doc commit that adds only the validation record may follow the run, under the check in Validation ("Order"); the Probe protocol paragraph after step 11 names this exception. Commands 1, 5, 6, 7 and 11 are human-only. The tester runs only allowlisted commands; its report is recorded and is not evidence. No allowlist rule for pipes is added. | At 9a5f1db the tester changed commands, piped `dotnet` into `tail` and reported grep's exit as 0 ("Tester report, not used as evidence"). An instruction alone did not hold. The build summary lines carry leading spaces in the log, so an exact-line check would not match them. | Phase 2 Validation; Probe protocol (paragraph after step 11); Phase 4 residual guard risks |
+| 3 | H2.1 is recorded as done. `microsoft-docs` was not installed as a plugin; only its MCP server was added, in the human-created `.mcp.json`, which is committed with `.claude/settings.json` in Phase 2's code commit. `tools` lists and `permissions.allow` name the exact Learn tools instead of `mcp__microsoft-learn`, which replaces the allow entry H2.1's record anticipated. | The server-level pattern also covers any tool the server adds later. microsoft-docs' skills run in fork mode and have `npx` fallbacks (human decision under "## H2.1"). | H2.1; Files; model table |
+| 4a | `.claude/settings.json` gains `"disableClaudeAiConnectors": true`. New probe P2.7, whose pass condition takes the `microsoft-learn` status text from the C2.7 record. A failing P2.7 follows the failure rule after P2.8. | The two claude.ai connectors are outside the plan, and a background subagent keeps every MCP tool. | Files; P2.7 |
+| 4b | `.claude/settings.json` gains `"disableBundledSkills": true`. New human step H2.3 and probe P2.8; a failing P2.8 follows the same rule. The setting is not an authorization boundary. | Fewer unused skills and workflows in this repository's sessions; the pipeline uses no bundled skill. No behaviour is inferred from skill names. | Files; H2.3; P2.8; Phase 4 residual guard risks |
+| 5 | `LSP` and the exact Learn tools are listed without `ToolSearch`, with no `ENABLE_TOOL_SEARCH` or `alwaysLoad`. P2.6 is rewritten: it records each agent's `requestShape`, a failure is classified before any fix, and a mechanical pass rule decides the Learn call. "If LSP fails on .NET 10, remove `LSP` from every agent's `tools`" is dropped. The Phase 4 Known-gaps sentence on P2.6 and the Rollback note for `csharp-lsp` follow the same classification. C2.7 and C2.8 are added as settled named checks. | In C2.8, a restricted list without `ToolSearch` called both tools directly, and one with `ToolSearch` loaded them through it. Neither result is generalized to the real profiles. | notes after the model table; P2.6; Named checks; Phase 4 Known gaps; Rollback notes |
+| 6 | This plan does not set or override `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` or `CLAUDE_CODE_FORK_SUBAGENT`, and the documented behaviour of background subagents is recorded. P2.x does not use the term "default mode". Execution is read from each agent's own `requestShape`, and the permission mode is recorded as a human observation. Phase 4 adapts CLAUDE.md's turn-end rule to results that arrive as a completion notification and records the session-wide effect of a lasting permission answer. | Either variable can change a subagent's mode, and with it its tool set. C2.7 and C2.8 ran in the background. "Default mode" could name either the execution mode or the permission mode. | "Background subagents" (Phase 2); P2.6; Phase 4 CLAUDE.md Orchestration |
+| 7 | Prompts that limit tool use name the allowed task tools and allow `SubagentHandback` for report delivery only. They ask for no lengths and no exact-length excerpts. "Verbatim" text written by a model is not raw evidence. | C2.7's report summarized a result it was asked to paste. The C2.8 reports' 300-character excerpts were not exact. In C2.8 the main session pasted a tool's expanded definition as the result of a `ToolSearch` call whose raw record is a tool_reference. | probe preamble |
+| 8 | Every evidence record is one of four types: a mechanical result record, a human observation, a human decision or a model report. The human appends to the evidence file and copies it into As built, verified with `diff`; the main session does not write to the evidence file. The steps that this revision adds or changes, and that record something, have the human record it in the evidence file (Probe protocol, step 1.5), from which it is copied into As built (step 1.7). The tester's report, including `tester-verdict.md`, is a claim, examined mechanically when it reports a concrete error. The provenance of a Phase 3 `gate.sh` run is stated, with its known limit; Phase 3's design does not change. | Since the Phase 1 tester incident, evidence has come only from the external Git Bash, files the shell writes and tool records extracted from transcripts. The Probe protocol still had the main session append and copy evidence, and it treated the tester's run as the gate. | Probe protocol, steps 1.3, 1.5, 1.7, 1.11 and 2-5; P2.1 (fallback); P2.8; H2.2; H2.3; Phase 2 Body changes (tester) |
+| 9 | In Phase 2, Probe protocol step 1.3 gives each M2.x proof its own coder turn, between the human's before and after records made with `run`. Before: HEAD, an empty `git status --porcelain --untracked-files=all` and the targets' sha256. The red run comes from the coder's transcript. After: equal hashes, `git diff --exit-code HEAD -- <targets>` at 0 and an empty status. The coder's own `git diff --exit-code` after its inverse Edit is part of its turn and does not replace the human's records. Phase 3's `/mutate` does not change. | `git diff --exit-code -- <file>` covers only the tracked differences of the named file. A single coder turn for all proofs leaves no point at which the human can record between them. | Probe protocol, step 1.3; Phase 2 Mutation proofs |
+| 10 | After Phase 2 there are five `*.test.js` files; "all six test files" counted `run-hook.js`. New tests use flat `test()` calls. Under "Tests to add", a code span that begins with "blocks " or "allows " names a test, and each such name carries its hook prefix; the three "malformed JSON" cases also get prefixed names. Code spans that give a command, a path or another input are cases and stay as they are. Validation, the mutation table and the behaviour mapping table use the same prefixed names. Command 2 checks every prefixed code span; items that give cases or commands are not test names. No test and no mutation is added. A mapping table states, for every "Tests to add" item, a mutation proof or "review only". The Phase 1 test files and helpers are checked unchanged by a diff. | `blocks on malformed JSON` is a Phase 1 name that M1.3 and M1.11 rely on, and bash-allowlist's general test repeated it. A name that passes is not evidence of behaviour. | Tests to add; Mutation proofs; Validation |
+| 11 | The researcher gets `LSP` and all three Learn tools. The planner and the three reviewers get `LSP`, `microsoft_docs_search` and `microsoft_docs_fetch`. The coder, tester and explainer get none. The coder stops on an open decision that affects user-facing behavior, a public contract, security or data integrity, and CLAUDE.md's coder bullet says so. P2.6 verifies runtime access for two pairs only, after checking the committed `tools` lines. | The reasons for each choice not made are recorded after the model table. The limited P2.6 scope was chosen for usage cost and is recorded as a residual risk. | model table and the notes after it; Body changes (coder); Files (CLAUDE.md); P2.6; Phase 4 residual guard risks |
+| 12 | A failing P2.7 or P2.8 stays FAIL and does not go back to the coder. The human decides, and the phase goes on only through an action exit or a residual-risk exit. The Probe protocol paragraph after step 11 names this exception. | The approved plan has no fix within the coder's scope. | after P2.8; Probe protocol (paragraph after step 11); Phase 4 residual guard risks |
+| 13 | The roadmap's "new Known gaps row, residual guard risks" is named as the Phase 4 residual record that Phase 2 refers to; `docs/ai-workflow.md` repeats this list under "Residual risks". | Phase 2 refers to one residual record, and `docs/ai-workflow.md` already defines its list as the same list as the roadmap row. | Phase 4 Files (roadmap row) |
+| 14 | C2.2 is replaced. Its `/agents` check can no longer run as written, so it rests on records the Phase 2 probes already make: P2.1's `agentType`, plus a hook-log line from each agent's own hooks, tied to its tool call by the `LIVEPROBE` id (P2.2, P2.4, P2.5). Its extent is stated. The paragraph after the frontmatter hooks block now says that C2.2 rests on those lines, instead of citing C2.2 as proof that the YAML parses. | Since v2.1.198, `/agents` prints a reminder instead of listing agents. | Named checks; Frontmatter hooks block; Phase 2 Validation |
+
+### Documentation cited
+
+- https://code.claude.com/docs/en/sub-agents — full model IDs in `model`; a per-invocation model parameter overrides the frontmatter model; fork mode, background subagents, their tool sets, permission prompts and completion notification; `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` and `CLAUDE_CODE_FORK_SUBAGENT`; section "Choose a model" for the model warning (P2.1); the `/agents` note at the end of "Quickstart: create your first subagent", "Subagent files Claude Code skips" and "Choose the subagent scope" (C2.2)
+- https://code.claude.com/docs/en/mcp — `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` and long MCP tool calls; the scope of `disableClaudeAiConnectors`
+- https://code.claude.com/docs/en/settings-reference — `disableClaudeAiConnectors`, `disableBundledSkills`
+- https://code.claude.com/docs/en/skills — the scope of `disableBundledSkills`, `skillOverrides`
+- https://github.com/anthropics/claude-code/releases/tag/v2.1.169 — `disableBundledSkills` exists since v2.1.169
+- https://platform.claude.com/docs/en/models/sonnet-5-5/overview — the model ID `claude-sonnet-5-5`
+
+Human decisions (2026-10-03): Revision 6 accepted as the edit set in TestResults/chore-agents-hardening/validation/r6e-edit-set.md (sha256 6a7d128f18063120441112c03bd8f3208e15f71c605be10126b59df0693a0da0), derived from the planner's version 3 report with one change by the human: Edit 19 also prefixes plan lines 3006–3007, which name tests. It was applied to this plan by a script, recorded under "## Application of r6e to the plan" in the evidence file. The human's rulings on the open questions of version 3 are recorded under "## Derivation of the Revision 6 edit set r6e from version 3" in the evidence file. The open item, READY_TO_PUSH as the tester's verdict and the explainer starting on it, stays open.
+
 ---
 
 ## Goal
@@ -325,31 +362,43 @@ No (Q5): this is process, not product architecture. `docs/ai-workflow.md` takes 
 1. **Order within a phase:**
    1. The coder implements, ending with PHASE_COMPLETE.
    2. The human runs `/commit`.
-   3. A separate coder turn runs the mutation proofs against that commit.
+   3. A separate coder turn runs the mutation proofs against that commit. In Phase 2, instead, each M2.x proof gets its own coder turn, between the human's records listed under Phase 2, "Mutation proofs". Each proof's evidence is a mechanical result record (step 3), not the coder's report.
    4. The human restarts Claude Code.
-   5. The probes run in the fresh session. The main session appends raw evidence, as it happens, to `TestResults/chore-agents-hardening/evidence/phase-N.md`. `TestResults/` is gitignored, so the tree stays clean for later probes.
+   5. The probes run in the fresh session. The human appends each record, named by its type (step 3), to `TestResults/chore-agents-hardening/evidence/phase-N.md`; the main session does not write to the evidence file. `TestResults/` is gitignored, so the tree stays clean for later probes.
    6. Cleanup, then `git status --short` is empty.
-   7. The main session copies the evidence file into this plan under `## As built — Phase N`.
+   7. The human copies the evidence file mechanically into this plan under `## As built — Phase N` and verifies the copy with `diff`.
    8. The human commits that as a separate `docs(agents)` commit.
    9. code-reviewer runs on the evidence commit. Its `Head:` is that commit.
    10. **The human commits the review file, whatever its verdict.** This keeps the tree clean for the tester's `status` section and for the next phase's probes. In Phase 1 the reviewers still work under their old contract and write no file, so this step does nothing there.
-   11. The tester runs on the review-file commit. **The tester's `Head:` is that commit** (in Phase 1, the evidence commit). The code-review file's `Head:` still satisfies Head rule R, because the only paths changed since it are under `thoughts/shared/reviews/`.
+   11. The tester runs on the review-file commit. **The tester's `Head:` is that commit** (in Phase 1, the evidence commit). The code-review file's `Head:` still satisfies Head rule R, because the only paths changed since it are under `thoughts/shared/reviews/`. The tester's report, including its verdict file, is a model report (step 3): it is not a gate; it is a claim. If it reports a concrete error or divergence, that claim is examined mechanically: the command is re-run with `run`, or the tester's tool record is read from the transcript. READY_TO_PUSH is not given while an unexplained finding that could affect the decision exists. The outcome is recorded in the evidence. A confirmed claim needs a fix; a refuted one is recorded with the mechanical record that refutes it. The tester saying "all passed" adds nothing. In Phase 2, READY_TO_PUSH is the human's decision on the validation log (Phase 2, Validation).
 
-   A failing probe sends the phase back to the coder before any review. A NEEDS_REVISION from code-reviewer does the same, after step 10. Every evidence and doc commit lands before the reviewers run and before the PR-end sequence. The only commit between code-reviewer and tester is the review-file commit from step 10. Any other commit after the tester ran invalidates its verdict (Phase 3, `/pr`).
-2. **Preconditions:** `git status --short` is empty, and `git rev-parse HEAD` is recorded.
+   A failing probe sends the phase back to the coder before any review. A NEEDS_REVISION from code-reviewer does the same, after step 10. Every evidence and doc commit lands before the reviewers run and before the PR-end sequence. The only commit between code-reviewer and tester is the review-file commit from step 10. Any other commit after the tester ran invalidates its verdict (Phase 3, `/pr`). In Phase 2, two exceptions apply, each stated where it applies: a failing P2.7 or P2.8 follows the rule after P2.8 instead of going back to the coder, and a doc commit that adds only the validation record may follow the validation run, under the check in Phase 2, Validation ("Order"). The other phases keep this paragraph's rules.
+2. **Preconditions:** `git status --short` is empty, and `git rev-parse HEAD` is recorded. The human records both with `run` in an external Git Bash (step 3).
    - Every probe command is chosen so that, if the guard fails, it does no harm on a clean tree: `-h`/`--help`, `--dry-run`, `-n`, and `git stash` on a clean tree.
    - The three probes whose `--help` behaviour is UNVERIFIED (C1.5) also run inside the empty scratch dir from H1.2.
    - No probe command contains a secret.
 3. **Evidence is raw:**
-   - the tool result text, exactly as returned
-   - the hook-log lines for that probe: `grep 'LIVEPROBE-<id>' TestResults/hook-log/hooks.jsonl`
-   - `git status --short`
+   - the tool result, as a `tool_result` record extracted from the session or subagent transcript together with its input
+   - the hook-log lines for that probe: `grep 'LIVEPROBE-<id>' TestResults/hook-log/hooks.jsonl`, recorded by the human with `run`
+   - `git status --short`, recorded by the human with `run`
+
+   **Record types (Revision 6).** Every record in the evidence file is one of four types and is named by its type.
+   1. Mechanical result record: the actual output and exit status of a named command or tool call, captured by the shell or the tool runtime, with its context: the command text, HEAD and the working-tree state where relevant, the time and the session. Examples: `run` log lines; a file that a command's own output writes (`Out-File`, or `gate.sh`'s `gates.txt`); `tool_result` records extracted from a transcript together with their input. Text a model wrote is not result evidence, even when the shell wrote it to a file with a heredoc or a script extracted it from a transcript; a SubagentHandback report is an example. Such a report can be kept verbatim as the raw text of what the model wrote, as `r6-planner-report.md` is, but it proves no result.
+   2. Human observation: what the human saw or did, for example "no permission prompt appeared" or "auto mode was on". It is written as a human record and marked as an observation, never presented as a tool record or a model's interpretation.
+   3. Human decision: for example READY_TO_PUSH, or accepting a deviation.
+   4. Model report: text a subagent or the main session wrote, including text a model pasted "verbatim". It is a claim to examine, not evidence.
+
+   **Producing and recording are separate.** A tool can produce a mechanical record: the human's `run`, the tester's call of `gate.sh`, or a tool record in a transcript. Appending to the evidence file, and copying mechanically into As built, is the human's job; the copy is verified with `diff`. The main session does not write to the evidence file.
+
+   **Phase 3 `gate.sh` boundary.** The provenance of a gate run rests on three things: the tool call (the transcript record of the tester's `gate.sh` call); the file executed (the `gate.sh` path that call ran); and the link between HEAD and output (in `gates.txt`, the header time and `head=`, the per-step `exit=` lines and the final `gate-exit` line, plus the file path and sha256 that `gate.sh` prints to stdout matching a recomputed sha256). An empty status step inside `gates.txt` does not by itself prove that the committed `gate.sh` ran. The tester's `Gates-sha256` is a report value: it is compared with these records and is not provenance by itself. As far as the plan shows, the current design keeps no separate hash of the executed `gate.sh` content; this is a known limit. No new mechanism is proposed, and Phase 3's design does not change.
+
+   **Scope.** These rules apply to records made after Revision 6 is applied. Past As built sections and evidence records stay byte-for-byte unchanged. Nothing is reclassified retroactively; if needed, a dated note is added to the evidence file.
 
    Every probe target carries a `LIVEPROBE-<id>` tag. No test file contains the string `LIVEPROBE` (C1.7), and tests log to a temp directory (`ENVANEX_HOOK_LOG_DIR`), so a `LIVEPROBE` line in the project log can only come from a live hook. Log lines are redacted by the hook itself (Phase 1).
 
-   An agent's description of the result is not evidence. An agent that refuses without calling the tool makes the probe **inconclusive**: it is re-prompted, not recorded as a pass. An outcome is recorded only once it exists, and stays marked `pending` until then (F19).
-4. **Cleanup:** probe files are deleted. `git status --short` must be empty again, and `ls obj/LIVEPROBE-*` must answer "No such file".
-5. **Restart:** quit and start again with `claude` in `C:\projects\envanex`, and record `claude --version`. When Claude Code rereads configuration mid-session is not tested (F21). The restart avoids the question.
+   An agent's description of the result is a model report (type 4), not evidence. An agent that refuses without calling the tool makes the probe **inconclusive**: it is re-prompted, not recorded as a pass. An outcome is recorded only once it exists, and stays marked `pending` until then (F19).
+4. **Cleanup:** probe files are deleted. `git status --short` must be empty again, and `ls obj/LIVEPROBE-*` must answer "No such file". The human records both checks with `run`.
+5. **Restart:** quit and start again with `claude` in `C:\projects\envanex`, and the human records `claude --version` with `run`. When Claude Code rereads configuration mid-session is not tested (F21). The restart avoids the question.
 
 ## Named checks (UNVERIFIED items that aren't behavioural probes)
 
@@ -365,11 +414,13 @@ No (Q5): this is process, not product architecture. `docs/ai-workflow.md` takes 
 | C1.8 | The behaviour of the Revision 4 probe commands when run for real (UNVERIFIED, never relied on): whether `-h`/`--help` is honored late, and whether `docker-compose` and `dotnet-ef` exist. See the steps below this table. Every outcome is harmless there. | Phase 1 amendments |
 | C1.9 | Mirror check: every `Bash(<p>)` deny entry has a `PowerShell(<p>)` twin, and the reverse. The command below prints `mirror-ok 47`. | Phase 1 amendments, every later phase |
 | C2.1 | Workspace trust was accepted for `C:\projects\envanex`, which frontmatter hooks require (F1). The path guard firing in fix(db) implies it; record the `/status` or trust state. | Phase 2 |
-| C2.2 | `/agents` lists all eight project agents with no load error. This proves the YAML frontmatter parses; that the hooks are nested correctly is proven by P2.2, P2.4 and P2.5. | Phase 2 |
+| C2.2 | The original check, "`/agents` lists all eight project agents with no load error", can no longer run as written: since v2.1.198, `/agents` prints a reminder instead of listing agents (https://code.claude.com/docs/en/sub-agents, the note at the end of "Quickstart: create your first subagent"). It is replaced by records the Phase 2 probes already make. Each of the eight project agents runs in a probe, and P2.1 records its `agentType`. For each agent, a hook-log line from a hook that its project file defines is tied to that agent's tool call by the probe's `LIVEPROBE` id: `coder-bash-guard` for the coder (P2.2), `write-scope:<dir>` for the other seven agents (P2.4), and also the `bash-allowlist` profile for the tester and the explainer (P2.5). A file that Claude Code skips, for example because its YAML does not parse, is not loaded (same page, "Subagent files Claude Code skips"), so it cannot produce these lines. Extent: these records show that each agent ran with hooks its project file defines. They do not prove which file was loaded: a same-named definition from a higher-priority scope (managed settings or `--agents`; same page, "Choose the subagent scope") that carried the same hooks would produce the same records. Fields that no probe exercises are not checked, and Claude Code does not report a skipped file in the session. That the hooks are nested correctly is proven by P2.2, P2.4 and P2.5. | Phase 2 |
 | C2.3 | The hook log shows whether `agent_type`/`agent_id` appear in hook input for subagent calls. Record present or absent. | Phase 2 |
 | C2.4 | Order of deny rule and PreToolUse hook: on the coder's `git stash list --grep=LIVEPROBE-2e`, record whether a `coder-bash-guard` line with that target appears in the log. | Phase 2 |
 | C2.5 | `grep -n "model: haiku" .claude/agents/*.md` returns nothing, which makes F3's "Haiku ignores effort" moot. | Phase 2 |
 | C2.6 | Whether `dotnet build -p:PreBuildEvent=<cmd>` runs `<cmd>` (UNVERIFIED; the tester allowlist blocks `-p:` either way, so the result only records whether the risk was real). See the steps below this table. | Phase 2 |
+| C2.7 | Settled (a diagnostic, 2026-10-01). A general-purpose subagent ran on Claude Code 2.1.286 with the default configuration, in auto mode. It loaded `LSP` and `mcp__microsoft-learn__microsoft_docs_search` with `ToolSearch` and called each once; both returned results (is_error=false). It ran in the background (`"requestShape":"background"`), and the Agent input had no background field. Limits: it covers only that agent in that session. It does not show whether either tool was in the agent's starting list, or whether restricted profiles reach the tools (P2.6), and it does not show why the agent ran in the background. Evidence: "## C2.7" at 2026-10-01T01:12:24+03:00 and "## C2.7 transcripts" in `TestResults/chore-agents-hardening/evidence/phase-2.md`. | Phase 2 |
+| C2.8 | Settled (a diagnostic, 2026-10-01). Two session-only agents were passed with `--agents`. They had restricted lists and `model: inherit`, and differed only in whether their list included `ToolSearch`. The agent without `ToolSearch` called `LSP` and `mcp__microsoft-learn__microsoft_docs_search` directly. The agent with `ToolSearch` loaded both through it, and its `ToolSearch` for `mcp__microsoft-learn__microsoft_docs_fetch`, which is outside its list, returned "No matching deferred tools found". Both agents ran in the background and ran `claude-opus-5-5`, with no `model` field in the Agent input. Limits: the negative control shows only that `ToolSearch` did not find or load the tool, not whether such a tool could run. The control was not applicable to the agent without `ToolSearch`. The result is not generalized to the real profiles (P2.6), and the tester's model is P2.1's. Evidence: "## C2.8", "## C2.8 session start" and "## C2.8 transcripts". | Phase 2 |
 | C3.1 | `ls ~/.claude/skills` has no `commit`, `pr`, `gate`, `mutate` or `verify` (F5). | Phase 3 |
 | C3.2 | Whether a skill's `effort: low` can be observed while it runs. Record "observed at …" or "set, not observable". | Phase 3 |
 | C3.3 | `command -v sha256sum` prints a path in Git Bash. `gate.sh`'s `tools-check` step fails the gate otherwise. | Phase 3 |
@@ -2763,18 +2814,21 @@ Human ruling (2026-09-29): on the human-run log above, Phase 1 is READY_TO_PUSH 
 
 ### Human steps (before the coder turn)
 
-- **H2.1:**
-  - Run `dotnet tool install --global csharp-ls`.
-  - Install the `csharp-lsp` and `microsoft-docs` plugins at **project** scope from the official marketplace. Read each plugin's manifest and scripts first (F10).
-  - Restart.
-  - Record under As built:
-    - the exact install commands
-    - the `.claude/settings.json` keys the install added (`enabledPlugins`, and `extraKnownMarketplaces` if present)
-    - the exact MCP server id and tool names from `/mcp`
-    - that the `LSP` tool appears
+- **H2.1 (done).** The records are under "## H2.1" and under "## H2.1 additions" at 2026-09-30T01:41:17+03:00 (the successful run) in `TestResults/chore-agents-hardening/evidence/phase-2.md`.
+  - `csharp-ls` 0.28.0 was installed as a global tool with `dotnet tool install --global csharp-ls`.
+  - The `csharp-lsp` plugin was installed at project scope with `claude plugin install csharp-lsp@claude-plugins-official --scope project`. The install added `enabledPlugins` to `.claude/settings.json` and re-serialized the file. A key-order-insensitive comparison with HEAD showed no other change.
+  - `microsoft-docs` is not installed as a plugin, by the human's decision ("## H2.1"): its skills run in fork mode and have `npx` fallbacks. Only its MCP server was added, with the plugin's exact config, in the project's `.mcp.json`, which the human created: server `microsoft-learn`, `"type": "http"`, `"url": "https://learn.microsoft.com/api/mcp"`. Re-evaluate if a review finds an invented .NET API that these MCP tools could have caught.
+  - After the restart, `/mcp` showed `microsoft-learn` connected, and `/plugin` showed `csharp-lsp` enabled with the LSP server `csharp-ls`. An `LSP` call returned document symbols.
+  - The three tool names on record:
+    - `mcp__microsoft-learn__microsoft_docs_search`
+    - `mcp__microsoft-learn__microsoft_docs_fetch`
+    - `mcp__microsoft-learn__microsoft_code_sample_search`
+
+    All three are in the human's `/mcp` record. `LSP` and `microsoft_docs_search` were called in C2.7 and C2.8; `microsoft_docs_fetch` appeared only as a `tool_reference` returned by ToolSearch in the C2.8 main session; `microsoft_code_sample_search` rests only on the human's `/mcp` record from H2.1.
 
   The coder uses those recorded names verbatim. Any name not recorded is not added.
-- **H2.2:** run C2.6 and record the result under As built.
+- **H2.2:** run C2.6; the human records the result in the evidence file (Probe protocol, step 1.5), from which it is copied into As built (step 1.7).
+- **H2.3 (P2.8's baseline; before the coder turn):** in a session started before `disableBundledSkills` is set, run `/skills` and record its output, as a human observation (Probe protocol, step 3), in the evidence file (Probe protocol, step 1.5), from which it is copied into As built (step 1.7). Optionally, pick a bundled skill whose `/skills` description says it only displays information, and record its name for P2.8.
 
 ### Files
 
@@ -2783,15 +2837,32 @@ Human ruling (2026-09-29): on the human-run log above, Phase 1 is READY_TO_PUSH 
 - `.claude/hooks/write-scope.js` — created.
 - `.claude/hooks/tests/coder-bash-guard.test.js`, `.claude/hooks/tests/bash-allowlist.test.js`, `.claude/hooks/tests/write-scope.test.js` — created.
 - `.claude/agents/researcher.md`, `planner.md`, `plan-reviewer.md`, `code-reviewer.md`, `db-reviewer.md`, `coder.md`, `tester.md`, `explainer.md` — all modified (frontmatter and body, as below).
+- `.mcp.json` — created by the human (H2.1). The coder only confirms that it exists and does not edit it.
 - `.claude/settings.json` — modified:
-  - the plugin keys from H2.1 (the human's install writes them; the coder only confirms they are present)
-  - `permissions.allow` gains `mcp__<server id recorded in H2.1>`
+  - the plugin key from H2.1, `"enabledPlugins": {"csharp-lsp@claude-plugins-official": true}`. The human's install wrote it; the coder only confirms that it is present. The install added no `extraKnownMarketplaces` ("## H2.1").
+  - `permissions.allow` gains the three exact entries `mcp__microsoft-learn__microsoft_docs_search`, `mcp__microsoft-learn__microsoft_docs_fetch` and `mcp__microsoft-learn__microsoft_code_sample_search`. They replace the server-level `mcp__microsoft-learn` that H2.1's record anticipated, because the server-level pattern also covers any tool the server adds later.
   - `permissions.allow` gains the exact entries `Bash(node --test .claude/hooks/tests/coder-bash-guard.test.js)`, `Bash(node --test .claude/hooks/tests/bash-allowlist.test.js)` and `Bash(node --test .claude/hooks/tests/write-scope.test.js)` (Revision 4, B1: every test file has its own exact entry)
+  - `"disableClaudeAiConnectors": true` (Revision 6).
+    - Reason: the two connectors synced from the claude.ai account, `claude.ai Claude Docs` (which has write tools) and `claude.ai Google Drive`, are outside the plan ("## H2.1", and "## C2.7" at 2026-10-01T01:12:24+03:00). A background subagent keeps every MCP tool (https://code.claude.com/docs/en/sub-agents), so any agent without an explicit `tools` list would get them.
+    - Scope, per https://code.claude.com/docs/en/settings-reference and https://code.claude.com/docs/en/mcp: it covers only the connectors Claude Code fetches itself, in terminal, VS Code, JetBrains and Agent SDK sessions. It turns all of them off at once. Set in project settings, it applies to this repository, and a `true` in any settings source applies. Servers from `.mcp.json`, from plugins and from `--mcp-config` are not affected.
+    - Probe: P2.7.
+  - `"disableBundledSkills": true` (Revision 6).
+    - Reason: fewer unused skills and workflows in this repository's sessions. The pipeline uses no bundled skill.
+    - It is not an authorization boundary. It does not stop any agent or tool from writing `.claude/settings.json`, which path-guard does not cover. That stays in Phase 4's residual risks.
+    - Scope, per https://code.claude.com/docs/en/settings-reference and https://code.claude.com/docs/en/skills:
+      - it removes the bundled skills and workflows
+      - built-in commands such as `/init` stay typable but are hidden from the model
+      - skills from plugins, `.claude/skills/` and `.claude/commands/` are not affected
+      - a single bundled skill can be hidden with `skillOverrides` instead
+      - the setting exists since v2.1.169 (https://github.com/anthropics/claude-code/releases/tag/v2.1.169)
+    - Baseline: H2.3. Probe: P2.8.
+- **Commit:** `.mcp.json` and `.claude/settings.json` are committed together in Phase 2's code commit. The `/commit` file list for that commit names both.
 - `CLAUDE.md` — modified, minimal. Only the Orchestration bullets that would otherwise contradict the new contracts:
   - code-reviewer: "no Bash tool, never edits files" becomes "writes only its verdict file under `thoughts/shared/reviews/`"
   - tester: "never writes files" becomes "writes only under `TestResults/`"
   - explainer: "the only agent permitted to write files" becomes "writes only under `docs/journal/`"
   - one new bullet: researcher, planner and reviewers each write only to their own `thoughts/shared/` directory, enforced by hooks
+  - coder: "ends with `PHASE_COMPLETE`" becomes "ends with `PHASE_COMPLETE` (or, if the plan leaves open a decision that affects user-facing behavior, a public contract, security or data integrity, stops without it and reports the decision; the human routes it to the planner)"
 
   The full rewrite waits for Phase 4.
 
@@ -2872,7 +2943,7 @@ This is the exact YAML for the tester. Every other agent uses the same nesting w
 name: tester
 description: <unchanged>
 tools: Read, Bash, Glob, Grep, Write
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 effort: low
 hooks:
   PreToolUse:
@@ -2887,20 +2958,38 @@ hooks:
 ---
 ```
 
-A wrong nesting still parses (C2.2) but installs no hook. The probes catch that: P2.2, P2.4 and P2.5 each require a log line from the named hook.
+A wrong nesting can still parse but installs no hook. The probes catch that: P2.2, P2.4 and P2.5 each require a log line from the named hook, and C2.2 rests on those lines.
 
 | Agent | `model` | `effort` | `tools` | PreToolUse hooks |
 |---|---|---|---|---|
-| researcher | `claude-opus-5-5` | `xhigh` | Read, Glob, Grep, Write, LSP, MCP tools from H2.1 | `Write\|Edit\|MultiEdit\|NotebookEdit` → `write-scope.js thoughts/shared/research` |
-| planner | `claude-opus-5-5` | `max` | Read, Glob, Grep, Write, LSP, MCP | write-scope `thoughts/shared/plans` |
-| plan-reviewer | `claude-opus-5-5` | `max` | Read, Glob, Grep, Write, LSP, MCP | write-scope `thoughts/shared/reviews` |
-| code-reviewer | `claude-opus-5-5` | `max` | Read, Glob, Grep, Write, LSP, MCP | write-scope `thoughts/shared/reviews` |
-| db-reviewer | `claude-opus-5-5` | `max` | Read, Glob, Grep, Write, LSP, MCP | write-scope `thoughts/shared/reviews` |
+| researcher | `claude-opus-5-5` | `xhigh` | Read, Glob, Grep, Write, LSP, `mcp__microsoft-learn__microsoft_docs_search`, `mcp__microsoft-learn__microsoft_docs_fetch`, `mcp__microsoft-learn__microsoft_code_sample_search` | `Write\|Edit\|MultiEdit\|NotebookEdit` → `write-scope.js thoughts/shared/research` |
+| planner | `claude-opus-5-5` | `max` | Read, Glob, Grep, Write, LSP, `mcp__microsoft-learn__microsoft_docs_search`, `mcp__microsoft-learn__microsoft_docs_fetch` | write-scope `thoughts/shared/plans` |
+| plan-reviewer | `claude-opus-5-5` | `max` | Read, Glob, Grep, Write, LSP, `mcp__microsoft-learn__microsoft_docs_search`, `mcp__microsoft-learn__microsoft_docs_fetch` | write-scope `thoughts/shared/reviews` |
+| code-reviewer | `claude-opus-5-5` | `max` | Read, Glob, Grep, Write, LSP, `mcp__microsoft-learn__microsoft_docs_search`, `mcp__microsoft-learn__microsoft_docs_fetch` | write-scope `thoughts/shared/reviews` |
+| db-reviewer | `claude-opus-5-5` | `max` | Read, Glob, Grep, Write, LSP, `mcp__microsoft-learn__microsoft_docs_search`, `mcp__microsoft-learn__microsoft_docs_fetch` | write-scope `thoughts/shared/reviews` |
 | coder | `claude-opus-5-5` | `xhigh` | Read, Write, Edit, Bash, Glob, Grep (MultiEdit dropped, F9) | `Bash` → `coder-bash-guard.js` |
-| tester | `claude-sonnet-5` | `low` | Read, Bash, Glob, Grep, Write | `Bash` → `bash-allowlist.js tester`; write-scope `TestResults` |
+| tester | `claude-sonnet-5-5` | `low` | Read, Bash, Glob, Grep, Write | `Bash` → `bash-allowlist.js tester`; write-scope `TestResults` |
 | explainer | `claude-opus-5-5` | `xhigh` | Read, Glob, Grep, Bash, Write | `Bash` → `bash-allowlist.js explainer`; write-scope `docs/journal` |
 
 No agent sets `memory` (F4).
+
+Revision 6 notes on this table:
+- **Tester model:** `claude-sonnet-5-5` with effort `low`. The other rows use the current Opus 5.5, and the table gave no reason for pinning the previous Sonnet. Whether the ID is available on this account, and which model actually runs, is verified in P2.1. A model choice does not guarantee correct reporting. That comes from the human-run log in Phase 2 (Validation) and from `gate.sh` in Phase 3.
+- **Exact MCP tool names:** `tools` lists name only the exact Learn tools each agent needs, never the server-level `mcp__microsoft-learn`, because the server-level pattern also covers any tool the server adds later.
+- **LSP and Learn tools per agent:**
+  - researcher: `LSP`, `mcp__microsoft-learn__microsoft_docs_search`, `mcp__microsoft-learn__microsoft_docs_fetch`, `mcp__microsoft-learn__microsoft_code_sample_search`
+  - planner, plan-reviewer, code-reviewer and db-reviewer: `LSP`, `mcp__microsoft-learn__microsoft_docs_search`, `mcp__microsoft-learn__microsoft_docs_fetch`
+  - coder, tester and explainer: none of the LSP or Learn tools; their other tools stay as the table gives them
+
+  Each agent file's `tools:` line is the table's `tools` cell in the order given, without the parenthetical note; P2.6 lists the eight lines. The reasons for the choices not made:
+  - planner without `microsoft_code_sample_search`: collecting samples is the researcher's job, and samples arrive with its report; the planner checks API pages with docs_search and docs_fetch. Reopen if a review finding shows that a plan misused a .NET API and the researcher's report had no sample for that API.
+  - coder without LSP and Learn: API and behaviour decisions are made in the plan (the researcher and the planner check them with Learn, and plan-reviewer reviews the plan). The coder's work is checked by tests (every public behaviour gets a test in the same phase) and by code-reviewer, which has LSP and Learn. The coder changes only the files the plan lists. Reopen if a review finding shows that the coder misused an API the plan specified correctly.
+  - tester and explainer: their work involves no code navigation or API checking.
+- **Tools listed directly:** `LSP` and the Learn tools are listed without `ToolSearch`, and no `ENABLE_TOOL_SEARCH` or `alwaysLoad` setting is added. The basis, and its limits:
+  - In C2.7, the general-purpose agent reached both tools through `ToolSearch` ("C2.7 transcripts").
+  - In C2.8, two session-only agents with restricted lists ran. The one without `ToolSearch` called both tools directly. The one with `ToolSearch` loaded them through `ToolSearch`.
+  - That agent's `ToolSearch` for `mcp__microsoft-learn__microsoft_docs_fetch`, a tool outside its list, found nothing. This shows only that `ToolSearch` did not find or load the tool, not whether such a tool could run ("C2.8 transcripts").
+  - Neither result is generalized to the real profiles. P2.6 verifies those.
 
 ### Body changes
 
@@ -2928,7 +3017,7 @@ No agent sets `memory` (F4).
 
   Replace "partial receipt, cancelled orders" with in-scope edge cases: concurrency, negative stock, rounding, the append-only ledger (F8).
 - **db-reviewer:** change the unique-constraint examples to product, warehouse and unit-of-measure codes. The outbox check applies only "if the phase adds an outbox" (F8).
-- **tester:** write `TestResults/<branch-slug>/tester-verdict.md`. Its first lines are exact:
+- **tester:** write `TestResults/<branch-slug>/tester-verdict.md`. The file is the record of the tester's run, not a gate: it is a model report (Probe protocol, step 3). Its first lines are exact:
 
   ```
   Verdict: <READY_TO_PUSH|NEEDS_FIXES>
@@ -2941,11 +3030,16 @@ No agent sets `memory` (F4).
   - State that git writes and `gh` are blocked by hook. Read-only git, including `git merge-base`, is allowed.
   - Document the false-positive class: any command naming `git` as a word, such as `ls .git/hooks` or `grep -rn "git" docs`, is blocked. Use the Grep or Glob tool instead.
   - Restore mutations with the inverse Edit plus `git diff --exit-code`, never `git checkout --`.
+  - If the plan leaves open a decision that affects user-facing behavior, a public contract, security or data integrity, do not guess. Stop without undoing your changes, and report the files changed, the work done, the work left, and the open decision with the plan section it concerns. Do not output `PHASE_COMPLETE`. Other implementation choices do not stop the phase: resolve them from the plan, these rules and the existing code patterns.
 - **explainer:** state that Write and Bash are hook-scoped.
 
 ### Tests to add
 
 All tests go through `runHook`, so each one uses a temp log dir. No test contains `LIVEPROBE`. Every coder-bash-guard and bash-allowlist case sends the Bash shape `{"tool_name":"Bash","tool_input":{"command":"<case>"},"cwd":"C:\\projects\\envanex"}`, so every allow case also proves that `runGuard` reads the target through `getCommand` (required change 4). Every write-scope case sends the file shape `{"tool_name":"Write","tool_input":{"file_path":"<case>"}}`.
+
+Test names (Revision 6):
+- New test files use flat `test()` calls, as in Phase 1, so a test's identity is its name alone. This is a design choice; the baseline's `suites 0` does not force it. If the choice changes, the identity rule in Validation (command 2) is rewritten too.
+- New tests get unique names with a hook prefix: the hook's name, a colon and a space, for example `bash-allowlist: blocks on malformed JSON`. Phase 1's test names do not change; M1.3 and M1.11 rely on `blocks on malformed JSON`.
 
 `.claude/hooks/tests/coder-bash-guard.test.js`:
 
@@ -2954,21 +3048,21 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
   - `git checkout -b x`, `git switch main`, `git branch -D x`, `git tag v1`, `git merge x`, `git rebase main`, `git restore x`
   - `git clean -n`, `git rm x`, `git mv a b`, `git apply p`, `git cherry-pick h`, `git revert h`, `git worktree add w`, `git config user.name x`
   - with global options: `git -C src commit -m x`, `git -c user.name=x commit`, `git --no-pager push`
-  - `blocks git --git-dir=.git commit` and `blocks git --work-tree=. status` (no longer skipped)
-  - `blocks GIT commit -m x (uppercase)`
+  - `coder-bash-guard: blocks git --git-dir=.git commit` and `coder-bash-guard: blocks git --work-tree=. status` (no longer skipped)
+  - `coder-bash-guard: blocks GIT commit -m x (uppercase)`
   - wrapped: `cd src && git add x`, `bash -c "git commit -m x"`, `node -e "require('child_process').execSync('git push')"`
   - `gh pr create`, `gh pr list`
-  - `git` alone, and malformed JSON
+  - `git` alone, and `coder-bash-guard: blocks on malformed JSON`
   - documented false positives:
-    - `blocks ls tools/git/x (documented false positive)`
-    - `blocks ls .git/hooks (documented false positive)`
-    - `blocks grep -rn "git" docs (documented false positive)`
+    - `coder-bash-guard: blocks ls tools/git/x (documented false positive)`
+    - `coder-bash-guard: blocks ls .git/hooks (documented false positive)`
+    - `coder-bash-guard: blocks grep -rn "git" docs (documented false positive)`
 - **Allows:**
   - `git status`, `git status --short`, `git diff --stat`, `git diff --exit-code -- src/x.cs`, `git log --oneline -5`
   - `git show HEAD:x`, `git ls-files`, `git branch --show-current`, `git rev-parse HEAD`
-  - `allows git merge-base main HEAD`
-  - `allows the Phase 1 base-check command line` — the exact string `git rev-parse --verify origin/main && test "$(git merge-base main HEAD)" = "$(git merge-base origin/main HEAD)"; echo "base-check=$?"`
-  - `allows bash -c "git status"` (the quotes are stripped from the next token)
+  - `coder-bash-guard: allows git merge-base main HEAD`
+  - `coder-bash-guard: allows the Phase 1 base-check command line` — the exact string `git rev-parse --verify origin/main && test "$(git merge-base main HEAD)" = "$(git merge-base origin/main HEAD)"; echo "base-check=$?"`
+  - `coder-bash-guard: allows bash -c "git status"` (the quotes are stripped from the next token)
   - `dotnet build -warnaserror`, `dotnet test --filter X`
   - words that merely contain `git`: `grep -rn "digit" src`, `cat .gitignore`, `ls .github`
 
@@ -2979,9 +3073,9 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
   - `grep -rn "Fact" tests/Envanex.IntegrationTests`, `dotnet test 2>&1 | tail -20`
   - `cat TestResults/x/gates.txt`, `docker compose ps`, `dotnet format --verify-no-changes`
   - `node --test .claude/hooks/tests/path-guard.test.js`, `node --test .claude/hooks/tests/*.test.js`
-  - `allows dotnet build -warnaserror`
-  - `allows dotnet test --no-restore --filter Category=Unit tests/Envanex.Domain.Tests`
-  - `allows dotnet test -v minimal`
+  - `bash-allowlist: allows dotnet build -warnaserror`
+  - `bash-allowlist: allows dotnet test --no-restore --filter Category=Unit tests/Envanex.Domain.Tests`
+  - `bash-allowlist: allows dotnet test -v minimal`
 - **tester profile blocks:**
   - `echo x > src/a.cs`, `cat a >> b`, `tee x`, `sed -i s/a/b/ x`
   - `dotnet format` (without `--verify-no-changes`)
@@ -2990,24 +3084,24 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
   - substitution: `` echo `id` ``, `echo $(id)`
   - wrappers: `bash -c "ls"`, `node -e "1"`
   - `dotnet test | tee out.txt`
-  - `blocks node --test with .. traversal` — `node --test .claude/hooks/tests/../../../TestResults/x.test.js`
-  - `blocks node --test on a file outside .claude/hooks/tests` — `node --test TestResults/x.test.js`
-  - `blocks git diff --output=src/a.cs`, `blocks git log --output x`
-  - `blocks git difftool` (token-wise matching)
-  - `blocks bash .claude/skills/gate/scripts/gate.sh --extra` (exact entry)
-  - `blocks grep -E "Passed!|Failed!" (documented quote-unaware split)`
+  - `bash-allowlist: blocks node --test with .. traversal` — `node --test .claude/hooks/tests/../../../TestResults/x.test.js`
+  - `bash-allowlist: blocks node --test on a file outside .claude/hooks/tests` — `node --test TestResults/x.test.js`
+  - `bash-allowlist: blocks git diff --output=src/a.cs`, `bash-allowlist: blocks git log --output x`
+  - `bash-allowlist: blocks git difftool` (token-wise matching)
+  - `bash-allowlist: blocks bash .claude/skills/gate/scripts/gate.sh --extra` (exact entry)
+  - `bash-allowlist: blocks grep -E "Passed!|Failed!" (documented quote-unaware split)`
   - dotnet fixed-token entries:
-    - `blocks dotnet build -p:PreBuildEvent=x`
-    - `blocks dotnet test --results-directory src`
-    - `blocks dotnet format --verify-no-changes --report x`
-    - `blocks dotnet build -o src/x`
-    - `blocks dotnet build -bl`
-    - `blocks dotnet test --no-build`
-    - blocks `dotnet test --filter -p:PreBuildEvent=x`
-    - blocks `dotnet test --filter /p:PreBuildEvent=x`
-    - `blocks dotnet build src/../../x.csproj` (`..` in a project path)
+    - `bash-allowlist: blocks dotnet build -p:PreBuildEvent=x`
+    - `bash-allowlist: blocks dotnet test --results-directory src`
+    - `bash-allowlist: blocks dotnet format --verify-no-changes --report x`
+    - `bash-allowlist: blocks dotnet build -o src/x`
+    - `bash-allowlist: blocks dotnet build -bl`
+    - `bash-allowlist: blocks dotnet test --no-build`
+    - `bash-allowlist: blocks dotnet test --filter -p:PreBuildEvent=x`
+    - `bash-allowlist: blocks dotnet test --filter /p:PreBuildEvent=x`
+    - `bash-allowlist: blocks dotnet build src/../../x.csproj` (`..` in a project path)
 - **explainer profile:** allows `git diff main...HEAD --stat`, `git log --oneline`, `dotnet list package`; blocks `dotnet build`, `echo x > docs/journal/x.md`, `git add .`.
-- **General:** `blocks an unknown profile`, `blocks a missing profile`, `blocks on malformed JSON`.
+- **General:** `bash-allowlist: blocks an unknown profile`, `bash-allowlist: blocks a missing profile`, `bash-allowlist: blocks on malformed JSON`.
 
 `.claude/hooks/tests/write-scope.test.js` (argument `thoughts/shared/reviews`, `CLAUDE_PROJECT_DIR=C:\projects\envanex` unless stated):
 
@@ -3015,18 +3109,34 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
   - `C:\projects\envanex\thoughts\shared\reviews\2026-09-25_x.md`
   - relative `thoughts/shared/reviews/x.md`
   - mixed case `Thoughts\Shared\Reviews\x.md`
-  - `allows a git-bash-style target with a git-bash-style project dir` — `CLAUDE_PROJECT_DIR=/c/projects/envanex`, target `/c/projects/envanex/thoughts/shared/reviews/x.md`
-  - `allows a backslash target with a git-bash-style project dir` — `CLAUDE_PROJECT_DIR=/c/projects/envanex`, target `C:\projects\envanex\thoughts\shared\reviews\x.md`
+  - `write-scope: allows a git-bash-style target with a git-bash-style project dir` — `CLAUDE_PROJECT_DIR=/c/projects/envanex`, target `/c/projects/envanex/thoughts/shared/reviews/x.md`
+  - `write-scope: allows a backslash target with a git-bash-style project dir` — `CLAUDE_PROJECT_DIR=/c/projects/envanex`, target `C:\projects\envanex\thoughts\shared\reviews\x.md`
 - **Blocks:**
   - `src\x.cs`
   - `thoughts\shared\reviews-evil\x.md`
   - `thoughts/shared/reviews/../plans/x.md`
   - `C:\Users\jesus\AppData\Local\Temp\x.md`
   - a missing argument
-  - malformed JSON
+  - `write-scope: blocks on malformed JSON`
 - **Other scopes:**
-  - `allows docs/journal/0015-x.md under docs/journal`
-  - `allows TestResults/chore-agents-hardening/tester-verdict.md under TestResults`
+  - `write-scope: allows docs/journal/0015-x.md under docs/journal`
+  - `write-scope: allows TestResults/chore-agents-hardening/tester-verdict.md under TestResults`
+
+Behaviour mapping (Revision 6). A name that appears and passes is not evidence of behaviour. This table states, for every item in this section, either the mutation proof that is its behaviour evidence or "review only". This mapping is the rule. There is no general requirement that every new behaviour be proven by mutation, and no new mutation requirement is added.
+
+| Tests to add item | Evidence |
+|---|---|
+| coder-bash-guard, wrapped: `bash -c "git commit -m x"` and `cd src && git add x` | behaviour evidence: M2.1 |
+| coder-bash-guard: `git commit -m x` | behaviour evidence: M2.2 |
+| write-scope: `thoughts\shared\reviews-evil\x.md` | behaviour evidence: M2.3 |
+| write-scope: `thoughts/shared/reviews/../plans/x.md` | behaviour evidence: M2.4 |
+| bash-allowlist, tester profile: `echo x > src/a.cs` | behaviour evidence: M2.5 |
+| `bash-allowlist: blocks node --test with .. traversal` | behaviour evidence: M2.6 |
+| `bash-allowlist: blocks git difftool` | behaviour evidence: M2.7 |
+| `bash-allowlist: blocks dotnet build -p:PreBuildEvent=x`, `bash-allowlist: blocks dotnet test --results-directory src`, `bash-allowlist: blocks dotnet format --verify-no-changes --report x` | behaviour evidence: M2.8 |
+| every other item in this section | review only |
+
+The coder's open-decision bullet (Body changes, coder) and the matching CLAUDE.md coder-bullet edit (Files) are checked by review only. No test, mutation or check is added for them.
 
 ### Mutation proofs (after `/commit`)
 
@@ -3037,21 +3147,55 @@ All tests go through `runHook`, so each one uses a temp log dir. No test contain
 | M2.3 | in write-scope, drop the trailing `'/'` from the prefix | `thoughts\shared\reviews-evil\x.md` |
 | M2.4 | in write-scope, skip resolving `..` | the traversal case |
 | M2.5 | in bash-allowlist, drop the `>` check | `echo x > src/a.cs` |
-| M2.6 | in bash-allowlist, drop the `node --test` argument check | `blocks node --test with .. traversal` |
-| M2.7 | in bash-allowlist, match entries by string prefix instead of token-wise | `blocks git difftool` |
-| M2.8 | in bash-allowlist, accept any further token after a dotnet entry's leading tokens | `blocks dotnet build -p:PreBuildEvent=x`, `blocks dotnet test --results-directory src` and `blocks dotnet format --verify-no-changes --report x` |
+| M2.6 | in bash-allowlist, drop the `node --test` argument check | `bash-allowlist: blocks node --test with .. traversal` |
+| M2.7 | in bash-allowlist, match entries by string prefix instead of token-wise | `bash-allowlist: blocks git difftool` |
+| M2.8 | in bash-allowlist, accept any further token after a dotnet entry's leading tokens | `bash-allowlist: blocks dotnet build -p:PreBuildEvent=x`, `bash-allowlist: blocks dotnet test --results-directory src` and `bash-allowlist: blocks dotnet format --verify-no-changes --report x` |
 
-Each is restored by the inverse Edit, proven with `git diff --exit-code -- <file>`.
+Each M2.x proof runs in its own coder turn. The human records the state before it; the coder applies that one mutation, runs the named tests, restores it with the inverse Edit and stops; the human records the state after it. The human's records are made with `run` in an external Git Bash (Revision 6):
+1. Before the mutation: record HEAD. `git status --porcelain --untracked-files=all` must be empty; otherwise the mutation does not start. Take the sha256 of every target file.
+2. Mutation and red run: by mechanical record from the coder's transcript. A red run counts only when the test's own assertion fails.
+3. After the restore, which the coder makes with the inverse Edit: the targets' sha256 values equal the earlier ones; `git diff --exit-code HEAD -- <targets>` returns 0; `git status --porcelain --untracked-files=all` is empty. As git reports it, an empty status shows that tracked files do not differ from HEAD and that there is no untracked file that is not ignored. The hashes verify the targets' content. Ignored outputs, such as TestResults and bin/obj, are out of scope.
+
+The coder's own `git diff --exit-code` after its inverse Edit (Body changes, coder) is part of its turn. It does not replace the human's records in steps 1 and 3.
+
+Phase 3's `/mutate` design does not change.
+
+### Background subagents (Revision 6)
+
+Per https://code.claude.com/docs/en/sub-agents:
+- In an interactive session, fork mode is on by default, subagents run in the background, and the Agent tool has no `run_in_background` parameter.
+- A background subagent keeps every MCP tool and a fixed set of built-in tools. These include `LSP` (since 2.1.280), `ToolSearch`, and `SubagentHandback` for a subagent that reports through it.
+- Its permission prompts surface in the main session, and an answer that lasts beyond one call applies to the whole session.
+- Its result arrives as a completion notification.
+
+The agents in C2.7 and C2.8 ran in the background, and no Agent input had a background field. Their meta files record `"requestShape":"background"` ("C2.7 transcripts", "C2.8 transcripts"). These records do not establish why they ran in the background.
+
+This plan does not set either of these variables:
+- `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS`. Setting it to 1 makes Claude Code run subagents in the foreground, where the same definition can resolve to a different tool set than in the background (https://code.claude.com/docs/en/sub-agents). The same variable also turns off the automatic backgrounding of long MCP tool calls, together with the other background task features (https://code.claude.com/docs/en/mcp).
+- `CLAUDE_CODE_FORK_SUBAGENT`. Setting it to 0 turns fork mode off. Claude then runs a subagent in the background by default and in the foreground when it needs the result before continuing, so the mode, and with it the tool set, can differ from one call to the next (https://code.claude.com/docs/en/sub-agents).
+
+P2.x does not use the term "default mode". Two settings are recorded separately:
+- Execution: this plan does not set or override `CLAUDE_CODE_DISABLE_BACKGROUND_TASKS` or `CLAUDE_CODE_FORK_SUBAGENT`. The documented default for an interactive session is to run subagents in the background. Whether a probe's agent actually ran in the background is determined from that agent's own `requestShape`, read from its `agent-<id>.meta.json` by the same method P2.1 uses. One agent's record says nothing about another's.
+- Permission mode: for each probe, the human records, as an observation, the mode shown in the main session's prompt footer (manual, accept edits, plan or auto). The human's usual mode was auto in C2.7 and C2.8. This record does not verify a subagent's effective permissions. No agent definition sets `permissionMode`, so the plan does not rely on how a definition's `permissionMode` would interact with the main session's mode. If one is ever set, its effect is checked against the documentation first.
 
 ### Probes (fresh session; each agent spawned by the human's request)
 
-Every probe prompt states that this is an authorized guard probe, asks the agent to call the tool exactly once per item, and asks it to paste each tool result verbatim.
+Every probe prompt states that this is an authorized guard probe and asks the agent to call the tool exactly once per item. The following apply as well (Revision 6):
+- The main session spawns each agent without a model parameter. The delegation wording says "do not pass a model parameter", because a per-invocation model parameter overrides the frontmatter model (https://code.claude.com/docs/en/sub-agents). In C2.8, neither Agent call's input had a `model` field ("C2.8 transcripts").
+- A prompt that limits tool use names the allowed task tools ("For the task, call only ...") and allows `SubagentHandback` for report delivery only: "Deliver your report through SubagentHandback if your tool list has it, and use it for nothing else."
+- Prompts ask for no lengths and no exact-length excerpts. Results and their lengths come from the extraction script, run on the transcripts in an external Git Bash.
+- "Verbatim" text written by a model is not raw evidence, whether an agent or the main session wrote it. In C2.8, the main session pasted a tool's expanded definition as the result of a `ToolSearch` call whose raw record is a tool_reference ("C2.8 transcripts").
 
 - **P2.1 (F14 — models and effort):**
   - While each agent below runs its probe, the human opens `/tasks` and records the model and effort shown.
   - Afterwards, run `grep -H '"agentType"' ~/.claude/projects/C--projects-envanex/<session>/subagents/agent-*.meta.json` and `grep -o '"model":"[^"]*"' <each matching agent-*.jsonl> | sort | uniq -c`, and paste the raw output.
-  - Expected: `claude-opus-5-5` for seven agents, `claude-sonnet-5` for the tester, and the effort each row of the table sets. The Opus agents show their frontmatter effort, not the user-level `effortLevel: "medium"` (C1.3).
-  - If a full ID is rejected, or `/tasks` shows a different model, switch that agent to the alias (`opus`/`sonnet`), record that under As built, restart and repeat P2.1.
+  - Expected: `claude-opus-5-5` for seven agents, `claude-sonnet-5-5` for the tester, and the effort each row of the table sets. The Opus agents show their frontmatter effort, not the user-level `effortLevel: "medium"` (C1.3).
+  - **Tester model (Revision 6):** the Claude API model ID `claude-sonnet-5-5` is listed on https://platform.claude.com/docs/en/models/sonnet-5-5/overview, and the `model` field accepts full model IDs (https://code.claude.com/docs/en/sub-agents). Neither fact shows that the ID is available on this account or which model actually runs, and neither is verified yet. P2.1 verifies both:
+    - the extraction script, run on the tester's subagent transcript in an external Git Bash, prints `models: claude-sonnet-5-5` and no other model
+    - the Agent call that spawned the tester, extracted from the main-session transcript, has no `model` field in its input
+    - the model warning, read as the next item says
+  - Model warning source: https://code.claude.com/docs/en/sub-agents, section "Choose a model". In interactive sessions, when Claude Code replaces a requested model because the organization's `availableModels` allowlist blocks it, it shows a warning that names both the model that was asked for and the model the subagent actually uses. The page promises no warning for any other difference, such as a switch through a fallback model chain. In P2.1, a warning is recorded when it appears, and it shows such a replacement; its absence does not show that the requested model ran. The model that ran is read from the transcript's `model` field; `/tasks` stays the human's observation.
+  - **Fallback:** if a full ID is rejected or replaced, or the transcript's `model` field shows another model, switch that agent to the alias (`opus`/`sonnet`); the human records that in the evidence file (Probe protocol, step 1.5), from which it is copied into As built (step 1.7). Then restart and repeat P2.1. In that case too, the model that actually ran is recorded from the transcript.
   - If Pro clamps an effort level, record the effective level.
 - **P2.2 (coder git block):** the coder is asked to run each command as its own Bash call.
   - Must be blocked:
@@ -3101,20 +3245,146 @@ Every probe prompt states that this is an authorized guard probe, asks the agent
   - If the guard were missing, 5f would only build the solution with an unused property, which is harmless: `bin/` and `obj/` are gitignored.
   - The same inconclusive rule as P2.4 applies.
 - **P2.6 (LSP and Learn):**
-  - code-reviewer: "Use LSP go-to-definition on `Result` in `src/Envanex.Domain`." The expected location is under `src/Envanex.Domain/Common/`.
-  - researcher: "Search Microsoft Learn for EF Core `ComplexProperty`." The expected result is a `learn.microsoft.com` URL.
-  - If LSP fails on .NET 10, remove `LSP` from every agent's `tools`, record it, and file it as a Known gap in Phase 4.
+
+  P2.6 verifies runtime access for two pairs only: code-reviewer × `LSP` and researcher × `mcp__microsoft-learn__microsoft_docs_search`. For every other agent and tool pair in the table, runtime access is not verified. This is an accepted, limited verification scope, chosen for usage cost. That the five profiles share the model and the tool mechanism is the reason the risk is accepted, not evidence that access works.
+
+  Before the live calls, the human records `grep -H '^tools:' .claude/agents/*.md` with `run`. The output must equal, as a set, the eight `tools` lines derived from the table. This shows only that the committed lists match the approved configuration, not that a tool name exists or can be loaded. The evidence for the names: `LSP` and `microsoft_docs_search` were called in C2.7 and C2.8; `microsoft_docs_fetch` appeared only as a `tool_reference` returned by ToolSearch in the C2.8 main session; `microsoft_code_sample_search` rests only on the human's `/mcp` record from H2.1.
+
+  The eight expected `tools` lines:
+
+      .claude/agents/code-reviewer.md:tools: Read, Glob, Grep, Write, LSP, mcp__microsoft-learn__microsoft_docs_search, mcp__microsoft-learn__microsoft_docs_fetch
+      .claude/agents/coder.md:tools: Read, Write, Edit, Bash, Glob, Grep
+      .claude/agents/db-reviewer.md:tools: Read, Glob, Grep, Write, LSP, mcp__microsoft-learn__microsoft_docs_search, mcp__microsoft-learn__microsoft_docs_fetch
+      .claude/agents/explainer.md:tools: Read, Glob, Grep, Bash, Write
+      .claude/agents/plan-reviewer.md:tools: Read, Glob, Grep, Write, LSP, mcp__microsoft-learn__microsoft_docs_search, mcp__microsoft-learn__microsoft_docs_fetch
+      .claude/agents/planner.md:tools: Read, Glob, Grep, Write, LSP, mcp__microsoft-learn__microsoft_docs_search, mcp__microsoft-learn__microsoft_docs_fetch
+      .claude/agents/researcher.md:tools: Read, Glob, Grep, Write, LSP, mcp__microsoft-learn__microsoft_docs_search, mcp__microsoft-learn__microsoft_docs_fetch, mcp__microsoft-learn__microsoft_code_sample_search
+      .claude/agents/tester.md:tools: Read, Bash, Glob, Grep, Write
+
+  - code-reviewer: "Use LSP go-to-definition on `Result` in `src/Envanex.Domain`." The expected location is under `src/Envanex.Domain/Common/`. The prompt says "For the task, call only `LSP`."
+  - researcher: "Search Microsoft Learn for EF Core `ComplexProperty`." The prompt says "For the task, call only `mcp__microsoft-learn__microsoft_docs_search`."
+  - Both prompts also carry the `SubagentHandback` sentence and ask for no lengths (probe preamble).
+  - **Execution and permission mode:** recorded as "Background subagents" says. Each probe agent's `requestShape` comes from its own `agent-<id>.meta.json`, and the human records the main session's permission mode as an observation.
+  - **Evidence:** the subagent transcripts, run through the extraction script in an external Git Bash. The script is printed into the evidence before its output, as `c27-extract.js` was under "C2.7 transcripts".
+  - **Pass, LSP:** the `LSP` tool result has is_error=false and gives a location under `src/Envanex.Domain/Common/`.
+  - **Pass, Learn:** the tool result has is_error=false and parses as JSON with a non-empty `results` array, in which every element has a non-empty string `title` and a `contentUrl` starting with `https://learn.microsoft.com/`. The extraction script checks this and prints the outcome. There is no condition on the exact content, the number of results or their order. For the same query, C2.7 and C2.8 returned different results ("C2.8 transcripts").
+  - **On failure:** a failure is first classified as tool visibility, permission or server error, and no fix is chosen from a single failed attempt. For a visibility failure, the first candidate fix is adding `ToolSearch` to that profile's `tools` list, because C2.8 showed that `ToolSearch` loads listed tools.
+  - **Note:** the first `LSP` call in a session took 12 to 13 seconds in both C2.7 and C2.8. Measured from the tool_use and result timestamps, it took 12.3 s under "C2.7 transcripts" and 13.5 s for c28-with-toolsearch under "C2.8 transcripts". The later call by c28-without-toolsearch took under 0.1 s.
+- **P2.7 (claude.ai connectors off):** after the restart, the human records `claude mcp list` with `run` in an external Git Bash in `C:\projects\envanex`.
+  - Pass: no output line starts with `claude.ai`, and the `microsoft-learn` line still ends in `✔ Connected`, the status text that ends that line in the baseline record.
+  - Baseline: the `claude mcp list` record under "## C2.7" at 2026-10-01T01:12:24+03:00, where `claude.ai Claude Docs` and `claude.ai Google Drive` were both connected.
+- **P2.8 (bundled skills off):** after the restart, the human runs `/skills` and records its output, as a human observation (Probe protocol, step 3), in the evidence file (Probe protocol, step 1.5), from which it is copied into As built (step 1.7).
+  - Pass: compared with the H2.3 baseline, the list shows no bundled skill, and it still shows the project's `/commit`, `/pr` and `/verify`.
+  - Optional: if the human picked a skill in H2.3, the main session invokes it with the Skill tool. The transcript record, extracted by the script in an external Git Bash, shows that the skill is not found.
+
+If P2.7 or P2.8 fails, the result is recorded as FAIL and that record is not changed. The phase does not go back to the coder, as the Probe protocol would otherwise require, because the approved plan has no fix within the coder's scope. The human decides the next step, and the decision is recorded separately. The options depend on the kind of failure:
+- Something that should have been removed remains (a `claude.ai` line in `claude mcp list`, or a bundled skill in `/skills`): an approved plan revision that removes it by another means, or acceptance as a residual risk. For connectors, `deniedMcpServers` is a candidate; its effect and the settings scopes that support it are checked against the documentation before that decision.
+- A function the work needs is lost (`microsoft-learn` is no longer connected, or one of the project skills `/commit`, `/pr` or `/verify` is missing): the function is restored, or the steps that depend on it are redefined by an approved plan revision. Accepting a residual risk alone is not an option for this kind.
+
+A recorded decision does not by itself let the phase proceed. The phase goes on only through one of two exits:
+- Action: the action the decision calls for (restoring a function, a plan revision, or removing something by another means) is complete; a plan revision first goes through the normal plan and coder steps. The verifications it affects have been re-run and passed, at least the failed probe, as the approved plan then defines it, in a fresh session. The human records which verifications were re-run and why. The new results are recorded separately; the original FAIL record is not changed.
+- Residual risk (only when something remains): the record names exactly what remains and under which setting, and the risk is added to the Phase 4 residual record. The original FAIL stays FAIL.
+
+Until one of these exits is complete, the phase does not go on to review and cannot be READY_TO_PUSH.
 
 ### Validation
 
-The Phase 1 block, plus:
-- `node --test .claude/hooks/tests/*.test.js` covering all six test files
-- C1.7 over the new test files
-- C2.2 and C2.5
-- `grep -c $'\r'` over the new files
-- C1.9 prints `mirror-ok 47` (Phase 2 adds no deny entry)
+The Phase 2 gate rests on each numbered command's expected exit code and on its output condition, checked in the log of one run. READY_TO_PUSH is the human's decision on that log (Revision 6). The tester runs only the commands its bash-allowlist permits; its report is recorded but is not evidence (Probe protocol, step 3). No allowlist rule for pipes is added (Phase 4, residual guard risks).
 
-From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 1 block's base-check line passes it because the read allowlist has `merge-base`, and the test `allows the Phase 1 base-check command line` pins that down.
+**Order.**
+- Validation runs after all of Phase 2's commits: the code commit that contains `.claude/settings.json` and `.mcp.json`, the commit that copies the probe evidence into As built, and the review-file commit.
+- Before validation, the temporary changes made for mutation proofs and probes are undone, their evidence records are kept, and the working tree is clean.
+- The READY_TO_PUSH record states three things separately:
+  1. The validated HEAD, and the name and sha256 of that run's log.
+  2. If a doc commit follows, its sha and this check: `git diff --numstat <validated sha>..<last sha>` shows only the plan file and 0 deletions, and the human reviews and records that the added lines are only the validation record and that no requirement, command or success criterion changed. If one did, the old run does not count until its effect is assessed.
+  3. That `git status --short` is empty in the final state to be pushed.
+
+**Test files and baseline.**
+- After Phase 2 there are exactly five `*.test.js` files: the existing `guard-common.test.js` and `path-guard.test.js`, and `coder-bash-guard.test.js`, `bash-allowlist.test.js` and `write-scope.test.js`, which Files lists as created. `run-hook.js` and `fixtures/async-decide-guard.js` are helpers, not test files.
+- Baseline (accepted), from the raw log `TestResults/chore-agents-hardening/validation/validation-9a5f1db-20260929T202623.log` (named under "Validation at 9a5f1db, human-run"), sha256 4c3d54cbf85f740fbd4397452d6a2bd7f50137ba9e813d52755dda53558c59ba, which the human checked against the file with `run` ("## Baseline log check before the Revision 6 correction (human record)" in the evidence file): tests 85, suites 0, pass 85; fail, cancelled, skipped and todo 0; exit 0; 85 distinct names.
+- New tests use flat `test()` calls (Tests to add, "Test names"), so a test's identity is its name alone.
+
+**Numbered commands.** Each has its expected exit code and its output condition. Commands 1-13 are the 13 commands of "Validation (amendments)" exactly as they ran at 9a5f1db; `TestResults/chore-agents-hardening/validation/commands.txt` holds them with the C1.9 command filled in. **Human-only** marks the commands that only the human runs, because the tester's allowlist blocks them.
+
+1. `node --version` — **human-only**. Exit 0; a single line `v<major>.<minor>.<patch>`; major, as an integer, at least 20 (C1.2).
+2. `node --test .claude/hooks/tests/*.test.js` — one run of the five test files. Exit 0. Summary: `tests` = 85 + the number of new names, `suites` 0, `pass` = `tests`, and `fail`, `cancelled`, `skipped` and `todo` 0. Names are taken from the `✔ <name> (<duration>)` lines by dropping the trailing duration in parentheses; the unit is not fixed. No `✖` line appears. Each of the 85 baseline names appears exactly once on a passing line. Each new name appears exactly once and equals no baseline name. Every test name written under "Tests to add" as a prefixed code span appears; items that give cases or commands are not test names; new names not in the plan are listed for review.
+3. `grep -c LIVEPROBE .claude/hooks/tests/*.js .claude/hooks/tests/fixtures/*.js` — exit 1. The output is exactly this set of 7 paths, each with `:0`, order not part of the condition: `.claude/hooks/tests/bash-allowlist.test.js`, `.claude/hooks/tests/coder-bash-guard.test.js`, `.claude/hooks/tests/guard-common.test.js`, `.claude/hooks/tests/path-guard.test.js`, `.claude/hooks/tests/run-hook.js`, `.claude/hooks/tests/write-scope.test.js`, `.claude/hooks/tests/fixtures/async-decide-guard.js` (C1.7).
+4. `grep -c $'\r' .claude/hooks/lib/guard-common.js .claude/hooks/path-guard.js .claude/hooks/tests/*.js .claude/hooks/tests/fixtures/*.js` — exit 1. Exactly 9 paths, each with `:0`: `.claude/hooks/lib/guard-common.js`, `.claude/hooks/path-guard.js` and the seven paths of command 3.
+5. `node -e "JSON.parse(require('fs').readFileSync('.claude/settings.json','utf8'))"` — **human-only**. Exit 0; no output.
+6. `node -e "const d=require('./.claude/settings.json').permissions.deny;const b=d.filter(x=>x.startsWith('Bash(')).map(x=>x.slice(5));const p=d.filter(x=>x.startsWith('PowerShell(')).map(x=>x.slice(11));const ok=b.length===p.length&&b.every(x=>p.includes(x))&&b.length+p.length===d.length;console.log(ok?'mirror-ok '+b.length:'mirror-FAIL');process.exit(ok?0:1)"` — **human-only**. Exit 0; exact line `mirror-ok 47`. This is C1.9; Phase 2 adds no deny entry.
+7. `grep -cE 'Bash\((git switch \*|dotnet ef database update \*|dotnet new \*|node --test \.claude/hooks/tests/\*)\)' .claude/settings.json` — **human-only**. Exit 1; exact line `0`.
+8. `dotnet format --verify-no-changes` — exit 0; no other condition.
+9. `dotnet build -warnaserror` — Exit 0; the output has a line matching `^[[:space:]]*0 Warning\(s\)[[:space:]]*$` and a line matching `^[[:space:]]*0 Error\(s\)[[:space:]]*$` (POSIX ERE).
+10. `dotnet test` — exit 0; per assembly `Failed` 0, `Passed` n, `Skipped` 0, `Total` n, with n = 120 for `Envanex.Domain.Tests.dll`, 126 for `Envanex.Application.Tests.dll` and 392 for `Envanex.IntegrationTests.dll`.
+11. `git rev-parse --verify origin/main && test "$(git merge-base main HEAD)" = "$(git merge-base origin/main HEAD)"; echo "base-check=$?"` — **human-only**. Exit 0; last line `base-check=0`.
+12. `git diff --name-only main...HEAD -- src tests db` — exit 0; no output.
+13. `git status --short` — exit 0; no output.
+14. `ls .claude/hooks/tests/*.test.js` — exit 0; exactly the five paths, as a set: `.claude/hooks/tests/bash-allowlist.test.js`, `.claude/hooks/tests/coder-bash-guard.test.js`, `.claude/hooks/tests/guard-common.test.js`, `.claude/hooks/tests/path-guard.test.js`, `.claude/hooks/tests/write-scope.test.js`.
+15. `grep -n "model: haiku" .claude/agents/*.md` — exit 1; no output (C2.5).
+16. `grep -c $'\r' .claude/hooks/coder-bash-guard.js .claude/hooks/bash-allowlist.js .claude/hooks/write-scope.js` — exit 1; exactly these 3 paths, each with `:0`.
+17. `git diff --name-only be6477e..HEAD -- .claude/hooks/tests/guard-common.test.js .claude/hooks/tests/path-guard.test.js .claude/hooks/tests/run-hook.js .claude/hooks/tests/fixtures` — exit 0; no output.
+
+Validation runs in an external Git Bash at the repository root.
+
+Commands file: `TestResults/chore-agents-hardening/validation/phase-2-commands.txt`. It holds one command per line, in the order of the numbered list above and identical to it. The human writes it with a quoted heredoc (`<<'EOF'`), so nothing in it is expanded, and only if the file does not exist yet. Its content and sha256 are then recorded into the evidence file with `run`.
+
+Recording function. `E` names the file it writes to; in the human's shell it is set to the evidence file. `run` records the command's exit code but does not return it. It returns non-zero only when one of its own checked steps fails: writing the `$` line, reading the log's last byte, or writing the line break or the `exit=` line.
+
+    run() {
+      local rc t
+      printf '\n$ %s\n' "$1" >> "$E" || return 1
+      bash -c "$1" < /dev/null >> "$E" 2>&1
+      rc=$?
+      t=$(tail -c1 "$E") || return 1
+      if [ -n "$t" ]; then printf '\n' >> "$E" || return 1; fi
+      printf 'exit=%s\n' "$rc" >> "$E" || return 1
+    }
+
+One run of the commands file, with `C` set to the commands file:
+
+    if h=$(git rev-parse HEAD) && s=$(sha256sum "$C"); then
+      L=TestResults/chore-agents-hardening/validation/validation-${h:0:7}-$(date -u +%Y%m%dT%H%M%S).log
+      if [ -e "$L" ]; then echo "STOP: $L exists"
+      elif printf 'HEAD %s\n%s\n' "$h" "$s" > "$L"; then
+        if ( E=$L; while IFS= read -r c || [ -n "$c" ]; do run "$c" || exit 3; done < "$C" ); then echo "recorded: $L"; else echo "STOP: writing $L failed; this run is incomplete"; fi
+      else echo "STOP: cannot create $L"; fi
+    else echo "STOP: no HEAD or no commands file"; fi
+
+- No command runs unless the log was created with its two header lines: the `HEAD` line and the sha256 line of the commands file.
+- Each command appears as a blank line, a `$ <command>` line, its output and an `exit=<code>` line. `run` adds a line break before `exit=` only when the output does not end with one, so a command with no output has its `exit=` line directly after its `$` line.
+- A command's exit code, including an expected non-zero one such as `grep`'s 1, never stops the run. The run stops only when one of `run`'s checked steps fails. A failure in the command's own redirection or output is not detected separately, and the log may not reveal it. A log that stops early fails the pass rule; it is kept as it is and recorded like any failed run.
+- The loop runs in a subshell, so `E` in the human's shell still names the evidence file afterwards. The log's path stays in `L` for the record of its name and sha256.
+- `recorded:` only means that the loop ended without any of `run`'s checked steps failing. Whether the log is complete and whether the run passes is decided only by the pass rule of this section, applied to the log.
+
+**Runs.**
+- A run is one execution of `TestResults/chore-agents-hardening/validation/phase-2-commands.txt`. Its output goes to a new log file that did not exist before: `TestResults/chore-agents-hardening/validation/validation-<short sha>-<time>.log`.
+- The log starts with a `HEAD <sha>` line and the sha256 of the commands file.
+- "Each command once" holds for each run separately.
+- A failed run's log is kept unchanged and recorded in `TestResults/chore-agents-hardening/evidence/phase-2.md`: file name, sha256 and the condition not met.
+- A new run is a new log file; earlier runs are not extra commands for it.
+- READY_TO_PUSH names exactly one run and its HEAD.
+
+**Pass rule, per run.**
+- Every numbered command appears in the log once and in order, and its `$ ...` line equals the commands file's line exactly.
+- Its exit code is the expected one.
+- Its output meets the command's output condition.
+- If any of these fails, the run has not passed; this includes a missing, extra or changed command.
+
+**Condition forms.**
+- Every condition is mechanically checkable: an exact line, an exact set of lines, "no output", a regular expression or a numeric comparison.
+- For .NET, `Failed`, `Passed`, `Skipped` and `Total` each have an expected value per assembly.
+- For Node, `tests`, `suites`, `pass`, `fail`, `cancelled`, `skipped` and `todo` each have an expected value. "`pass` = `tests`" is valid only while `fail`, `cancelled`, `skipped` and `todo` are 0. `suites` = 0 is a separate design choice (Tests to add, "Test names").
+- In the `node --version` output, the major version is read as an integer and compared numerically with 20.
+- The fixed output of our own scripts is checked as an exact line.
+- A command whose exit code is always 0 must have an output condition.
+
+**Boundary.**
+- HEAD and an empty status define only the content of tracked files. They do not define gitignored files or tool versions other than node.
+- A checker script that tests a log against these conditions is deferred; this revision does not add one.
+
+Where the Phase 2 additions went. Command 2's glob covers all five test files, and command 14 lists them. Command 3 is C1.7 over the new test files. Command 15 is C2.5. Command 16 is the CR check over the new hook files. Command 6 is C1.9. Command 17 shows that the Phase 1 test files and helpers have not changed since be6477e. C2.2 is not a shell command; it rests on the P2.1, P2.2, P2.4 and P2.5 records (Named checks, C2.2).
+
+From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 1 block's base-check line passes it because the read allowlist has `merge-base`, and the test `coder-bash-guard: allows the Phase 1 base-check command line` pins that down.
 
 ---
 
@@ -3377,6 +3647,8 @@ The Phase 1 block, plus:
       All evidence and doc commits land before step 1. A commit after step 4 means re-running the tester.
     - the main agent never types the tester's file list (F13)
     - reviewers' verdict files (F11), named with the branch slug and carrying `Head:`
+    - **subagent completion (Revision 6):** the rule "When a subagent returns, the main agent's turn ENDS" is adapted to results that arrive as a completion notification. The documented default for an interactive session is to run subagents in the background, and a background subagent's result arrives as a completion notification (https://code.claude.com/docs/en/sub-agents). For such a subagent, the Agent call's launch result is not the return. The return is the completion notification, and the rule applies to it: the main agent outputs the verdict verbatim and its turn ends.
+    - **lasting permission answers (Revision 6):** a background subagent's permission prompts surface in the main session, and an answer that lasts beyond one call applies to the whole session (https://code.claude.com/docs/en/sub-agents).
   - **New section "Verification rules":**
     - a passing test is not a protecting test
     - mutations run against committed code
@@ -3390,7 +3662,7 @@ The Phase 1 block, plus:
 - **`docs/roadmap.md` — modified:**
   - line 58: `fix(db)` status becomes `done (#14)`
   - rows 197-198 are removed (closed by this PR)
-  - **new Known gaps row, residual guard risks:**
+  - **new Known gaps row, residual guard risks** (the Phase 4 residual record that Phase 2 refers to; `docs/ai-workflow.md` repeats this list under "Residual risks"):
     - **Threat model:** the guards stop accidental destructive actions by a cooperative agent. They are not a boundary against code the model writes and runs itself: `dotnet run` (including .NET 10 file-based `dotnet run x.cs`), `dotnet test`, `dotnet build`, `node` or a script. Such code can call any denied command.
     - the Bash guards are string heuristics. Obfuscation bypasses them: a variable holding `git`, or script indirection (`bash x.sh` where the script calls git).
     - coder-bash-guard has a false-positive class: any command naming `git` as a word, such as `ls .git/hooks`, `ls tools/git/x` or `grep -rn "git" docs`, is blocked
@@ -3398,9 +3670,11 @@ The Phase 1 block, plus:
     - the path guard doesn't see Bash writes
     - **Windows path aliasing (UNVERIFIED):** `normalizePath` is pure string logic and doesn't model Win32 path normalization. That normalization strips a trailing `.` or space from a segment, so `obj.\x` could reach `obj\x`. It also accepts NTFS stream suffixes, so `.env::$DATA` could reach `.env`. Either could alias a protected path past the path guard. Whether Claude Code's Write tool reaches Win32 normalization is UNVERIFIED; to settle it, Write `TestResults\x.` and then `ls TestResults`. This plan does not run that check.
     - **Redaction of user-secrets values:** a quoted `user-secrets set` value that contains `;`, `|` or `&&` is redacted only up to that character. The rest is covered only by the password, sqlcmd and token rules.
-    - agents can edit `.claude/` itself, taking effect after a restart
+    - agents can edit `.claude/` itself, taking effect after a restart. That includes `.claude/settings.json`, which path-guard does not cover. `disableBundledSkills` is therefore not an authorization boundary: it does not stop any agent or tool from writing that file (Revision 6). The same holds for `disableClaudeAiConnectors`.
     - user-level settings sit outside the repository; `Bash(find *)` there allows `find -delete`
     - the `base-check` failure path of `gate.sh` is not probed
+    - **No allowlist rule for pipes (Revision 6):** bash-allowlist lets a later pipe segment start with `grep`, `head`, `tail` or `wc`, so a tester pipeline's exit status is that segment's, not `dotnet`'s. The Phase 1 tester ran `dotnet build -warnaserror 2>&1 | tail -20` and `dotnet test 2>&1 | tail -40` ("Tester report, not used as evidence", under "As built — Phase 1 amendments"). No rule is added, because no verdict rests on a tester's direct `dotnet` run. Phase 2's READY_TO_PUSH is the human's decision on the human-run log (Phase 2, Validation). Phase 3's gate rests on `gate.sh`'s run, whose provenance rests on the records named in Probe protocol step 3, not on the tester's `Gates-sha256` alone. Reopens when a verdict again rests on a direct `dotnet` run by the tester.
+    - **Runtime tool access outside P2.6 (Revision 6):** runtime access outside P2.6's two pairs (code-reviewer × `LSP`, researcher × `mcp__microsoft-learn__microsoft_docs_search`) is not verified, by the accepted scope in P2.6. Reopens when an agent run finds a listed tool unavailable; that failure is first classified as in P2.6.
     - **Deny forms not covered (finding 10 of the Phase 1 code review; UNVERIFIED, because they concern the rule matcher; settle by probing each in auto mode, as P1.11 does):**
       - global options before the subcommand other than `-C`/`-c`: `git --no-pager …`, `git --git-dir=… …`, `git --work-tree=… …`
       - another binary name: `git.exe …`
@@ -3425,7 +3699,7 @@ The Phase 1 block, plus:
         - Settle it with `node -e "const {redactSecrets}=require('./.claude/hooks/lib/guard-common');for(const n of [1e3,1e4,1e5]){const s='a'.repeat(n);const t=Date.now();redactSecrets(s);console.log(n,Date.now()-t,'ms')}"`. Growth faster than linear confirms it.
     - **Redaction is pattern-based:** a secret under a key name outside `SENSITIVE`, or passed as a bare positional argument, is logged. Rule 1 and `VALUE` over-redact, by design, when a quote directly follows a value.
 
-    Closes in: "not scheduled — recorded". If P2.6 failed, a further row covers the LSP failure.
+    Closes in: "not scheduled — recorded". If P2.6 ends with a failure that stays unresolved after classification, a further row records the failing tool, the failure's class, the fixes tried and the human's decision.
   - **new Known gaps row, hook tests not run in CI:** `node --test .claude/hooks/tests/*.test.js` runs only locally and through `gate.sh`. `normalizePath` is pure string logic, so a step on the `ubuntu-latest` CI job can be added without a rewrite. Closes in: "not scheduled — recorded".
   - "How the work is run":
     - the diagram gains the light lane and the PR-end sequence
@@ -3490,7 +3764,7 @@ The Phase 1 block, plus C4.1 and P4.1-P4.3.
 - **If a full model ID is rejected:** switch that agent's frontmatter to `opus`/`sonnet` and record it (P2.1). `opus` resolves to the main session's Opus, since `~/.claude/settings.json` sets `"model": "opus"`.
 - **If a subagent won't write its report file:** revert that agent to "present content, the main agent saves it" (P2.4 fallback). `/pr` preconditions 5-7 then need the main session to save that reviewer's output under the same five-line header.
 - **If the tester's dotnet allowlist blocks a flag the tester genuinely needs:** add that exact token to the fixed list in `bash-allowlist.js`, with an allow test and a note in `docs/ai-workflow.md`. Never turn the entry back into a prefix entry.
-- **If `csharp-lsp` fails:** remove `LSP` from `tools`, and uninstall the plugin at project scope, which removes its `enabledPlugins` key.
+- **If `csharp-lsp` fails in P2.6:** the failure is first classified as a tool visibility, permission or server error, and no fix is chosen from a single failed attempt. For a visibility failure, the first candidate fix is adding `ToolSearch` to that profile's `tools`. Removing `LSP` from the `tools` lists and uninstalling the plugin at project scope, which removes its `enabledPlugins` key, is a rollback the human decides after classification and records with its reason.
 - **If redaction hides evidence a probe needs:** no probe target contains a secret pattern, so this should not occur. If it does, change the probe target, not the redaction.
 - H1.1's edits to the local and user settings files are outside the PR. Undoing them is a manual edit. The deleted SA-password allow entry is not restored by any rollback.
 - The scratch dir from H1.2 and the C2.6 scratch project are outside the repo. Delete them by hand after Phases 1 and 2.
