@@ -1,8 +1,4 @@
 {
-  "statusLine": {
-    "type": "command",
-    "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);const w=j.context_window_size||0;const u=j.context_tokens_used||0;if(w)process.stdout.write('ctx '+Math.round(u/w*100)+'%')}catch(e){}})\""
-  },
   "permissions": {
     "allow": [
       "Bash(dotnet build)",
@@ -46,7 +42,13 @@
       "Bash(gh run view *)",
       "Bash(node --test .claude/hooks/tests/guard-common.test.js)",
       "Bash(node --test .claude/hooks/tests/path-guard.test.js)",
-      "Bash(node --test .claude/hooks/tests/*.test.js)"
+      "Bash(node --test .claude/hooks/tests/coder-bash-guard.test.js)",
+      "Bash(node --test .claude/hooks/tests/bash-allowlist.test.js)",
+      "Bash(node --test .claude/hooks/tests/write-scope.test.js)",
+      "Bash(node --test .claude/hooks/tests/*.test.js)",
+      "mcp__microsoft-learn__microsoft_docs_search",
+      "mcp__microsoft-learn__microsoft_docs_fetch",
+      "mcp__microsoft-learn__microsoft_code_sample_search"
     ],
     "deny": [
       "Bash(git stash)",
@@ -168,5 +170,14 @@
         ]
       }
     ]
-  }
+  },
+  "statusLine": {
+    "type": "command",
+    "command": "node -e \"let d='';process.stdin.on('data',c=>d+=c);process.stdin.on('end',()=>{try{const j=JSON.parse(d);const w=j.context_window_size||0;const u=j.context_tokens_used||0;if(w)process.stdout.write('ctx '+Math.round(u/w*100)+'%')}catch(e){}})\""
+  },
+  "enabledPlugins": {
+    "csharp-lsp@claude-plugins-official": true
+  },
+  "disableClaudeAiConnectors": true,
+  "disableBundledSkills": true
 }
