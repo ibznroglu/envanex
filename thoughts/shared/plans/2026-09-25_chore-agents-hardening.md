@@ -304,6 +304,30 @@ The record rules of this revision (Probe protocol, step 3) apply to records made
 
 Human decisions (2026-10-03): Revision 6 accepted as the edit set in TestResults/chore-agents-hardening/validation/r6e-edit-set.md (sha256 6a7d128f18063120441112c03bd8f3208e15f71c605be10126b59df0693a0da0), derived from the planner's version 3 report with one change by the human: Edit 19 also prefixes plan lines 3006–3007, which name tests. It was applied to this plan by a script, recorded under "## Application of r6e to the plan" in the evidence file. The human's rulings on the open questions of version 3 are recorded under "## Derivation of the Revision 6 edit set r6e from version 3" in the evidence file. The open item, READY_TO_PUSH as the tester's verdict and the explainer starting on it, stays open.
 
+## Revision 7
+
+This revision applies the human's decision of 2026-10-07: for the remaining mutation proofs M2.3–M2.8 only, run each proof on a throwaway copy of the committed hook and test files outside the repository, instead of mutating the live files in a coder turn. The in-place method leaves a mutation in the live guard for the length of the coder turn and depends on the coder being able to edit its own guard file; a copy outside the repository never changes the live hooks, agent definitions or permission settings, and the proof still measures the same thing — that the guard's test catches the planned regression. This is a limited, explicit change; it is not declared silently compatible with the existing plan.
+
+What changes (M2.3–M2.8 only):
+- Probe protocol step 1.3 and Phase 2 "Mutation proofs (after `/commit`)" gain the copy procedure, the runner and the red-run condition. This supersedes, for M2.3–M2.8 only, the "each M2.x proof runs in its own coder turn" execution procedure of Revision 6, decision 9. Decision 9's record itself is left unchanged.
+- The Phase 3 note "Mutation proofs after Phase 3" gains a clause so its description of the Phase 2 proofs stays accurate.
+
+What is preserved:
+- M2.1 and M2.2 are done in place and recorded; they are not re-run. M2.2's human assessment record is a separate open item and is unaffected by this revision.
+- The mutation table (M2.1–M2.8), each row's target test and the Behaviour mapping are unchanged.
+- The red-run condition keeps the plan's "the test's own assertion fails" rule and makes explicit that the failure must be the intended effect of the mutation, excluding a `runGuard` `guard error` (exit 2), any unrelated `ERR_ASSERTION`, and a reduced test count.
+- The live agent-to-hook connection stays a P2.x check (P2.2, P2.4, P2.5), not a mutation-proof check.
+- M2.4 stays in `write-scope.js`; `guard-common.js`, the Phase 1 files, the tests and the helpers are not mutated.
+- The runner's `run()` return (record-write success) and the separately captured test exit code stay distinct.
+- Each runner invocation has a common live-repository before/after record: branch, current HEAD, empty status, target hashes and a clean hook diff against HEAD. Current HEAD stays distinct from the tested source; if the Revision 7 plan commit moved HEAD, the source-to-HEAD difference is verified to contain only the plan file and no hook change.
+- The human appends the actual runner and boundary records to `TestResults/chore-agents-hardening/evidence/phase-2.md` without rewriting old records, then makes a separate assessment for each proof, including any additional failing tests.
+- The clarified red-run condition applies only to M2.3–M2.8. M2.1 and M2.2 retain their original acceptance conditions and records; M2.2's human assessment remains outstanding.
+- The Phase 2 Validation precondition that the tree is clean before validation still holds: the M2.3–M2.8 copies live outside the repository, so they leave no live change to undo.
+- As built sections and past evidence are not edited by this revision.
+- The source for every M2.3–M2.8 copy is `ce5e7cfcb6a90561b69fdb24c0db5384196df3f0` by full SHA. If this revision's text is committed and moves HEAD, the new HEAD is kept distinct from the tested source commit `ce5e7cfcb6a90561b69fdb24c0db5384196df3f0`.
+
+No live probe, P2.x check, restart, As built step, review or final validation changes.
+
 ---
 
 ## Goal
@@ -362,7 +386,7 @@ No (Q5): this is process, not product architecture. `docs/ai-workflow.md` takes 
 1. **Order within a phase:**
    1. The coder implements, ending with PHASE_COMPLETE.
    2. The human runs `/commit`.
-   3. A separate coder turn runs the mutation proofs against that commit. In Phase 2, instead, each M2.x proof gets its own coder turn, between the human's records listed under Phase 2, "Mutation proofs". Each proof's evidence is a mechanical result record (step 3), not the coder's report.
+   3. A separate coder turn runs the mutation proofs against that commit. In Phase 2: M2.1 and M2.2 each ran in their own coder turn, between the human's records listed under Phase 2, "Mutation proofs" (done and recorded; not re-run). M2.3–M2.8 instead run on throwaway copies of the committed hook and test files outside the repository, driven by a human-run runner (Revision 7); no coder turn applies their mutation. In every case the proof's evidence is a mechanical result record (step 3), not the coder's report.
    4. The human restarts Claude Code.
    5. The probes run in the fresh session. The human appends each record, named by its type (step 3), to `TestResults/chore-agents-hardening/evidence/phase-N.md`; the main session does not write to the evidence file. `TestResults/` is gitignored, so the tree stays clean for later probes.
    6. Cleanup, then `git status --short` is empty.
@@ -3151,12 +3175,35 @@ The coder's open-decision bullet (Body changes, coder) and the matching CLAUDE.m
 | M2.7 | in bash-allowlist, match entries by string prefix instead of token-wise | `bash-allowlist: blocks git difftool` |
 | M2.8 | in bash-allowlist, accept any further token after a dotnet entry's leading tokens | `bash-allowlist: blocks dotnet build -p:PreBuildEvent=x`, `bash-allowlist: blocks dotnet test --results-directory src` and `bash-allowlist: blocks dotnet format --verify-no-changes --report x` |
 
-Each M2.x proof runs in its own coder turn. The human records the state before it; the coder applies that one mutation, runs the named tests, restores it with the inverse Edit and stops; the human records the state after it. The human's records are made with `run` in an external Git Bash (Revision 6):
+M2.1 and M2.2 ran in place, each in its own coder turn, and are recorded; they are not re-run. For each, the human recorded the state before, the coder applied the one mutation, ran the named tests, restored it with the inverse Edit and stopped, and the human recorded the state after — with `run` in an external Git Bash (Revision 6):
 1. Before the mutation: record HEAD. `git status --porcelain --untracked-files=all` must be empty; otherwise the mutation does not start. Take the sha256 of every target file.
 2. Mutation and red run: by mechanical record from the coder's transcript. A red run counts only when the test's own assertion fails.
-3. After the restore, which the coder makes with the inverse Edit: the targets' sha256 values equal the earlier ones; `git diff --exit-code HEAD -- <targets>` returns 0; `git status --porcelain --untracked-files=all` is empty. As git reports it, an empty status shows that tracked files do not differ from HEAD and that there is no untracked file that is not ignored. The hashes verify the targets' content. Ignored outputs, such as TestResults and bin/obj, are out of scope.
+3. After the restore, which the coder makes with the inverse Edit: the targets' sha256 values equal the earlier ones; `git diff --exit-code HEAD -- <targets>` returns 0; `git status --porcelain --untracked-files=all` is empty. As git reports it, an empty status shows that tracked files do not differ from HEAD and that there is no untracked file that is not ignored. The hashes verify the targets' content. Ignored outputs, such as TestResults and bin/obj, are out of scope. The coder's own `git diff --exit-code` after its inverse Edit (Body changes, coder) is part of its turn and does not replace the human's records in steps 1 and 3.
 
-The coder's own `git diff --exit-code` after its inverse Edit (Body changes, coder) is part of its turn. It does not replace the human's records in steps 1 and 3.
+The new red-run condition below applies only to M2.3–M2.8. M2.1 and M2.2 retain their original acceptance conditions and recorded results; this revision does not reclassify them. M2.2's human assessment record remains a separate open item.
+
+Live repository boundary records (M2.3–M2.8). The human records one before/after pair for each runner invocation, using the existing `run` mechanism in external Git Bash. One invocation may cover one proof or several consecutive proofs; an initial M2.3-only invocation and a later invocation for the remaining proofs each get their own pair. These are common boundary records, not extra records between every proof:
+- Before: record branch `chore/agents-hardening`, current HEAD, `git status --porcelain --untracked-files=all` (must be empty), and the SHA256 of the live mutation targets `.claude/hooks/write-scope.js` and `.claude/hooks/bash-allowlist.js`. Record `git diff --exit-code HEAD -- .claude/hooks` with exit 0. The tested source is the full commit SHA stated below, separately from current HEAD. If the Revision 7 plan commit has moved HEAD, verify that the source-to-HEAD changed-path set contains only `thoughts/shared/plans/2026-09-25_chore-agents-hardening.md`, and that `git diff --exit-code <source-sha> HEAD -- .claude/hooks` exits 0. Do not start on an unexpected result.
+- After: record and compare branch, HEAD and target hashes with the before record; all must be unchanged. Record `git diff --exit-code HEAD -- .claude/hooks` with exit 0 and an empty `git status --porcelain --untracked-files=all`. Capture this final state even if an invocation stops early; an unavailable or failed after record leaves the boundary verification incomplete. An empty status does not cover ignored files. Intended append-only evidence and runner outputs under `TestResults/` remain separate from this tracked-file check.
+
+M2.3–M2.8 run on throwaway copies outside the repository (Revision 7); no coder turn applies their mutation. No Claude Code session is opened in the copy directory, so the live hooks, agent definitions and permission settings are never touched. For each M2.x independently:
+1. Source the target files from commit `ce5e7cfcb6a90561b69fdb24c0db5384196df3f0` (the Phase 2 implementation commit) by full SHA — never `HEAD` — into a directory outside the repository, keeping the `.claude/hooks/` layout so each test resolves the copied hook through `__dirname` and `run-hook.js` runs the copied hook with Node. (`run-hook.js` passes the JSON case to the hook on stdin; it does not run the test input's shell commands in a shell.) The copy's target-file sha256 must equal both the live file's sha256 and `ce5e7cfcb6a90561b69fdb24c0db5384196df3f0`'s blob for that path. Compare the raw blob, because an export may apply line-ending or filter conversions.
+2. Show the unmutated copy green: run the named test file(s); record the raw output and exit code.
+3. Apply the single planned mutation from the table to the copy. It must match in exactly one place; afterwards the copy differs from `ce5e7cfcb6a90561b69fdb24c0db5384196df3f0` only by that change.
+4. Show the target test red under the red-run condition below; record the raw output and exit code, including the failing `test … :line` and the assertion.
+5. Restore the copy from the same `ce5e7cfcb6a90561b69fdb24c0db5384196df3f0` blob and show it green again.
+
+A runner performs steps 1–5 and records, per mutation: the source commit, the three hashes of step 1, the exact commands, their raw output and their exit codes. It stops at the first unexpected result and leaves that record in place. The runner lives under `TestResults/chore-agents-hardening/validation/` beside `tool-records.js`; its sha256 is recorded on its first run and reused unchanged, as `tool-records.js` is. The runner's `run()` return reports whether a record was written; the exit code of each test command is captured and checked separately, not inferred from the record-write result.
+
+The human appends the boundary records and the runner's exact commands, raw stdout/stderr, actual command exit codes, source identity and hashes to `TestResults/chore-agents-hardening/evidence/phase-2.md`, as mechanical result records in the existing format. Outputs are captured mechanically, never reconstructed from a model summary; existing records are not overwritten or deleted. For each M2.x, the human records a separate assessment against the applicable acceptance condition, identifying the named target tests and any other failing tests. The runner's success message does not replace that assessment or close a proof automatically. Appending the assessment is separate from producing the mechanical record; M2.2's outstanding assessment is not supplied or inferred by this runner.
+
+
+Red-run condition (M2.3–M2.8). A red run counts only when the named target test fails on its own assertion AND that failure is the intended behavioural effect of the planned mutation: the mutated hook now blocks or allows the case differently, so the test's status assertion (expected block vs allow) or its reason assertion fails because the guard's own decision changed. It does NOT count when the failure comes from anything other than that intended effect — in particular a hook that throws and is turned by `runGuard` into an exit-2 `guard error` block (which can fail a reason assertion for an unrelated reason), any `ERR_ASSERTION` whose cause is not the mutation's intended effect, or a drop in the total test count. M2.5 meets the condition: with the `>` redirection pre-check removed, `echo x > src/a.cs` falls through to token matching and is blocked with the normal `command is not in the tester allowlist` reason, so the target test's reason assertion fails as the intended effect rather than through a crash.
+
+Unchanged by Revision 7:
+- M2.4 stays in `write-scope.js`. No M2.3–M2.8 mutation touches `guard-common.js`, the Phase 1 files, the test files or the helpers; the copy of those stays byte-for-byte `ce5e7cfcb6a90561b69fdb24c0db5384196df3f0`.
+- The Behaviour mapping table is the rule for behaviour evidence: each M2.x remains the behaviour evidence for its test. The live agent-to-hook connection is not shown by the mutation proofs; it is checked in P2.x (P2.2, P2.4, P2.5).
+- No extra live-log-hash check is added, because none of the M2.3–M2.8 mutations touch log isolation (`resolveLogDir`, `logDecision`, `run-hook.js`). If a future mutation ever did, the live `TestResults/hook-log/hooks.jsonl` would need a before/after hash taken with no live session acting meanwhile; that case does not arise here.
 
 Phase 3's `/mutate` design does not change.
 
@@ -3480,7 +3527,7 @@ From this phase on, the coder's own Bash runs under coder-bash-guard. The Phase 
     - a red counts only when the test's own assertion fails; infrastructure failures (for example a Docker API 500) are rerun and logged as `<label>-infra-N`
     - report the failing assertion for every red
     - restore only with the inverse Edit, never `git checkout --` (denied)
-- **Mutation proofs after Phase 3 (minor 14):** a coder turn never invokes `/mutate`. It runs the same four steps, calling `bash .claude/skills/mutate/scripts/mutate-run.sh …` and `bash .claude/skills/mutate/scripts/mutate-clean.sh …` directly. The Phase 1 and Phase 2 proofs predate the scripts and use Edit, `node --test` and `git diff --exit-code`.
+- **Mutation proofs after Phase 3 (minor 14):** a coder turn never invokes `/mutate`. It runs the same four steps, calling `bash .claude/skills/mutate/scripts/mutate-run.sh …` and `bash .claude/skills/mutate/scripts/mutate-clean.sh …` directly. The Phase 1 proofs and the Phase 2 proofs M2.1 and M2.2 predate the scripts and use Edit, `node --test` and `git diff --exit-code`; M2.3–M2.8 run on copies outside the repository through the Revision 7 runner (Phase 2, "Mutation proofs").
 - **`mutate-run.sh <label> <file> dotnet "<filter>" [<project>]` or `mutate-run.sh <label> <file> node <test-file>`:**
   - appends to `TestResults/<slug>/mutations/<label>.txt`, in order:
     - `$ git diff -- <file>` (the mutation)
