@@ -194,6 +194,26 @@ test('bash-allowlist: blocks echo $(id)', () => {
   assertTesterBlocks('echo $(id)', 'command substitution with "$(" is not allowed');
 });
 
+test('bash-allowlist: blocks git status and rm x separated by a newline', () => {
+  assertTesterBlocks('git status\nrm x', 'a newline is not allowed');
+});
+
+test('bash-allowlist: blocks git status & rm x', () => {
+  assertTesterBlocks('git status & rm x', 'a background "&" is not allowed');
+});
+
+test('bash-allowlist: blocks cat <(rm x)', () => {
+  assertTesterBlocks('cat <(rm x)', 'process substitution is not allowed');
+});
+
+test('bash-allowlist: blocks git status || rm x', () => {
+  assertTesterBlocks('git status || rm x', 'chaining with "||" is not allowed');
+});
+
+test('bash-allowlist: blocks cat x >(rm x)', () => {
+  assertTesterBlocks('cat x >(rm x)', 'process substitution is not allowed');
+});
+
 test('bash-allowlist: blocks bash -c "ls"', () => {
   assertTesterBlocks('bash -c "ls"', NOT_IN_TESTER);
 });
