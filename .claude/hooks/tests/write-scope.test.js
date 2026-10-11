@@ -127,3 +127,35 @@ test('write-scope: allows docs/journal/0015-x.md under docs/journal', () => {
 test('write-scope: allows TestResults/chore-agents-hardening/tester-verdict.md under TestResults', () => {
   assertAllowed(runWrite(['TestResults'], 'TestResults/chore-agents-hardening/tester-verdict.md'), 'TestResults');
 });
+
+test('write-scope: blocks src/x.txt under thoughts/shared/research', () => {
+  assertBlocked(
+    runWrite(['thoughts/shared/research'], 'src/x.txt'),
+    'write-scope:thoughts/shared/research',
+    'target is outside the write scope "thoughts/shared/research"',
+  );
+});
+
+test('write-scope: blocks src/x.txt under thoughts/shared/plans', () => {
+  assertBlocked(
+    runWrite(['thoughts/shared/plans'], 'src/x.txt'),
+    'write-scope:thoughts/shared/plans',
+    'target is outside the write scope "thoughts/shared/plans"',
+  );
+});
+
+test('write-scope: blocks src/x.txt under TestResults', () => {
+  assertBlocked(
+    runWrite(['TestResults'], 'src/x.txt'),
+    'write-scope:TestResults',
+    'target is outside the write scope "TestResults"',
+  );
+});
+
+test('write-scope: blocks src/x.txt under docs/journal', () => {
+  assertBlocked(
+    runWrite(['docs/journal'], 'src/x.txt'),
+    'write-scope:docs/journal',
+    'target is outside the write scope "docs/journal"',
+  );
+});
