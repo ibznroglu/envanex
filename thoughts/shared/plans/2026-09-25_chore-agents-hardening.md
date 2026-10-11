@@ -380,6 +380,22 @@ The test commit changes no file Claude Code loads, so it needs no restart and no
 
 Unchanged: Revision 8's accepted limit, closure conditions and Unchanged list; Phase 1; the M2 records and assessments; the conditions of P2.1, P2.3, P2.6, P2.7 and P2.8; Phases 3 and 4.
 
+## Revision 10
+
+Human decision: 2026-10-11, accept proposal thoughts/shared/plans/2026-10-11_phase2-precheck-test-correction-r2.md (sha256 cd0603bc00998ac4ef9bf4df252c4b95cb7a9ece36bf7012e84dde694e49f1ef, preserved at 859c9ba14ab1790846ee180eb4becd050bc8d1dc). Plan review: thoughts/shared/reviews/2026-10-11_chore-agents-hardening-plan-review-r5.md (APPROVED, Head 859c9ba14ab1790846ee180eb4becd050bc8d1dc). Source: finding F1 of the first R9.7 preliminary code review, thoughts/shared/reviews/2026-10-11_chore-agents-hardening-code-review.md (NEEDS_REVISION; Range 84ebd9072f3a06783d71f4af4a7d95f4644c9361..4994826ca784c2cfc66268aefbde16ef77591748; sha256 8b08a823693a85772220c0a9345e895890d97774cf0f3f3416b9180645d898ae; preserved alone at 7b9f113a58e1709301fdebb88e06b93ce7ebc7ee). The dated evaluation of its findings F1-F8 (Probe protocol step 3, "Approval and review chain"), model-authored under the human's delegation and recorded by the human: "F1 correction proposal preservation and F1-F8 evaluation" in the evidence file.
+
+This revision closes the test gap that F1 names. Tests to add, bash-allowlist.test.js, gains five tester-profile block tests, one for each pre-check branch that had none: a newline, a bare `&`, `<(`, `||` and `>(`. It changes no hook code, test helper, permission, tool list, write scope, agent definition, model or effort value, CLAUDE.md, Behaviour mapping row, mutation proof, evidence record or As built section, and it closes no probe.
+
+- Inputs. Each input is a string that `run-hook.js` passes to the hook as JSON on stdin; no shell runs it (Phase 2, Mutation proofs, step 1). No input contains `LIVEPROBE` (C1.7).
+- Behaviour evidence. The five items are "review only" under the Behaviour mapping's last row; no mutation proof is added. That each test fails when its branch is removed is a static reading, UNVERIFIED by execution and not a condition: without its branch, the newline, `&` and `<(` inputs would match a prefix entry and be allowed (the status assertion fails), and the `||` and `>(` inputs would be blocked by a later check with another reason (the reason assertion fails).
+- Counts. From the current 56 bash-allowlist tests and R9.6's 211: 61 and 216, that is 85 baseline names and 131 new names. These are cross-checks; Validation command 2's condition stays as written.
+- Correction steps. The correction loop in Probe protocol step 3, "Approval and review chain", applies unchanged. The coder turn is R9.5 with `.claude/hooks/tests/bash-allowlist.test.js` in place of `.claude/hooks/tests/write-scope.test.js` in every command and status condition, its input limited to the five Revision 10 items (Tests to add, bash-allowlist.test.js, tester profile blocks), and "the five additions" in place of "the four additions". Then come the test commit alone, an identity comparison and R9.6 again, because a file under .claude/hooks changed; no restart follows, because files under .claude/hooks/tests/ are excluded from the restart rule. The Coverage ledger's unmutated results come from the R9.6 record at the Revision 10 test commit; the earlier R9.6 record stays as recorded.
+- Re-review name (F7). The first R9.7 report keeps its recorded name and is not renamed, overwritten or deleted; its naming deviation stays recorded under "R9.7 preliminary review correlation and preservation" in the evidence file. The R9.7 re-review over the full Range writes thoughts/shared/reviews/<date>_chore-agents-hardening-code-review-phase2-r2.md, and a later re-review takes -r3, and so on (-r2 first, as for plan reviews). Its caller values name the first report, with its path and sha256, as the earlier review file, and give the changed-path list at the re-review's own HEAD.
+- Other findings. F2 and F3 stay disclosed, non-blocking residual findings in the class of Phase 4's "the Bash guards are string heuristics"; their runtime claims stay UNVERIFIED. F4-F6 are not implementation work in this revision. F8 is answered by "Append-only clarification of earlier evidence" in the evidence file, a model-authored clarification recorded by the human; no earlier record is rewritten.
+- Tester scope. The preliminary tester's existing check that every test Phase 2 requires exists and asserts something covers the five tests; R9.9's scope text is unchanged.
+
+Unchanged: Revision 9's decisions, execution order, approval chain, step conditions and settled readings; the Coverage ledger's 17 rows; Validation's numbered commands and conditions; Phases 1, 3 and 4.
+
 ---
 
 ## Goal
@@ -3219,6 +3235,12 @@ Test names (Revision 6):
   - `git commit -m x`, `git stash`, `rm -rf obj`, `cp a b`, `mv a b`, `docker compose down`
   - chained: `dotnet test; rm x`, `dotnet test && git add .`, `bash .claude/skills/gate/scripts/gate.sh; rm x`
   - substitution: `` echo `id` ``, `echo $(id)`
+  - pre-check branches (Revision 10), in this order after the `$(` substitution test; each test uses the existing `assertTesterBlocks` helper, so it asserts exit status 2 and stderr containing `Blocked by bash-allowlist:tester:` and the reason:
+    - `bash-allowlist: blocks git status and rm x separated by a newline` — input `git status`, one LF, `rm x` (the source writes the LF as the `\n` escape inside a single-quoted string; no CR); reason `a newline is not allowed`
+    - `bash-allowlist: blocks git status & rm x` — input `git status & rm x`; reason `a background "&" is not allowed`
+    - `bash-allowlist: blocks cat <(rm x)` — input `cat <(rm x)`; reason `process substitution is not allowed`
+    - `bash-allowlist: blocks git status || rm x` — input `git status || rm x`; reason `chaining with "||" is not allowed`
+    - `bash-allowlist: blocks cat x >(rm x)` — input `cat x >(rm x)`; reason `process substitution is not allowed`
   - wrappers: `bash -c "ls"`, `node -e "1"`
   - `dotnet test | tee out.txt`
   - `bash-allowlist: blocks node --test with .. traversal` — `node --test .claude/hooks/tests/../../../TestResults/x.test.js`
@@ -3450,7 +3472,7 @@ Until one of these exits is complete, the phase does not go on to review and can
 The Phase 2 gate rests on each numbered command's expected exit code and on its output condition, checked in the log of one run. READY_TO_PUSH is the human's decision on that log (Revision 6). The tester runs only the commands its bash-allowlist permits; its report is recorded but is not evidence (Probe protocol, step 3). No allowlist rule for pipes is added (Phase 4, residual guard risks).
 
 **Order.**
-- Validation runs after all of Phase 2's commits: the code commit that contains `.claude/settings.json` and `.mcp.json`; the Revision 9 plan and test commits and any approved correction commit; the review-file and journal commits of Probe protocol step 3, "Revision 9 execution order"; the commit that copies the probe evidence into As built; and the review-file commit of the final code review (R9.12). The preliminary tester run (R9.9) is not this Validation and closes nothing.
+- Validation runs after all of Phase 2's commits: the code commit that contains `.claude/settings.json` and `.mcp.json`; the Revision 9 plan and test commits, the Revision 10 plan and test commits, and any approved correction commit; the review-file and journal commits of Probe protocol step 3, "Revision 9 execution order"; the commit that copies the probe evidence into As built; and the review-file commit of the final code review (R9.12). The preliminary tester run (R9.9) is not this Validation and closes nothing.
 - Before validation, the temporary changes made for mutation proofs and probes are undone, their evidence records are kept, and the working tree is clean.
 - The READY_TO_PUSH record states three things separately:
   1. The validated HEAD, and the name and sha256 of that run's log.
