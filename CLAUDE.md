@@ -90,18 +90,22 @@ folders, not by extra processes.
 - Pipeline: researcher → HUMAN → planner → HUMAN → plan-reviewer → HUMAN → coder → HUMAN →
   code-reviewer → HUMAN → db-reviewer (only if the phase touched schema, migrations or queries)
   → HUMAN → tester → HUMAN. The human drives every transition. Agents STOP and wait.
-- **coder**: ONE phase per turn, ends with `PHASE_COMPLETE`, never commits, never pushes, and
-  NEVER runs another agent. Every coder prompt must contain an explicit stop instruction
+- **coder**: ONE phase per turn, ends with `PHASE_COMPLETE` (or, if the plan leaves open a
+  decision that affects user-facing behavior, a public contract, security or data integrity,
+  stops without it and reports the decision; the human routes it to the planner), never commits,
+  never pushes, and NEVER runs another agent. Every coder prompt must contain an explicit stop instruction
   ("do NOT run any other agent, do NOT commit, wait for me").
-- **code-reviewer**: verdict only — `APPROVED` / `NEEDS_REVISION` with file:line. No Bash tool,
-  never edits files.
+- **code-reviewer**: verdict only — `APPROVED` / `NEEDS_REVISION` with file:line. Writes only
+  its verdict file under `thoughts/shared/reviews/`.
 - **db-reviewer**: verdict only — `DB_APPROVED` / `DB_NEEDS_REVISION` with file:line.
   Never edits files. Skipping it on a schema-touching phase is a defect.
 - **tester**: verdict only — `READY_TO_PUSH` / `NEEDS_FIXES` with file:line. Runs format, build
-  and tests. NEVER edits or writes files — not via Edit/Write, not via shell redirection.
+  and tests. NEVER edits files, and writes only under `TestResults/` — never via shell redirection.
 - **explainer**: runs after tester returns `READY_TO_PUSH`, before the ADR and `/pr`. Writes
-  `docs/journal/NNNN-<slug>.md` — the only agent permitted to write files, and only there.
+  `docs/journal/NNNN-<slug>.md`, and writes only under `docs/journal/`.
   It never writes ADRs and never writes answers to its own questions.
+- **Write scopes:** researcher, planner and the reviewers each write only to their own
+  `thoughts/shared/` directory (`research/`, `plans/`, `reviews/`), enforced by hooks.
 - **Verdicts are terminal for the turn.** When any reviewer returns a verdict, the main agent
   MUST NOT edit or create any file (including plans and docs) and MUST NOT spawn any agent.
   `NEEDS_REVISION` -> human routes to planner. `NEEDS_FIXES` / `DB_NEEDS_REVISION` -> human
