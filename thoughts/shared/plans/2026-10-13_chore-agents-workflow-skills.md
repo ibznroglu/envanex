@@ -2,9 +2,26 @@
 
 Date: 2026-10-13. Branch: `chore/agents-workflow-skills` (slug `chore-agents-workflow-skills`), created from clean `main` at `2e8497a9220ae3ec8789fbc551270dd5538c609c`, the squash commit of PR #15.
 
-Status: planned. Nothing in this plan is implemented, committed, passed, probed or done.
+Status: planned. Nothing in this plan is implemented, passed, probed or done.
 
 Revision 1 (2026-10-13) applies the human's bounded revision, relayed unchanged by the main session (decisions 4-13 below). The earlier draft was never committed. Its Phase 3A/3B split, validation lists, journal, roadmap and merge texts are replaced, not kept beside the new ones.
+
+Revision 2 (2026-10-14) applies the plan review `thoughts/shared/reviews/2026-10-14_chore-agents-workflow-skills-plan-review.md` (NEEDS_REVISION, Head `6aa0305158aa14977e5d22bd3fd8b29352ba3979`). It also applies the human's correction decisions, relayed unchanged by the main session (decisions 14-20 below).
+- **S0 so far.**
+  - S0.2 committed this plan as P0 = `6aa0305`, and S0.4 committed the review as `b06e223`.
+  - This revision is S0.1 again. The human commits it (S0.2), and the re-review writes `…-plan-review-r2.md` against that commit (S0.3).
+- **The review's non-blocking observations N1-N4** stay recorded there, as non-blocking. This revision does not address them.
+
+| Review item | Required change | Where it lives now |
+|---|---|---|
+| B1 | 1: P3.7/P3.8 outcome rules, deterministic open-failure cases, guarded not-a-work-tree cases | Phase 3 Probes, "P3.7 and P3.8" (script, coverage, pass rules, INCONCLUSIVE rule); Phase 4 Files, residual item (10) and the sentence after it; `docs/ai-workflow.md` section 9, item (10); DV15 |
+| B2 | 2: every specified exit branch reached or listed | P3.8 cases e1-e9 (`mutate-run.sh`) and f0-f7, h-l and q (`mutate-clean.sh`); residual item (10) |
+| B3 | 3: tie the PR-end gate copy to its `/gate` run | Probe protocol item 8; P3.1, P3.2, P3.6; P4.4 steps 4-5; DV16 |
+| B4 | 4: P3.4 uses only its own records | Phase 3 Probes, P3.4 |
+| B5 | 5: D1 without redirection | Doc checks, D1's command and row; Phase 4 Validation |
+| L1 | 6: `Gates-sha256:` when there is no hash | tester.md steps 3, 4 and 11 (Phase 3 Signatures); DV5 |
+| L2 | 7: start-up stderr | the Diagnostics of `gate.sh`, `mutate-run.sh` and `mutate-clean.sh` (Phase 3 Signatures); P3.7/P3.8 expected lines; DV2, DV3 |
+| L3 | 8: the residual-risks heading | `docs/ai-workflow.md` section 9 heading |
 
 ## Source and pins
 
@@ -71,13 +88,34 @@ Revision 1 (relayed 2026-10-13):
 
     Title: `chore(agents): complete workflow skills and documentation`.
 
+Revision 2 (relayed 2026-10-14):
+
+14. **P3.7/P3.8 required cases.**
+    - A directory placed at the record path or log path is the required open-failure case. It is exercised separately for `gate.sh` and for both mutation scripts.
+    - `chmod` cases are supplementary only.
+    - INCONCLUSIVE never means PASS. Required coverage is kept apart from supplementary checks, and every branch still unexecuted is recorded honestly.
+    - Not-a-work-tree cases run only behind a guard. A gate never runs in an unrelated parent repository.
+15. **Scratch ownership.**
+    - A pre-existing scratch path is a hard stop before any change.
+    - Setup is checked before anything proceeds.
+    - Cleanup removes only the directory this invocation created. A pre-existing path is never deleted or reused.
+16. **PR-end gate provenance (B3).**
+    - The copied record is tied to the new `/gate` invocation by its tool call and result: successful completion, the record path, the hash and the final success line.
+    - The tester's copy is kept separately.
+    - A failed invocation cannot pass on a stale `gates.txt`.
+    - Successful completion is established without fabricated exit codes.
+17. **A fresh mutation label and log for every P3.4 attempt**, with its hash and line count recorded. Earlier attempts are preserved.
+18. **D1 is `wc -l CLAUDE.md`**, without redirection, with ordinary whitespace allowed.
+19. **`Gates-sha256: none`** when the current invocation gives no valid hash. Such a run cannot return READY_TO_PUSH. A missing or stale `gates.txt` is never used as a failed invocation's file list or evidence.
+20. **Explicit start-up stderr**, and the residual-risks heading pinned as `## Residual risks`.
+
 ### Inherited IDs: where they live now
 
 | ID | Original | Here | What changes |
 |---|---|---|---|
 | Phase 3 Files and Signatures | plan:22822-22986 | Phase 3 | DV2-DV5 |
-| P3.1-P3.6, C3.1-C3.3 | plan:22994-23029, 596-598 | Phase 3 | slug paths; DV6-DV8; P3.5 on the As built commit; P3.6 after the review |
-| P3.7, P3.8 | — (new: decisions 8-9) | Phase 3 | focused failure checks |
+| P3.1-P3.6, C3.1-C3.3 | plan:22994-23029, 596-598 | Phase 3 | slug paths; DV6-DV8, DV16; P3.5 on the As built commit; P3.6 after the review |
+| P3.7, P3.8 | — (new: decisions 8-9, 14-15) | Phase 3 | focused failure checks: required and supplementary cases |
 | H4.0, C4.1, C4.2, P4.1-P4.3 | plan:23044-23049, 599-600, 23169-23173 | Phase 4 | P4.2 is case-insensitive (DV9) |
 | P4.4 | plan:23174-23182 | Phase 4 | this PR's own PR-end sequence: the first real use of the new `/pr`, with decision 13's merge protections. It is not a repeat of a completed probe |
 | Phase 4 Files | plan:23051-23161 | Phase 4 | DV10-DV12 |
@@ -136,7 +174,7 @@ Restarts follow plan:573 and F21: when Claude Code rereads skills, agents and se
 **S0.3 caller values:**
 - Range: `2e8497a9220ae3ec8789fbc551270dd5538c609c..P0`
 - Head: P0
-- changed paths: the human's `git diff --name-only 2e8497a9220ae3ec8789fbc551270dd5538c609c P0`. Expected: this plan only.
+- changed paths: the human's `git diff --name-only 2e8497a9220ae3ec8789fbc551270dd5538c609c P0`. Expected: this plan and earlier review files of this branch only.
 
 **S0.4 outcomes.**
 - NEEDS_REVISION returns to S0.1. The next plan commit gets a re-review, `-r2` first, against that commit, and then S0.4 runs again.
@@ -144,7 +182,7 @@ Restarts follow plan:573 and F21: when Claude Code rereads skills, agents and se
 
 **S1 record.** The human records whether that `/commit` run wrote `TestResults/COMMIT_MSG.txt`. It would only if the session had already loaded the new skill file.
 
-**Why the order holds.** No step depends on a tool before the restart that installs it. If the session loads the new `/commit` before R3, the S1 commit simply runs the new recipe. P3.5 is defined as the first commit after R3, so the order holds either way. None of S0's commits is made in the planning turn.
+**Why the order holds.** No step depends on a tool before the restart that installs it. If the session loads the new `/commit` before R3, the S1 commit simply runs the new recipe. P3.5 is defined as the first commit after R3, so the order holds either way. None of S0's commits is made in a planning turn.
 
 ## Probe protocol for this branch
 
@@ -208,9 +246,18 @@ Inherits plan:471-573 with the changes below.
      - the destination is checked with `test ! -e`
      - the sha256 is recorded before the move and re-checked after it
 7. **Tester runs: correlation.** After every tester run, the human makes the P3.6 records (Phase 3, Probes) as that run's correlation record. They are a probe only in Phase 3.
-8. **Gate copies.**
-   - `gates.txt` is overwritten by every `gate.sh` run. Right after each relevant run, the human copies it to `TestResults/chore-agents-workflow-skills/validation/gates-<label>-<HEAD7>.txt` and records both sha256 values.
-   - Labels: `p3.1`, `p3.2`, `3-tester`, `4-tester`, `pr-end-tester` and `pr-end-gate`.
+8. **Gate records (decision 16).**
+   - **The stale-record risk.** Every `gate.sh` run overwrites `TestResults/chore-agents-workflow-skills/gates.txt`. A run that stops at start-up (exit 2) writes nothing and leaves an older record in place.
+   - **Remove before each used run.** The used runs are P3.1, P3.2, every tester run and P4.4 step 5. Before each one, the human first copies the live record if it is still needed, then removes it and records `rm -f TestResults/chore-agents-workflow-skills/gates.txt; test ! -e TestResults/chore-agents-workflow-skills/gates.txt; echo "absent=$?"`, which must print `absent=0`.
+   - **Copy after each used run.** Right after each such run, the human copies the new record to `TestResults/chore-agents-workflow-skills/validation/gates-<label>-<HEAD7>.txt` and records both sha256 values. Labels: `p3.1`, `p3.2`, `3-tester`, `4-tester`, `pr-end-tester` and `pr-end-gate`. A copy is never overwritten or reused for another run.
+   - **A record belongs to the run that printed its hash.** That run's stdout has the record's path on line 1, a `sha256sum` line on line 2 whose hash equals the copy's sha256, and a `gate-exit=` line as its last line. A run whose stdout lacks these produced no usable record, whatever file exists.
+   - **Successful completion** is established without inferring a numeric exit code:
+     - the run's stdout ends with `gate-exit=0 failed=`. `gate.sh` prints that line only after verifying its record and printing the whole summary.
+     - the live record was absent before the run
+     - the copy passes G0-G11
+     - where the transcript row of the call carries an error flag, the flag is not set
+
+     A numeric exit code is cited only where a record shows it, such as an external `run` record's `exit=` line or `echo "gate=$?"`.
 9. **Hook log.** `TestResults/hook-log/hooks.jsonl` is shared with the earlier branch. Lines are selected by session_id, agent_id, hook, target and the call/result window, never by counting over the whole log (plan:546).
 10. **Transcripts.**
     - Main session: `~/.claude/projects/C--projects-envanex/<session-id>.jsonl`.
@@ -229,7 +276,7 @@ Inherits plan:471-573 with the changes below.
 ## Validation lists and the runner
 
 **Who runs what:**
-- The tester runs `gate.sh` once per run and inspects the record (tester.md step 5).
+- The tester runs `gate.sh` once per run and inspects the record (tester.md step 6).
 - The human runs, while no agent runs:
   - the extra checks, with the runner on a stage's commands file
   - the gate record checks, against the copy of the gates file from the tester's or `/gate`'s run
@@ -356,7 +403,7 @@ X10 output:
 - `commands-pr-end.txt` holds the lines of `commands-4.txt`, then `git remote -v` (E1, which is C4.2).
 
 ```
-wc -l < CLAUDE.md
+wc -l CLAUDE.md
 awk '/^<!-- APPENDIX-A-START -->$/{f=1;next} /^<!-- APPENDIX-A-END -->$/{f=0} f' thoughts/shared/plans/2026-10-13_chore-agents-workflow-skills.md | sed '1d;$d' | diff - CLAUDE.md
 grep -rn "/verify" CLAUDE.md docs/roadmap.md docs/ai-workflow.md .claude
 grep -n -i -e purchasing -e SoapCore -e "Windows Service" CLAUDE.md
@@ -370,7 +417,7 @@ grep -n -e NNNN -e "PR number" .claude/agents/explainer.md
 
 | # | Who | Expected |
 |---|---|---|
-| D1 (C4.1) | both | `199` (Appendix A by the planner's count). C4.1's condition is ≤ 200; D2, not this count, establishes equality |
+| D1 (C4.1) | both | exit 0; one line matching `^[[:space:]]*199[[:space:]]+CLAUDE\.md$`, so `199 CLAUDE.md` with any ordinary whitespace. 199 is Appendix A by the planner's count. C4.1's condition is that the number is ≤ 200; D2, not this count, establishes equality |
 | D2 | human-only | exit 0; no output (CLAUDE.md equals Appendix A) |
 | D3 (P4.1) | both | exit 0; exactly one line, from `docs/ai-workflow.md`, containing "`/gate` replaces the project's earlier `/verify` skill". A match in the gitignored `.claude/settings.local.json` is recorded separately, as outside the PR |
 | D4 (P4.2) | both | exit 0; exactly one line, starting `8:`, the Overview's out-of-scope sentence |
@@ -382,7 +429,7 @@ grep -n -e NNNN -e "PR number" .claude/agents/explainer.md
 | D10 | both | exit 0; exactly 3 lines, starting `36:`, `37:` and `44:` (`44:# NNNN — <title>`) |
 | E1 (C4.2) | human-only | exit 0; lines for `origin` (fetch and push) |
 
-**Tester-runnable.** "both" marks the commands the tester's allowlist permits. None contains a `|` inside a pattern: bash-allowlist splits on every `|` regardless of quotes.
+**Tester-runnable.** "both" marks the commands the tester's allowlist permits. None contains a redirection, or a `|` inside a pattern: bash-allowlist splits on every `|` regardless of quotes, and tester.md allows no redirection other than `2>&1`.
 
 ### Runner
 
@@ -443,14 +490,15 @@ else echo "STOP: no HEAD or no commands file"; fi
 Each is a planner decision for the plan review.
 
 - **DV1. A new slug for every path.** Historical paths are untouched and unused.
-- **DV2. `gate.sh` robustness (decision 8).**
+- **DV2. `gate.sh` robustness (decisions 8 and 20).**
   - Start-up failures exit 2 and write nothing. Record I/O failures exit 3.
   - The record is opened once, and every write and read of it is checked. A final verification re-reads the last line.
+  - Each failure prints exactly one stderr line. The output of the script's own start-up and header commands, and of a failed open, is discarded.
   - Each step's stdin is `/dev/null`.
   - Callers set the Bash tool `timeout` to 600000. #15's logged integration suite alone took about a minute (plan:2934), so a full run is likely longer than the default 2 minutes; P3.1 records the real time.
   - The stdout format is pinned. Node summary lines are matched for both reporters.
   - `sha256=unavailable` is printed only when `sha256sum` itself is missing.
-- **DV3. Mutation scripts (decision 9).**
+- **DV3. Mutation scripts (decisions 9 and 20).**
   - Argument checks:
     - a label matching `^[A-Za-z0-9][A-Za-z0-9._-]*$`, because it becomes a file name and `../x` must not escape `mutations/`
     - the mode `dotnet` or `node`
@@ -458,7 +506,8 @@ Each is a planner decision for the plan review.
     - every target file tracked
   - `mutate-clean.sh` checks both `git diff --exit-code HEAD --` (working tree against HEAD) and `git diff --cached --exit-code --` (index against HEAD). Plain `git diff --exit-code --` compares the working tree with the index and misses a staged change that the working tree matches.
   - The mutation record is `git diff HEAD -- <file>`.
-  - Repository-root, `cd`, branch and directory failures exit 2. Log I/O failures exit 3.
+  - Repository-root, `cd`, branch and directory failures exit 2. A git call with an unexpected exit code in `mutate-clean.sh` also exits 2. Log I/O failures exit 3.
+  - Each failure prints exactly one stderr line.
   - Neither script changes the target, the index or HEAD.
 - **DV4. `/commit` and `/pr` are given as exact files.**
   - Old frontmatter is replaced, not duplicated.
@@ -469,11 +518,12 @@ Each is a planner decision for the plan review.
 - **DV5. tester.md.**
   - It is rebased on the current text (tester.md:18-63; model and effort lines unchanged).
   - It states the one Bash write exception, `gate.sh`, and its bounds.
-  - It inspects `gates.txt` instead of re-running the gate's commands (decision 5), and fails on a non-zero `gate.sh` exit.
+  - It inspects `gates.txt` instead of re-running the gate's commands (decision 5).
+  - It uses a record only when this run's stdout is complete and the record's `head=` is HEAD. Otherwise it writes `Gates-sha256: none` and NEEDS_FIXES (decision 19).
   - Its output sections let P3.6's byte comparison run mechanically.
   - It never overwrites an existing verdict file.
 - **DV6. P3.2 targets one test.** "Edit path-guard.test.js so one assertion expects 0 instead of 2" (plan:23004) would hit the shared helper `assertBlocked` at `.claude/hooks/tests/path-guard.test.js:44` and fail every block test, not one. The mutation is pinned to line 59.
-- **DV7. P3.4 pins its files.** M1.1's site is `toSlashForm` in `.claude/hooks/lib/guard-common.js:45` (plan:1654), not `path-guard.js`. "node mode on path-guard.js" (plan:23018) is read as node mode with `path-guard.test.js`. A safety reading and a restore fallback are added, because the live guard is mutated.
+- **DV7. P3.4 pins its files.** M1.1's site is `toSlashForm` in `.claude/hooks/lib/guard-common.js:45` (plan:1654), not `path-guard.js`. "node mode on path-guard.js" (plan:23018) is read as node mode with `path-guard.test.js`. A safety reading and a restore fallback are added, because the live guard is mutated. Each attempt has its own label and log (decision 17).
 - **DV8. P3.5's decisive comparison.**
   - P3.5 compares the stored message with `git stripspace` of the file.
   - `git log --format=%B` is a tformat and appends a line terminator, so a byte diff against it can differ by one trailing blank line (UNVERIFIED). The original command is recorded as context only.
@@ -495,7 +545,16 @@ Each is a planner decision for the plan review.
 - **DV12. explainer.md.** The journal-number wording follows decision 3. A stop rule enforces "no number is reused" (plan:360).
 - **DV13. Validation without duplicates (decision 5).** G inspects the gate record. X, D and E cover only what `gate.sh` does not run. The checks folded into exact diffs are listed in "Regression checks and historical proofs".
 - **DV14. Phase 4 runs the full protocol (steps 1-11).** Then come the learning journal (decision 11), the final evidence commit, and P4.4.
-- **DV15. Two new focused checks.** P3.7 covers `gate.sh`'s failure exits and P3.8 the mutation scripts (decisions 8-9). The human runs both from a throwaway script under `TestResults/` against a scratch repository outside the project. No test framework is introduced.
+- **DV15. Two new focused checks (decisions 8-9, 14-15).**
+  - P3.7 covers `gate.sh`'s failure exits; P3.8 covers both mutation scripts.
+  - Required cases decide the probes, including a directory placed at the record or log path for each script's failed open. `chmod` cases are supplementary.
+  - INCONCLUSIVE never passes, and every unexecuted branch is named in residual item (10).
+  - The human runs both from a throwaway script under `TestResults/`. The script owns only the scratch directory it creates.
+  - No test framework is introduced.
+- **DV16. Gate-record provenance (decision 16).**
+  - The live record is removed before every used gate run.
+  - A record counts only for the run whose complete stdout printed its hash.
+  - The PR-end `/gate` copy is tied to its own invocation and kept apart from the tester's copy.
 
 ## Phase 3: skills — `/gate`, `/mutate`, `/commit`, `/pr`; the tester and coder contracts
 
@@ -594,14 +653,24 @@ rule: print `$ <command>`, then its raw output.
 
 **`.claude/skills/gate/scripts/gate.sh`** (plan:22849-22896, with DV2). It takes no arguments. It sets `set -u`, never `set -e`, and never fetches. It works on the repository that contains the current directory.
 
-- **Start-up — exit 2, nothing written.** It prints one reason line to stderr and exits 2 when:
-  - `git rev-parse --show-toplevel` fails (not inside a work tree)
-  - `cd` to that directory fails
-  - `git branch --show-current` fails or prints nothing (detached HEAD)
-  - `mkdir -p TestResults/<slug>` fails. `<slug>` is the branch with `/` replaced by `-`.
+- **Start-up, in this order — exit 2, nothing written.** It exits 2 when:
+  1. `git rev-parse --show-toplevel` fails (not inside a work tree)
+  2. `cd` to that directory fails
+  3. `git branch --show-current` fails or prints nothing (detached HEAD)
+  4. `mkdir -p TestResults/<slug>` fails. `<slug>` is the branch with `/` replaced by `-`.
 - **The record.**
   - `TestResults/<slug>/gates.txt` is opened once, truncating it, on one file descriptor. Every later write uses that descriptor.
-  - A failed open prints `gate.sh: I/O error: open <path>` to stderr and exits 3.
+  - A failed open exits 3.
+- **Diagnostics (decision 20).**
+  - Every exit-2 or exit-3 path prints exactly one line to stderr, `gate.sh: <reason>`.
+  - The script discards the stdout and stderr of its own start-up `git` and `mkdir` calls, of the header's `git` calls, and of a failed open, the shell's own redirection message included.
+  - So a failure before the summary leaves exactly that one line as the script's whole output.
+  - The reasons, exactly:
+    - `not inside a git work tree`
+    - `cannot cd to <dir>`
+    - `no current branch`
+    - `cannot create TestResults/<slug>`
+    - `I/O error: <operation> <path>`. A failed open is `I/O error: open TestResults/<slug>/gates.txt`.
 - **Header (the first line):**
 
   ```
@@ -643,7 +712,7 @@ rule: print `$ <command>`, then its raw output.
 - **I/O rule — exit 3.**
   - Every write to the record is checked: the header, each `$` line, each newline fix, each `exit=` line, the final line.
   - Every read of it is checked: the size and last-byte reads, `final_status`'s read-back, the summary's reads, the final verification.
-  - A failed write or read prints `gate.sh: I/O error: <operation> <path>` to stderr and exits 3 at once.
+  - A failed write or read prints its one Diagnostics line and exits 3 at once.
 - **Final verification.** After the final line, the script closes the descriptor (checked) and re-reads the record's last line. If it is not exactly the line `final_status` wrote, exit 3.
 - **Exit status:**
   - 0 — the record is complete and verified, and its last line is `gate-exit=0 failed=`
@@ -651,7 +720,7 @@ rule: print `$ <command>`, then its raw output.
   - 2 — start-up failure; nothing written
   - 3 — I/O error on the record
 
-  Only 0 is a passing gate, and no other path exits 0. A failed summary read after a verified record also exits 3. The record stays as verified, but the caller sees a non-zero exit, and the tester returns NEEDS_FIXES on it.
+  Only 0 is a passing gate, and no other path exits 0. A failed summary read after a verified record also exits 3. The summary is then incomplete, so the tester's step 3 rejects the run.
 - **Stdout**, computed from the record after the final verification, in this order:
   1. the line `TestResults/<slug>/gates.txt`
   2. `sha256sum`'s output line for it, or `sha256=unavailable` when `sha256sum` is missing
@@ -689,29 +758,35 @@ Input: $ARGUMENTS (plan file path, and the phase or stage to validate)
 Steps:
 1. Read the plan's validation for that phase or stage.
 2. Run `bash .claude/skills/gate/scripts/gate.sh` once, with the Bash tool's `timeout` set to
-   600000. Paste its stdout verbatim. Its first two lines are the path of `gates.txt` and the
-   `sha256sum` line for it.
-3. Read `TestResults/<branch-slug>/gates.txt`; use Grep to find the lines you need, because the
-   file is long. Your file list is its `files` section: the lines between
+   600000. Paste its stdout verbatim.
+3. Use the gate record only if this run's stdout is complete: its first line is the path
+   `TestResults/<branch-slug>/gates.txt`, its second line is a `sha256sum` line for that path
+   (not `sha256=unavailable`), and its last line starts with `gate-exit=`. If it is not
+   complete, do not read `gates.txt` at all — a file there may be an older run's — and return
+   NEEDS_FIXES with `Gates-sha256: none`.
+4. Read `TestResults/<branch-slug>/gates.txt`; use Grep to find the lines you need, because the
+   file is long. Its first line must contain `head=` followed by the output of
+   `git rev-parse HEAD`; if it does not, the record is not this run's: return NEEDS_FIXES with
+   `Gates-sha256: none`. Your file list is the record's `files` section: the lines between
    `$ git diff --name-only main...HEAD` and the next `exit=` line. Ignore any file list typed in
    the prompt.
-4. Return NEEDS_FIXES when gate.sh exited with a status other than 0, when the line after
+5. Return NEEDS_FIXES when the Bash tool reported the gate.sh call as failed, when the line after
    `$ git status --short` in `gates.txt` is not exactly `exit=0 step=status kind=info` (the
    working tree was not clean), or when the last line of `gates.txt` is not exactly
    `gate-exit=0 failed=`.
-5. Check the outcomes gate.sh recorded — each step's `exit=` line, the hook-test summary, the
+6. Check the outcomes gate.sh recorded — each step's `exit=` line, the hook-test summary, the
    build's warning and error counts, and the test totals — against the plan's expectations, with
    Read and Grep. Do not run `node --test`, `dotnet format`, `dotnet build` or `dotnet test`
    yourself: gate.sh ran them, and `gates.txt` is their record.
-6. Run the plan's other validation commands that your allowlist permits, each exactly as the plan
+7. Run the plan's other validation commands that your allowlist permits, each exactly as the plan
    writes it. List the commands the plan marks human-only as not run.
-7. Manually trace the logic: read the files of step 3 and verify the implementation matches the
+8. Manually trace the logic: read the files of step 4 and verify the implementation matches the
    plan's goal, not just that it runs.
-8. Confirm the tests and checks the plan requires exist and actually assert something: grep for
+9. Confirm the tests and checks the plan requires exist and actually assert something: grep for
    each named test.
-9. Paste raw output; never compose it. A verdict without the commands' real output is incomplete
-   and will be rejected.
-10. Write `TestResults/<branch-slug>/tester-verdict.md`. `<branch-slug>` is the output of
+10. Paste raw output; never compose it. A verdict without the commands' real output is incomplete
+    and will be rejected.
+11. Write `TestResults/<branch-slug>/tester-verdict.md`. `<branch-slug>` is the output of
     `git branch --show-current` with `/` replaced by `-`. If that file already exists, do not
     write: report it and stop, because an earlier report is never overwritten. The file records
     your run; it is not a gate. Its first lines are exact:
@@ -720,10 +795,13 @@ Steps:
     Verdict: <READY_TO_PUSH|NEEDS_FIXES>
     Head: <git rev-parse HEAD>
     Branch: <branch>
-    Gates-sha256: <the 64-character hash on the second line of gate.sh's stdout in step 2>
+    Gates-sha256: <hash|none>
     ```
 
-    The rest of the file is your report below.
+    `<hash>` is the 64-character hash on the second line of gate.sh's stdout in step 2. It is
+    `none` when step 3 or step 4 found no valid record of this run, and a file with
+    `Gates-sha256: none` always has `Verdict: NEEDS_FIXES`. The rest of the file is your report
+    below.
 
 If the plan asks for a `dotnet` command that gate.sh does not run, it takes only the flags the
 allowlist lists: `-warnaserror`, `--no-restore`, `--filter`, `-v`/`--verbosity`, a `src/` or
@@ -733,9 +811,9 @@ Output:
 ## gate.sh stdout
 (verbatim, in a fenced block)
 ## Changed files
-(the `files` section of `gates.txt`, verbatim, in a fenced block)
+(the `files` section of `gates.txt`, verbatim, in a fenced block; "none: no valid record" when step 3 or 4 rejected the record)
 ## Recorded gate outcomes
-(the `gates.txt` lines checked in step 5, verbatim)
+(the `gates.txt` lines checked in step 6, verbatim)
 ## Other commands run
 (command — exit status — relevant output)
 ## Manual trace
@@ -807,20 +885,33 @@ mutate-run.sh <label> <file> dotnet "<filter>" [<project>]
 mutate-run.sh <label> <file> node <test-file>
 ```
 
-- **Argument check — exit 2, nothing written, a `usage:` line on stderr.**
+- **Argument check — exit 2, nothing written.**
   - the label matches `^[A-Za-z0-9][A-Za-z0-9._-]*$`
   - the mode is `dotnet`, with 4 or 5 arguments, or `node`, with exactly 4
-- **Start-up — exit 2, nothing written.** It fails when:
-  - `git rev-parse --show-toplevel` fails, or `cd` to it fails
-  - `git branch --show-current` fails or prints nothing
-  - `git ls-files --error-unmatch -- <file>` fails (untracked target)
-  - `mkdir -p TestResults/<slug>/mutations` fails
-- **The log.** `TestResults/<slug>/mutations/<label>.txt` is opened once in append mode on one descriptor; a failed open exits 3. It records, in order:
+- **Start-up, in this order — exit 2, nothing written:**
+  1. `git rev-parse --show-toplevel` fails
+  2. `cd` to it fails
+  3. `git branch --show-current` fails or prints nothing
+  4. `git ls-files --error-unmatch -- <file>` fails (untracked target)
+  5. `mkdir -p TestResults/<slug>/mutations` fails
+- **Diagnostics (decision 20).**
+  - Every exit-2 or exit-3 path prints exactly one line to stderr, `mutate-run.sh: <reason>`.
+  - The script discards the stdout and stderr of its own start-up `git` and `mkdir` calls and of a failed open, the shell's own redirection message included.
+  - So a failure before the first log write leaves exactly that one line as the script's whole output.
+  - The reasons, exactly:
+    - `usage: mutate-run.sh <label> <file> dotnet "<filter>" [<project>] | mutate-run.sh <label> <file> node <test-file>`, for every argument error
+    - `not inside a git work tree`
+    - `cannot cd to <dir>`
+    - `no current branch`
+    - `untracked file <file>`
+    - `cannot create TestResults/<slug>/mutations`
+    - `I/O error: <operation> <path>`. A failed open is `I/O error: open TestResults/<slug>/mutations/<label>.txt`.
+- **The log.** `TestResults/<slug>/mutations/<label>.txt` is opened once in append mode on one descriptor; a failed open exits 3, before any git or test command runs. It records, in order:
   1. `$ git diff HEAD -- <file>` (the mutation against the commit), its output, `exit=<n>`
   2. `$ <test command>`, its raw stdout and stderr (a final newline is added if missing), `exit=<n>`
 
   The test command is `dotnet test [<project>] --filter "<filter>"` (never `--no-build`) or `node --test <test-file>`. Stdin is `/dev/null`.
-- **I/O rule — exit 3.** Every write to the log and every read of it (the last-byte check) is checked. A failure prints `mutate-run.sh: I/O error: <operation> <path>` to stderr and exits 3 at once.
+- **I/O rule — exit 3.** Every write to the log and every read of it (the last-byte check) is checked. A failure prints its one Diagnostics line and exits 3 at once.
 - **Stdout:**
   - the log path
   - the test-output lines matching `^not ok|✖|AssertionError|^\s+(expected|actual)` (node) or `^\s*Failed |Assert|Shouldly|Expected|Actual|Error Message` (dotnet)
@@ -833,7 +924,12 @@ mutate-run.sh <label> <file> node <test-file>
 
 **`mutate-clean.sh <label> <file>...`** (plan:22919, with DV3). It needs at least one file.
 
-- **Checks.** Argument check and start-up as `mutate-run.sh`; every `<file>` must be tracked.
+- **Checks.** The argument check (the label) and the start-up order are those of `mutate-run.sh`; every `<file>` must be tracked.
+- **Diagnostics.** As in `mutate-run.sh`, with the prefix `mutate-clean.sh:`. It has two reasons of its own:
+  - `usage: mutate-clean.sh <label> <file>...` for every argument error
+  - `git diff failed with exit <n>` when a git call exits with a code other than 0 or 1
+
+  On that git error, stdout still carries the printed records.
 - **Records**, in the same log:
   1. `$ git diff --exit-code HEAD -- <files>` (working tree against HEAD), its output, `exit=<n>`
   2. `$ git diff --cached --exit-code -- <files>` (index against HEAD), its output, `exit=<n>`
@@ -1053,7 +1149,7 @@ The scripts and contracts are proven by these named probes:
 - **P3.5** — the new `/commit`.
 - **P3.6** — the new tester.
 - **P3.7** — `gate.sh`'s failure exits.
-- **P3.8** — the mutation scripts' failure handling and HEAD comparison.
+- **P3.8** — the mutation scripts' failure exits and HEAD comparison.
 - **C3.1-C3.3**.
 
 ### Probes (fresh session after R3)
@@ -1061,11 +1157,12 @@ The scripts and contracts are proven by these named probes:
 `GATES=TestResults/chore-agents-workflow-skills/gates.txt`. The human records with `run` in an external Git Bash.
 
 **P3.3 (rename) and P3.1 (`/gate` matches its file; positive control).** On a clean tree at the Phase 3 code commit:
-1. The human runs X5 (`ls .claude/skills`; no `verify`) and invokes `/gate`.
-2. From the main-session transcript `T`, the human records two rows:
+1. The human removes the live record that the coder's smoke run left (Probe protocol item 8; `absent=0`).
+2. The human runs X5 (`ls .claude/skills`; no `verify`) and invokes `/gate`.
+3. From the main-session transcript `T`, the human records two rows:
    - `grep -n -F 'bash .claude/skills/gate/scripts/gate.sh' "$T" | cut -c1-6000`, the tool_use row
    - the matching tool_result row, by its tool_use id
-3. The human copies the record:
+4. The human copies the record:
 
    ```
    cp "$GATES" TestResults/chore-agents-workflow-skills/validation/gates-p3.1-<HEAD7>.txt
@@ -1073,7 +1170,7 @@ The scripts and contracts are proven by these named probes:
    ```
 
    The two hashes are equal.
-4. With `GC` pointing at that copy, the human runs `gate-checks.txt` with `K=gate-checks-p3.1`.
+5. With `GC` pointing at that copy, the human runs `gate-checks.txt` with `K=gate-checks-p3.1`.
 
 **P3.3 passes when:**
 - the tool result's first line is `TestResults/chore-agents-workflow-skills/gates.txt`
@@ -1085,6 +1182,7 @@ The scripts and contracts are proven by these named probes:
 - the tool result's second line carries the same hash as G0
 - its `steps:` block equals G2's ten lines
 - it shows `dotnet test passed total: 638`
+- its last line is `gate-exit=0 failed=`. That shows successful completion (Probe protocol item 8).
 
 The two rows' timestamps give the run time (DV2).
 
@@ -1106,7 +1204,7 @@ The two rows' timestamps give the run time (DV2).
    ```
 
 2. The human records `git diff -- .claude/hooks/tests/path-guard.test.js`. It shows exactly that one-line change.
-3. The human runs `bash .claude/skills/gate/scripts/gate.sh; echo "gate=$?"`.
+3. The human removes the live record (Probe protocol item 8; P3.1's copy already exists), then runs `bash .claude/skills/gate/scripts/gate.sh; echo "gate=$?"`.
 4. The human runs `grep -x 'exit=1 step=node kind=required' "$GATES"`.
 5. The human runs `awk '/^\$ node --test \.claude\/hooks\/tests\/\*\.test\.js$/{f=1;next} /^exit=[0-9]+ step=node kind=required$/{f=0} f' "$GATES" | grep -E '^(# |ℹ )fail [0-9]+$'`.
 6. The human copies the record to `gates-p3.2-<HEAD7>.txt`.
@@ -1121,88 +1219,226 @@ The two rows' timestamps give the run time (DV2).
 
 Only `final_status` writes `failed=`. The contrast with P3.1's `gate-exit=0 failed=` ties the change to the mutation. No agent runs during P3.2.
 
-**P3.7 and P3.8 (focused failure checks).**
-- **Setup.** The human saves the script below verbatim as `TestResults/chore-agents-workflow-skills/validation/script-checks.sh`, with a quoted heredoc and only if absent, and records its sha256. With `E` set to `phase-3.md`, the human runs `run 'bash TestResults/chore-agents-workflow-skills/validation/script-checks.sh'` once.
-- **Scope.** It touches only a scratch repository outside the project, which it creates and removes.
-- **What is not simulated.** Base-check failure, and append, read and final-record failures. The code review checks that every write and read is checked and leads to exit 3. `gate.sh`'s final verification covers an incomplete record. Residual item (10) records what stays unexecuted.
+**P3.7 and P3.8 (focused failure checks; decisions 8-9, 14-15).**
+
+**Setup.**
+- The human saves the script below verbatim as `TestResults/chore-agents-workflow-skills/validation/script-checks.sh`, with a quoted heredoc and only if absent, and records its sha256.
+- With `E` set to `phase-3.md`, the human runs `run 'bash TestResults/chore-agents-workflow-skills/validation/script-checks.sh'` once.
+
+**Ownership.**
+- The script works only inside `S=/c/Users/jesus/AppData/Local/Temp/envanex-script-check`.
+- If that path already exists, it stops at once (`STOP: … already exists`) and changes nothing.
+- Each setup step is checked; a failure prints `STOP: setup failed: …`.
+- On every exit it removes `S` only if this invocation created it (`removed=0`). Otherwise it prints `removed=skipped` and deletes nothing.
+
+**Work-tree guard.**
+- The scratch repository is `S/repo`, a second repository with an unborn HEAD is `S/unborn`, and `S/notree` is a plain directory.
+- The not-a-work-tree cases (a, e8, f6) run only after the guard `notree-guard` confirms that git, with `GIT_CEILING_DIRECTORIES` set to `S`, finds no work tree at `S/notree`. The same setting is passed to the script under test.
+- If the guard finds a work tree, the case prints `<id>-skipped` and runs nothing. No script ever runs in an unrelated parent repository.
 
 ```
+set -u
 S=/c/Users/jesus/AppData/Local/Temp/envanex-script-check
 P=/c/projects/envanex/.claude/skills
+G=$P/gate/scripts/gate.sh
+R=$P/mutate/scripts/mutate-run.sh
+C=$P/mutate/scripts/mutate-clean.sh
+CREATED=0
+finish() {
+  cd / || exit 7
+  if [ "$CREATED" = 1 ]; then rm -rf -- "$S"; test ! -e "$S"; echo "removed=$?"; else echo "removed=skipped"; fi
+}
+trap finish EXIT
+show() { echo "$1 rc=$2"; printf '%s\n' "$3"; }
 echo "== setup"
-test ! -e "$S"; echo "free=$?"
-mkdir "$S" && cd "$S" || exit 9
-git init -q -b scratch && printf 'a\n' > f.txt && git add f.txt && git -c user.name=check -c user.email=check@example.invalid commit -q -m init; echo "setup=$?"
-echo "== P3.7 gate.sh"
-(cd .. && git rev-parse --show-toplevel >/dev/null 2>&1; echo "parent-is-worktree=$?")
-out=$(cd .. && bash "$P/gate/scripts/gate.sh" 2>&1); echo "a-notree rc=$?"; printf '%s\n' "$out"
+if [ -e "$S" ]; then echo "STOP: $S already exists; nothing was changed"; exit 8; fi
+mkdir -- "$S" || { echo "STOP: cannot create $S"; exit 8; }
+CREATED=1
+mkdir -- "$S/repo" "$S/notree" "$S/unborn" || { echo "STOP: setup failed: directories"; exit 8; }
+CEIL=$(cygpath -m "$S") || { echo "STOP: setup failed: cygpath"; exit 8; }
+cd "$S/unborn" && git init -q -b unborn && printf 'a\n' > f.txt && git add f.txt || { echo "STOP: setup failed: unborn repo"; exit 8; }
+cd "$S/repo" && git init -q -b scratch && printf 'a\n' > f.txt && git add f.txt && git -c user.name=check -c user.email=check@example.invalid commit -q -m init || { echo "STOP: setup failed: scratch repo"; exit 8; }
+echo "setup=0"
+(cd "$S/notree" && GIT_CEILING_DIRECTORIES="$CEIL" git rev-parse --show-toplevel >/dev/null 2>&1); NT=$?
+echo "notree-guard=$NT"
+
+echo "== P3.7 required: gate.sh"
+if [ "$NT" -ne 0 ]; then
+  out=$(cd "$S/notree" && GIT_CEILING_DIRECTORIES="$CEIL" bash "$G" 2>&1); show a-notree $? "$out"
+  echo "a-nothing-written=$(ls -A "$S/notree" | wc -l)"
+else echo "a-skipped"; fi
 git checkout -q --detach
-out=$(bash "$P/gate/scripts/gate.sh" 2>&1); echo "b-detached rc=$?"; printf '%s\n' "$out"
+out=$(bash "$G" 2>&1); show b-detached $? "$out"
 git checkout -q scratch
 test ! -e TestResults; echo "b-nothing-written=$?"
 printf 'x\n' > TestResults
-out=$(bash "$P/gate/scripts/gate.sh" 2>&1); echo "c-dir rc=$?"; printf '%s\n' "$out"
+out=$(bash "$G" 2>&1); show c-dir $? "$out"
+echo "c-file-kept=$(cat TestResults)"
 rm TestResults
-mkdir -p TestResults/scratch && printf 'old\n' > TestResults/scratch/gates.txt && chmod a-w TestResults/scratch/gates.txt
-test ! -w TestResults/scratch/gates.txt; echo "d-readonly=$?"
-out=$(bash "$P/gate/scripts/gate.sh" 2>&1); echo "d-record rc=$?"; printf '%s\n' "$out"
-cat TestResults/scratch/gates.txt
-chmod u+w TestResults/scratch/gates.txt && rm -r TestResults
-echo "== P3.8 mutation scripts"
-out=$(bash "$P/mutate/scripts/mutate-run.sh" 2>&1); echo "e-usage rc=$?"; printf '%s\n' "$out"
-out=$(bash "$P/mutate/scripts/mutate-clean.sh" ../x f.txt 2>&1); echo "f-label rc=$?"; printf '%s\n' "$out"
-test ! -e TestResults; echo "f-nothing-written=$?"
+mkdir -p TestResults/scratch/gates.txt
+out=$(bash "$G" 2>&1); show d-open $? "$out"
+echo "d-entries=$(ls -A TestResults/scratch/gates.txt | wc -l)"
+rm -r TestResults
+
+echo "== P3.8 required: mutate-run.sh"
+out=$(bash "$R" 2>&1); show e1-noargs $? "$out"
+out=$(bash "$R" ../x f.txt node t.test.js 2>&1); show e2-label $? "$out"
+out=$(bash "$R" lbl f.txt ruby t.rb 2>&1); show e3-mode $? "$out"
+out=$(bash "$R" lbl f.txt node 2>&1); show e4a-count $? "$out"
+out=$(bash "$R" lbl f.txt dotnet x y z 2>&1); show e4b-count $? "$out"
+test ! -e TestResults; echo "e1-e4-nothing-written=$?"
 printf 'u\n' > u.txt
-out=$(bash "$P/mutate/scripts/mutate-clean.sh" chk u.txt 2>&1); echo "g-untracked rc=$?"; printf '%s\n' "$out"
+out=$(bash "$R" lbl u.txt node t.test.js 2>&1); show e5-untracked $? "$out"
 rm u.txt
-bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt; echo "h-clean rc=$?"
+git checkout -q --detach
+out=$(bash "$R" lbl f.txt node t.test.js 2>&1); show e6-detached $? "$out"
+git checkout -q scratch
+test ! -e TestResults; echo "e5-e6-nothing-written=$?"
+printf 'x\n' > TestResults
+out=$(bash "$R" lbl f.txt node t.test.js 2>&1); show e7-dir $? "$out"
+echo "e7-file-kept=$(cat TestResults)"
+rm TestResults
+if [ "$NT" -ne 0 ]; then
+  out=$(cd "$S/notree" && GIT_CEILING_DIRECTORIES="$CEIL" bash "$R" lbl f.txt node t.test.js 2>&1); show e8-notree $? "$out"
+  echo "e8-nothing-written=$(ls -A "$S/notree" | wc -l)"
+else echo "e8-skipped"; fi
+mkdir -p TestResults/scratch/mutations/run.txt
+out=$(bash "$R" run f.txt node t.test.js 2>&1); show e9-open $? "$out"
+echo "e9-entries=$(ls -A TestResults/scratch/mutations/run.txt | wc -l)"
+rm -r TestResults
+
+echo "== P3.8 required: mutate-clean.sh"
+out=$(bash "$C" lbl 2>&1); show f0-nofile $? "$out"
+out=$(bash "$C" ../x f.txt 2>&1); show f1-label $? "$out"
+test ! -e TestResults; echo "f0-f1-nothing-written=$?"
+printf 'u\n' > u.txt
+out=$(bash "$C" chk u.txt 2>&1); show f2-untracked $? "$out"
+rm u.txt
+test ! -e TestResults; echo "f2-nothing-written=$?"
+bash "$C" chk f.txt; echo "h-clean rc=$?"
 printf 'b\n' > f.txt && git add f.txt
-bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt; echo "i-staged-same rc=$?"
+bash "$C" chk f.txt; echo "i-staged-same rc=$?"
 printf 'a\n' > f.txt
-bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt; echo "j-staged-only rc=$?"
+bash "$C" chk f.txt; echo "j-staged-only rc=$?"
 git reset -q
-bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt; echo "k-reset rc=$?"
+bash "$C" chk f.txt; echo "k-reset rc=$?"
 printf 'c\n' > f.txt
-bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt; echo "l-unstaged rc=$?"
+bash "$C" chk f.txt; echo "l-unstaged rc=$?"
 printf 'a\n' > f.txt
 cat TestResults/scratch/mutations/chk.txt
-chmod a-w TestResults/scratch/mutations/chk.txt
-test ! -w TestResults/scratch/mutations/chk.txt; echo "m-readonly=$?"
-out=$(bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt 2>&1); echo "m-log rc=$?"; printf '%s\n' "$out"
-chmod u+w TestResults/scratch/mutations/chk.txt
+rm -r TestResults
 git checkout -q --detach
-out=$(bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt 2>&1); echo "n-detached rc=$?"; printf '%s\n' "$out"
+out=$(bash "$C" chk f.txt 2>&1); show f4-detached $? "$out"
 git checkout -q scratch
-rm -r TestResults && printf 'x\n' > TestResults
-out=$(bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt 2>&1); echo "o-dir rc=$?"; printf '%s\n' "$out"
+test ! -e TestResults; echo "f4-nothing-written=$?"
+printf 'x\n' > TestResults
+out=$(bash "$C" chk f.txt 2>&1); show f5-dir $? "$out"
+echo "f5-file-kept=$(cat TestResults)"
 rm TestResults
-out=$(cd .. && bash "$P/mutate/scripts/mutate-clean.sh" chk f.txt 2>&1); echo "p-notree rc=$?"; printf '%s\n' "$out"
-echo "== cleanup"
-cd / && rm -rf "$S"; test ! -e "$S"; echo "removed=$?"
+if [ "$NT" -ne 0 ]; then
+  out=$(cd "$S/notree" && GIT_CEILING_DIRECTORIES="$CEIL" bash "$C" chk f.txt 2>&1); show f6-notree $? "$out"
+  echo "f6-nothing-written=$(ls -A "$S/notree" | wc -l)"
+else echo "f6-skipped"; fi
+mkdir -p TestResults/scratch/mutations/cdir.txt
+out=$(bash "$C" cdir f.txt 2>&1); show f7-open $? "$out"
+echo "f7-entries=$(ls -A TestResults/scratch/mutations/cdir.txt | wc -l)"
+rm -r TestResults
+out=$(cd "$S/unborn" && bash "$C" chk f.txt 2>&1); show q-giterror $? "$out"
+
+echo "== supplementary (chmod; never decides a pass)"
+mkdir -p TestResults/scratch && printf 'old\n' > TestResults/scratch/gates.txt && chmod a-w TestResults/scratch/gates.txt
+test ! -w TestResults/scratch/gates.txt; RO=$?; echo "d2-readonly=$RO"
+if [ "$RO" -eq 0 ]; then
+  out=$(bash "$G" 2>&1); show d2-record $? "$out"
+  echo "d2-first-line=$(head -n 1 TestResults/scratch/gates.txt)"
+else echo "d2-skipped"; fi
+chmod u+w TestResults/scratch/gates.txt
+mkdir -p TestResults/scratch/mutations && printf 'old\n' > TestResults/scratch/mutations/ro.txt && chmod a-w TestResults/scratch/mutations/ro.txt
+test ! -w TestResults/scratch/mutations/ro.txt; RO=$?; echo "m2-readonly=$RO"
+if [ "$RO" -eq 0 ]; then
+  out=$(bash "$C" ro f.txt 2>&1); show m2-log $? "$out"
+  echo "m2-first-line=$(head -n 1 TestResults/scratch/mutations/ro.txt)"
+else echo "m2-skipped"; fi
+chmod u+w TestResults/scratch/mutations/ro.txt
+rm -r TestResults
+echo "== done"
 ```
+
+Each `show` line is `<id> rc=<n>`, followed by the case's whole output, stdout and stderr together. In the tables, "exactly X" means that output is the single line X. "The usage line" means the script's Diagnostics `usage:` line, prefixed with the script name.
+
+**Required lines: setup and P3.7 (`gate.sh`).**
 
 | Line | Expected |
 |---|---|
-| `free=`, `setup=` | `0`, `0` |
-| `parent-is-worktree=` | non-zero. Otherwise case a is inconclusive and recorded so |
-| `a-notree rc=` | `2`; the output is one line naming the work-tree failure, and no `gate-exit=` line |
-| `b-detached rc=`, `b-nothing-written=` | `2`, `0` |
-| `c-dir rc=` | `2` (`TestResults` is a file, so the directory cannot be made); no `gate-exit=` line |
-| `d-readonly=` | `0`. Otherwise case d is inconclusive on this filesystem: `chmod` did not set the read-only attribute |
-| `d-record rc=` | `3`; an `I/O error` line and no `gate-exit=` line; `cat` prints `old`, so the record was neither truncated nor written |
-| `e-usage rc=` | `2`, with a `usage:` line |
-| `f-label rc=`, `f-nothing-written=` | `2`, `0` |
-| `g-untracked rc=` | `2` |
-| `h-clean rc=` | `0` |
-| `i-staged-same rc=` | `1`. The index and working tree both differ from HEAD; plain `git diff --exit-code` would have said 0 |
-| `j-staged-only rc=` | `1` (the working tree equals HEAD, the index does not) |
-| `k-reset rc=` | `0` |
-| `l-unstaged rc=` | `1` |
-| `cat …/chk.txt` | for each of h-l: `$ git diff --exit-code HEAD -- f.txt` and `$ git diff --cached --exit-code -- f.txt`, each followed by its `exit=` line |
-| `m-readonly=` | `0`. Otherwise case m is inconclusive |
-| `m-log rc=` | `3`, with an `I/O error` line |
-| `n-detached rc=`, `o-dir rc=`, `p-notree rc=` | `2`, `2`, `2` |
-| `removed=` | `0` |
+| `setup=` | `0`. A `STOP:` line instead ends the run, and neither probe passes |
+| `notree-guard=` | non-zero. If it is `0`, cases a, e8 and f6 print `-skipped` and are INCONCLUSIVE |
+| `a-notree` | `rc=2`; exactly `gate.sh: not inside a git work tree`; then `a-nothing-written=0` |
+| `b-detached` | `rc=2`; exactly `gate.sh: no current branch`; then `b-nothing-written=0` |
+| `c-dir` | `rc=2`; exactly `gate.sh: cannot create TestResults/scratch`; then `c-file-kept=x` |
+| `d-open` | `rc=3`; exactly `gate.sh: I/O error: open TestResults/scratch/gates.txt`; then `d-entries=0` (the record path, a directory, stays empty) |
+
+**Required lines: P3.8, `mutate-run.sh`.** No case reaches `node --test`, so no test output may appear.
+
+| Line | Expected |
+|---|---|
+| `e1-noargs`, `e2-label`, `e3-mode`, `e4a-count`, `e4b-count` | `rc=2` each; exactly the `mutate-run.sh` usage line; then `e1-e4-nothing-written=0` |
+| `e5-untracked` | `rc=2`; exactly `mutate-run.sh: untracked file u.txt` |
+| `e6-detached` | `rc=2`; exactly `mutate-run.sh: no current branch`; then `e5-e6-nothing-written=0` |
+| `e7-dir` | `rc=2`; exactly `mutate-run.sh: cannot create TestResults/scratch/mutations`; then `e7-file-kept=x` |
+| `e8-notree` | `rc=2`; exactly `mutate-run.sh: not inside a git work tree`; then `e8-nothing-written=0` |
+| `e9-open` | `rc=3`; exactly `mutate-run.sh: I/O error: open TestResults/scratch/mutations/run.txt`; then `e9-entries=0` |
+
+**Required lines: P3.8, `mutate-clean.sh`.**
+
+| Line | Expected |
+|---|---|
+| `f0-nofile`, `f1-label` | `rc=2` each; exactly the `mutate-clean.sh` usage line; then `f0-f1-nothing-written=0` |
+| `f2-untracked` | `rc=2`; exactly `mutate-clean.sh: untracked file u.txt`; then `f2-nothing-written=0` |
+| `h-clean`, `i-staged-same`, `j-staged-only`, `k-reset`, `l-unstaged` | `rc=0`, `rc=1`, `rc=1`, `rc=0`, `rc=1`. Case i is the one plain `git diff --exit-code` misses: the index and the working tree both differ from HEAD |
+| `cat …/chk.txt` | for each of h-l: `$ git diff --exit-code HEAD -- f.txt` and `$ git diff --cached --exit-code -- f.txt`, each followed by an `exit=` line matching that case |
+| `f4-detached` | `rc=2`; exactly `mutate-clean.sh: no current branch`; then `f4-nothing-written=0` |
+| `f5-dir` | `rc=2`; exactly `mutate-clean.sh: cannot create TestResults/scratch/mutations`; then `f5-file-kept=x` |
+| `f6-notree` | `rc=2`; exactly `mutate-clean.sh: not inside a git work tree`; then `f6-nothing-written=0` |
+| `f7-open` | `rc=3`; exactly `mutate-clean.sh: I/O error: open TestResults/scratch/mutations/cdir.txt`; then `f7-entries=0` |
+| `q-giterror` | `rc=2`. The output holds `$ git diff --exit-code HEAD -- f.txt`, git's own error, an `exit=<n>` line with n neither 0 nor 1 (128 expected for an unborn HEAD, UNVERIFIED; this line settles it), the second diff's record, and the stderr line `mutate-clean.sh: git diff failed with exit <n>` |
+| `== done`, `removed=` | `== done` is present; `removed=0` |
+
+**Supplementary lines (never decide a pass).**
+
+| Line | Reading |
+|---|---|
+| `d2-readonly=` | `0` runs case d2. Any other value prints `d2-skipped`: INCONCLUSIVE |
+| `d2-record`, `d2-first-line=` | PASS: `rc=3`, exactly `gate.sh: I/O error: open TestResults/scratch/gates.txt`, and `d2-first-line=old`. DEFECT: an rc other than 3 with `d2-first-line=old`, meaning the open failed and gate.sh mishandled it. INCONCLUSIVE: an rc other than 3 with the record rewritten, meaning the filesystem allowed the open; gate.sh then ran the full gate harmlessly inside `S/repo` |
+| `m2-readonly=`, `m2-log`, `m2-first-line=` | the same reading for `mutate-clean.sh`, with exactly `mutate-clean.sh: I/O error: open TestResults/scratch/mutations/ro.txt` and `m2-first-line=old` |
+
+**Outcome rules.**
+- **P3.7 passes when:**
+  - `setup=0`, `== done` and `removed=0` are present
+  - every required P3.7 line (a-d) is exactly as the table states
+  - no supplementary case is a DEFECT
+- **P3.8 passes when:**
+  - the same holds for every required P3.8 line (e1-e9, f0-f7, h-l, the log content and q)
+  - no supplementary case is a DEFECT
+- **INCONCLUSIVE never means PASS.** A required case printed as `-skipped` is INCONCLUSIVE, and its probe does not pass.
+- **Supplementary cases never make a probe pass.** Their INCONCLUSIVE outcome does not fail it. Their DEFECT outcome is a script defect and fails the probe.
+- **A required line that differs from the table** is a defect. The phase goes back to the coder (Probe protocol item 2).
+- **What follows an INCONCLUSIVE required case.** Only the guarded cases a, e8 and f6 can be inconclusive. The human records the cause, for example `GIT_CEILING_DIRECTORIES` not honored, and then takes one of two recorded decisions:
+  - re-run with a corrected script, saved under a new name (`script-checks-r2.sh`) with its sha256, never overwriting the first
+  - accept the branch as unexecuted. Residual item (10) then gains the text "; and, from inconclusive P3.7/P3.8 cases, the not-a-work-tree start-up failure of <`gate.sh`, `mutate-run.sh`, `mutate-clean.sh`, as applicable> (cases <ids>)" before its closing full stop.
+
+**Coverage.**
+- **Executed (required):**
+  - every argument and start-up exit of all three scripts except the `cd` failure
+  - each script's failed open (a directory at the path)
+  - `mutate-clean.sh`'s git-error exit
+  - the five clean-check outcomes
+- **Supplementary:** a second trigger of the same failed-open branch through `chmod`. It adds no branch.
+- **Not executed, only reviewed** (residual item (10)):
+  - `gate.sh`'s base-check failure path
+  - the `cd` failure of all three scripts
+  - the append, read and final-record failures after a successful open of the gate record or a mutation log
+
+  The code review checks that every write and read is checked and leads to exit 3. `gate.sh`'s final verification covers an incomplete record.
 
 **P3.4 (`/mutate`).** The human runs `/mutate` with:
 - label `M1.1`
@@ -1212,19 +1448,27 @@ cd / && rm -rf "$S"; test ! -e "$S"; echo "removed=$?"
 
 The run:
 - **Purpose.** It re-runs M1.1's mutation only to exercise `/mutate`. It does not replace or re-assess the Phase 1 proof (plan:1654).
-- **Preconditions.** A clean tree; no agent running.
+- **Preconditions** (decision 17):
+  - a clean tree
+  - no agent running
+  - `test ! -e TestResults/chore-agents-workflow-skills/mutations/M1.1.txt; echo "fresh=$?"`, recorded with `run`, prints `fresh=0`
+- **Repeat attempts.** An aborted or repeated attempt never reuses a label or log.
+  - The next attempt is `M1.1-r2`, then `M1.1-r3`, each after the same freshness check on its own log.
+  - An infrastructure rerun is `M1.1-infra-1`, … (F18).
+  - Earlier logs are kept unchanged.
 - **Safety reading** (static, UNVERIFIED). With `CLAUDE_PROJECT_DIR` in the `C:/…` form (C1.6), the live project dir still normalizes, and the inverse Edit's target holds no protected segment. path-guard is therefore expected to allow the restore.
 - **If the restore is blocked**, the human:
   1. restores the file in an external editor
   2. records `git diff --exit-code HEAD -- .claude/hooks/lib/guard-common.js; git diff --cached --exit-code -- .claude/hooks/lib/guard-common.js` (both exit 0)
   3. records P3.4 as failed at the restore step
-- **Pass.** `TestResults/chore-agents-workflow-skills/mutations/M1.1.txt` holds, in order:
+- **After step 4,** the human records `sha256sum` and `wc -l` of the attempt's log with `run`.
+- **Pass.** The attempt's own log, fresh by the precondition, holds exactly, in order:
   - step 0's two clean checks, each with `exit=0`
   - `$ git diff HEAD -- .claude/hooks/lib/guard-common.js`, showing the one-line change
   - `$ node --test .claude/hooks/tests/path-guard.test.js`, with a red on a test's own assertion
   - step 4's two clean checks, each with `exit=0`
 
-  Then `git status --short` is empty. The human records the log's sha256, and the Edit and Bash rows from the main-session transcript.
+  Then `git status --short` is empty. The human records the Edit and Bash rows from the main-session transcript.
 
 **P3.5 (`/commit`)** — the Phase 3 As built commit, the first commit after R3, made with the new `/commit`. Its message body contains the word `"quoted"` in double quotes. Right after it, before any other `/commit`, the human records:
 - `git log -1 --format=%B | diff - TestResults/COMMIT_MSG.txt; echo "diff=$?"`. This is the original command, recorded as context; a difference of one trailing blank line is the tformat terminator (DV8).
@@ -1238,7 +1482,7 @@ The run:
 
 These are late records, so they go to `phase-4.md`.
 
-**P3.6 (the new tester).** The Phase 3 per-phase tester (Probe protocol step 2.11) runs after retention, with HEAD H = the Phase 3 review-file commit. The records are late, so they go to `phase-4.md`:
+**P3.6 (the new tester).** The Phase 3 per-phase tester (Probe protocol step 2.11) runs after retention and after the live record is removed (items 6 and 8), with HEAD H = the Phase 3 review-file commit. The records are late, so they go to `phase-4.md`:
 
 ```
 git rev-parse HEAD
@@ -1252,8 +1496,9 @@ cp "$GATES" TestResults/chore-agents-workflow-skills/validation/gates-3-tester-<
 
 **Pass:**
 - the first command prints H
-- `head -n 4` shows `Verdict:`, `Head: H`, `Branch: chore/agents-workflow-skills` and `Gates-sha256: <hash>`
+- `head -n 4` shows `Verdict:`, `Head: H`, `Branch: chore/agents-workflow-skills` and `Gates-sha256: <hash>`, where `<hash>` is 64 hex characters, not `none`, for a READY_TO_PUSH verdict
 - `sha256sum` gives `<hash>`, which also equals the second line of the tester's `gate.sh` tool_result
+- that tool_result is complete: line 1 is the record path, and its last line is `gate-exit=0 failed=`
 - the record's first line contains `head=H`
 - `list-diff=0`
 - `gate-sh-clean=0`. This is plan:565's known limit: no hash of the executed content is kept.
@@ -1272,7 +1517,7 @@ A missing record is recorded as missing. The tester's verdict is a model report;
 **Coder (in the turn).**
 - **Syntax:** `bash -n .claude/skills/gate/scripts/gate.sh`, `bash -n .claude/skills/mutate/scripts/mutate-run.sh` and `bash -n .claude/skills/mutate/scripts/mutate-clean.sh`. Each exits 0 with no output.
 - **Mutation-script smoke:**
-  - `bash .claude/skills/mutate/scripts/mutate-run.sh` prints `usage:` and exits 2
+  - `bash .claude/skills/mutate/scripts/mutate-run.sh` prints exactly its usage line and exits 2
   - `bash .claude/skills/mutate/scripts/mutate-clean.sh coder-smoke .claude/hooks/path-guard.js` prints both diff commands with `exit=0` and exits 0
 - **One gate run:** `bash .claude/skills/gate/scripts/gate.sh`, with the Bash tool `timeout` 600000, and its stdout pasted.
   - The tree is dirty, so the status section is non-empty.
@@ -1282,7 +1527,7 @@ A missing record is recorded as missing. The tester's verdict is a model report;
 
 **Tester (step 2.11).**
 - Its prompt: this plan's path and `Phase 3`.
-- In scope: tester.md steps 1-10, with step 5 against G2-G11's expectations, and the "both" commands of X5-X11.
+- In scope: tester.md steps 1-11, with step 6 against G2-G11's expectations, and the "both" commands of X5-X11.
 
 **Human, after the tester:**
 - `commands-3.txt` (X1-X12) with `K=validation-3`
@@ -1345,9 +1590,12 @@ A missing record is recorded as missing. The tester's verdict is a model report;
   - **The paragraph beginning `Agent models: `planner``** (two lines) becomes `` Agent models and effort tiers: see [`docs/ai-workflow.md`](ai-workflow.md#roles-and-tiers). ``
   - **Residual record row (exact).** The roadmap row stays the residual record (Revision 6 decision 13, plan:293). `docs/ai-workflow.md` repeats the same items with details:
 
-    `` | **Residual risks of the agent guards** — the residual record; [`docs/ai-workflow.md`](ai-workflow.md#residual-risks) repeats it with each item's detail, settling command and reopen trigger. (1) Threat model: the guards stop accidental destructive actions by a cooperative agent and are no boundary against code the model writes and runs itself (`dotnet run`, including file-based `dotnet run x.cs`, `dotnet test`, `dotnet build`, `node`, a script), which can call any denied command. (2) The Bash guards are string heuristics: a variable holding `git`, or script indirection, bypasses them; `gate.sh` and the `/mutate` scripts run commands no hook inspects, so what they write is bounded by their reviewed content, not by a hook. (3) coder-bash-guard blocks any command that names `git` as a word. (4) bash-allowlist splits on `\|` without regard to quotes. (5) path-guard does not see Bash writes. (6) Windows path aliasing, UNVERIFIED. (7) A quoted `user-secrets set` value is redacted only up to a `;`, `\|` or `&&`. (8) Agents can edit `.claude/`, including `settings.json`, which path-guard does not cover; `disableBundledSkills` and `disableClaudeAiConnectors` are no authorization boundary. (9) User-level settings sit outside the repository; `Bash(find *)` there allows `find -delete`. (10) Reviewed, not executed: the base-check failure path of `gate.sh`, and the append, read and final-record failure paths of `gate.sh` and the mutation scripts. (11) No allowlist rule for pipes: a tester pipeline's exit status is its last segment's. (12) Runtime tool access outside P2.6's two pairs is not verified. (13) 16 negative live paths of Phase 2 stay UNVERIFIED end to end. (14) Deny forms not covered: other global git options, `git.exe`, a flag after another flag, bare `git rebase`, some `git checkout` and `git branch` forms. (15) git long-option abbreviations, UNVERIFIED. (16) The `*.test.js` allow entry's wildcard crosses `..` (P1.13g2). (17) Matcher case: `git switch -C*` did not deny `git switch -c` (P1.13a). (18) Path-guard alias classes (8.3 names, junctions and links, drive-relative paths, case folding), UNVERIFIED. (19) Hook timeouts and regex cost, UNVERIFIED. (20) Redaction is pattern-based. (21) Open non-blocking review findings F2, F3, N1, N2, N4 and DBR-1; F4–F6, DBR-2 and R3-6 to R3-8 stay as their review files record | not scheduled — recorded | ``
+    `` | **Residual risks of the agent guards** — the residual record; [`docs/ai-workflow.md`](ai-workflow.md#residual-risks) repeats it with each item's detail, settling command and reopen trigger. (1) Threat model: the guards stop accidental destructive actions by a cooperative agent and are no boundary against code the model writes and runs itself (`dotnet run`, including file-based `dotnet run x.cs`, `dotnet test`, `dotnet build`, `node`, a script), which can call any denied command. (2) The Bash guards are string heuristics: a variable holding `git`, or script indirection, bypasses them; `gate.sh` and the `/mutate` scripts run commands no hook inspects, so what they write is bounded by their reviewed content, not by a hook. (3) coder-bash-guard blocks any command that names `git` as a word. (4) bash-allowlist splits on `\|` without regard to quotes. (5) path-guard does not see Bash writes. (6) Windows path aliasing, UNVERIFIED. (7) A quoted `user-secrets set` value is redacted only up to a `;`, `\|` or `&&`. (8) Agents can edit `.claude/`, including `settings.json`, which path-guard does not cover; `disableBundledSkills` and `disableClaudeAiConnectors` are no authorization boundary. (9) User-level settings sit outside the repository; `Bash(find *)` there allows `find -delete`. (10) Reviewed, not executed: the base-check failure path of `gate.sh`; the `cd` failure of `gate.sh`, `mutate-run.sh` and `mutate-clean.sh`; and the append, read and final-record failures that follow a successful open of the gate record or a mutation log. (11) No allowlist rule for pipes: a tester pipeline's exit status is its last segment's. (12) Runtime tool access outside P2.6's two pairs is not verified. (13) 16 negative live paths of Phase 2 stay UNVERIFIED end to end. (14) Deny forms not covered: other global git options, `git.exe`, a flag after another flag, bare `git rebase`, some `git checkout` and `git branch` forms. (15) git long-option abbreviations, UNVERIFIED. (16) The `*.test.js` allow entry's wildcard crosses `..` (P1.13g2). (17) Matcher case: `git switch -C*` did not deny `git switch -c` (P1.13a). (18) Path-guard alias classes (8.3 names, junctions and links, drive-relative paths, case folding), UNVERIFIED. (19) Hook timeouts and regex cost, UNVERIFIED. (20) Redaction is pattern-based. (21) Open non-blocking review findings F2, F3, N1, N2, N4 and DBR-1; F4–F6, DBR-2 and R3-6 to R3-8 stay as their review files record | not scheduled — recorded | ``
 
-    (`\|` is a table escape of `|`.) Item (10) extends the original "the base-check failure path of `gate.sh` is not probed" (plan:23104). That path stays unprobed. P3.7 and P3.8 now execute the start-up failures and the unwritable-record and unwritable-log cases; item (10) names the paths that only review covers.
+    (`\|` is a table escape of `|`.)
+    - **Item (10) extends** the original "the base-check failure path of `gate.sh` is not probed" (plan:23104). That path stays unprobed.
+    - **What P3.7 and P3.8 execute:** every argument and start-up failure of the three scripts except `cd`; each script's failed open, through a directory at the record or log path; and `mutate-clean.sh`'s git-error exit. Their `chmod` cases are supplementary and add no branch.
+    - **If the human accepts an INCONCLUSIVE required case,** item (10) gains the text that P3.7/P3.8's "What follows an INCONCLUSIVE required case" gives.
 - **`docs/ai-workflow.md` — created.** English, reader-facing. Sections from plan:23139-23161:
   1. **The pipeline and the light lane.**
      - Why the human drives every transition.
@@ -1380,12 +1628,13 @@ A missing record is recorded as missing. The tester's verdict is a model report;
      - The incidents behind them (plan:23147-23150).
      - What prompts on purpose (plan:23151-23155). Note: `git commit` is pre-approved only inside `/commit`.
      - The tester's one Bash write exception (`gate.sh`) and the mutation scripts, with their bounds.
-  5. **Why hooks fail closed** — the exit-1 trap. Also why `gate.sh` and the mutation scripts fail non-zero on any I/O failure (exit 2 and 3).
+  5. **Why hooks fail closed** — the exit-1 trap. Also why `gate.sh` and the mutation scripts fail non-zero on any start-up or I/O failure (exits 2 and 3, one stderr line each).
   6. **What the hook log holds** — redaction rules 0-9, `SENSITIVE` and `VALUE`, `LIVEPROBE` tags, and test runs writing to a temp dir.
   7. **Verdict files and `/gate` evidence:**
      - the branch slug in the name, `Head:`, and Head rule R (SHA verification, git errors)
      - `gates.txt`'s header, sections, `exit=` lines and last line, and the empty `status` section
-     - the tester inspects the record instead of re-running its commands
+     - the tester inspects the record instead of re-running its commands, and uses it only when its own run's stdout is complete; otherwise `Gates-sha256: none`
+     - a record counts only for the run whose stdout printed its hash, and the live record is removed before every used run
      - `Gates-sha256:` is recorded, not compared, because `/gate` re-runs after the tester
      - the security-review file's `Verdict: PENDING` until the human sets it
      - the newest-db-review check
@@ -1396,9 +1645,12 @@ A missing record is recorded as missing. The tester's verdict is a model report;
      - the P1.x/P2.x lists in `thoughts/shared/plans/2026-09-25_chore-agents-hardening.md` (as of 2e8497a)
      - the P3.x/P4.x lists in this plan
      - the difference between regression checks and historical proofs (the section of that name above)
-  9. **Residual risks.** The roadmap row's items (1)-(21), in the same order and with the same names, each with its detail from plan:23095-23131 updated as follows:
+  9. **Residual risks** (heading exactly `## Residual risks`, the residual row's anchor `#residual-risks`). The roadmap row's items (1)-(21), in the same order and with the same names, each with its detail from plan:23095-23131 updated as follows:
      - (2) names `gate.sh` and the mutation scripts.
-     - (10) says which failure paths P3.7 and P3.8 execute and which only review covers, the base-check failure path included.
+     - (10) states three things:
+       - which failure paths P3.7 and P3.8 execute (required), and that the `chmod` cases are supplementary
+       - which paths only review covers: the base-check failure, the `cd` failures, and I/O failures after a successful open
+       - any INCONCLUSIVE case the human accepted
      - (11) is in the present tense.
      - (16) and (17) cite plan:2772-2774.
      - (21) lists every open finding and its source file:
@@ -1452,7 +1704,7 @@ Then Probe protocol steps 2.6-2.11:
 - the As built copy, which carries Phase 3's late records (P3.5, P3.6, review and tester correlations, validation logs)
 - the review, `code-review-phase4`
 - the review-file commit
-- the Phase 4 tester
+- the Phase 4 tester, after retention and with the live record removed (items 6 and 8)
 - the human's validation
 
 ### Learning journal (decision 11)
@@ -1485,8 +1737,23 @@ It starts on a clean tree at H_E, with C4.2 and H4.1 recorded.
    - This PR touches `.claude/`, so it is not exempt.
    - SECURITY_FINDINGS enters the correction loop.
 3. **Review-file commit.** The human commits both files in one `/commit`. HEAD is now H_R. `git show --name-only --format= H_R` lists exactly those two files.
-4. **Tester.** After retention, the tester runs (`PR-end`) on H_R. The human makes the P3.6 records as its correlation, copies the record (`pr-end-tester`), and runs `gate-checks.txt` on the copy.
-5. **`/gate`.** The PR-end sequence re-runs the gate on purpose, at the same head as the tester (plan:66). The human copies the record (`pr-end-gate`) and runs `gate-checks.txt` on it. G1 must show `head=H_R`; G3 and G11 must pass.
+4. **Tester.**
+   - First: retention (Probe protocol item 6), and the live record removed (item 8, `absent=0`).
+   - The tester runs (`PR-end`) on H_R.
+   - The human makes the P3.6 records as its correlation, copies the record to `gates-pr-end-tester-<HEAD7>.txt`, and runs `gate-checks.txt` on that copy. The copy stays as it is: step 5 neither uses nor replaces it.
+5. **`/gate`** (decision 16). The PR-end sequence re-runs the gate on purpose, at the same head (plan:66).
+   - **Before:** the human removes the live record again (item 8) and records `absent=0`.
+   - **Run:** the human invokes `/gate`, then records its Bash tool_use and tool_result rows from the main-session transcript.
+   - **Copy:** the human copies the new record to `gates-pr-end-gate-<HEAD7>.txt` and runs `gate-checks.txt` on that copy.
+   - **Step 5 passes when:**
+     - the tool_result's first line is `TestResults/chore-agents-workflow-skills/gates.txt`
+     - its second line is a `sha256sum` line whose hash equals G0's hash of the `pr-end-gate` copy
+     - its last line is `gate-exit=0 failed=`
+     - where the transcript row carries an error flag, the flag is not set
+     - G0-G11 hold on the copy, with G1 showing `head=H_R`
+     - the copy's header time is later than the `pr-end-tester` copy's
+   - **How success is established.** The live record was absent before the call. `gate.sh` prints `gate-exit=0 failed=` as its last stdout line only after verifying its record and printing the whole summary. So that line, together with the matching hash, shows that this invocation produced the copied record and completed. No numeric exit code is claimed unless a record shows one.
+   - **If any condition fails,** the record is not used and no older copy stands in for it. The human removes the live record again and re-runs `/gate`. `/pr` is not invoked until step 5 passes.
 6. **Human validation and READY_TO_PUSH.** The human runs `commands-pr-end.txt` with `K=validation-pr-end` at H_R. Then, in `pr-end.md`, the human records READY_TO_PUSH and V = H_R. This is the human's decision.
 7. **`/pr thoughts/shared/plans/2026-10-13_chore-agents-workflow-skills.md`.**
    - preconditions 1-7; precondition 7 is not required here
@@ -1517,12 +1784,12 @@ Title: `chore(agents): complete workflow skills and documentation`.
 
 **Coder (in the turn):**
 - `dotnet build -warnaserror` (coder.md:26)
-- D1, D2, D3, D4 and D10
+- D1 (`wc -l CLAUDE.md`), D2, D3, D4 and D10
 - `git status --short`, as listed
 
 **Tester:**
 - `Phase 4`, then `PR-end`
-- tester.md steps 1-10, with step 5 against G2-G11
+- tester.md steps 1-11, with step 6 against G2-G11
 - the "both" commands of X5-X11 and D1, D3, D4 and D6-D10
 
 **Human:**
@@ -1541,12 +1808,16 @@ Title: `chore(agents): complete workflow skills and documentation`.
   - then restart
   - A reverted journal entry keeps its number consumed (no number is reused).
 - **If a hook blocks everything:** follow plan:23193. Edit the file in an external editor, or set `"disableAllHooks": true` in `.claude/settings.local.json`; restart; record it.
-- **If `gate.sh` exits 2 or 3 in the project:** the gate has not passed. The human fixes the cause (repository, branch, directory, permissions, disk) and re-runs. A record left by a failed run is never cited.
+- **If `gate.sh` exits 2 or 3 in the project:** the gate has not passed. The human fixes the cause (repository, branch, directory, permissions, disk), removes any live record, and re-runs. A record left by a failed run is never cited.
 - **If P3.4's inverse Edit is blocked:**
   1. Restore `.claude/hooks/lib/guard-common.js` in an external editor.
   2. Record both HEAD diffs (exit 0).
   3. P3.4 fails at that step.
-  4. No agent runs until the restore is recorded.
+  4. No agent runs until the restore is recorded. The next attempt takes a new label.
+- **If the P3.7/P3.8 scratch path exists before the run:**
+  - The script stops without changing anything (`removed=skipped`).
+  - The human inspects the path. A leftover of an earlier run of this script may be removed by hand, and the removal is recorded. Anything else is left alone, and the run waits for the human's decision.
+  - If a run prints `removed=` with a non-zero value, the human removes the path it created by hand and records it.
 - **If the new `/commit` cannot write `TestResults/COMMIT_MSG.txt`:** the human commits with `git commit -F` in an external Git Bash and records it. P3.5 fails, and the correction loop follows.
 - **If `/security-review` is unavailable or errors at P4.4 step 2:** precondition 6 cannot pass. `/pr` stops, and the human decides and records the decision. No agent writes a security verdict.
 - **If `/pr` stops after `gh pr create`:**
@@ -1557,7 +1828,6 @@ Title: `chore(agents): complete workflow skills and documentation`.
 - **Local state.**
   - `TestResults/chore-agents-workflow-skills/**` is local; deleting it is the human's choice.
   - `TestResults/chore-agents-hardening/**` is never touched.
-  - The P3.7/P3.8 scratch repository removes itself (`removed=0`). Otherwise the human deletes `/c/Users/jesus/AppData/Local/Temp/envanex-script-check` by hand.
 
 ## Appendix A — CLAUDE.md after Phase 4 (exact)
 
