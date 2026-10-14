@@ -23,6 +23,18 @@ Revision 2 (2026-10-14) applies the plan review `thoughts/shared/reviews/2026-10
 | L2 | 7: start-up stderr | the Diagnostics of `gate.sh`, `mutate-run.sh` and `mutate-clean.sh` (Phase 3 Signatures); P3.7/P3.8 expected lines; DV2, DV3 |
 | L3 | 8: the residual-risks heading | `docs/ai-workflow.md` section 9 heading |
 
+Revision 3 (2026-10-15) applies only findings R1-R3 of the re-review `thoughts/shared/reviews/2026-10-14_chore-agents-workflow-skills-plan-review-r2.md` (NEEDS_REVISION, Head `54cf1e751cf6f10a6b8c9d5b527212b280835365`), with the human's decisions 21-23 below. It changes nothing else.
+- **S0 so far.**
+  - Revision 2 was committed as `54cf1e7`, and its re-review as `7793b05`.
+  - This revision is S0.1 again. The next re-review is `…-plan-review-r3.md`, against this revision's commit.
+- **N1-N7** stay recorded in the two review files as non-blocking. This revision does not address them, except that R3's harness-failure rule also covers a harness command that fails inside a case (N7).
+
+| Finding | Where it lives now |
+|---|---|
+| R1 | P3.7 and P3.8: the script's supplementary block, where m2 is measured by sha256 and line count before and after; the supplementary table; the outcome rules (d2 bears only on P3.7, m2 only on P3.8) |
+| R2 | Probe protocol item 8 (copy names with `n`, and the copy commands); the G-checks' `GC`; P3.1 steps 4-5; P3.2 step 6; P3.6; P4.4 steps 4-5; Phase 3 and Phase 4 Validation |
+| R3 | P3.7 and P3.8: the `setup=` row and the `== done`/`removed=` row of the required tables, and the outcome rules (harness failures); Rollback notes (the scratch-path bullet) |
+
 ## Source and pins
 
 - **Source specification.** `thoughts/shared/plans/2026-09-25_chore-agents-hardening.md` at commit `2e8497a9220ae3ec8789fbc551270dd5538c609c`. In this plan, **plan:N** means line N of that file at that commit.
@@ -108,6 +120,21 @@ Revision 2 (relayed 2026-10-14):
 18. **D1 is `wc -l CLAUDE.md`**, without redirection, with ordinary whitespace allowed.
 19. **`Gates-sha256: none`** when the current invocation gives no valid hash. Such a run cannot return READY_TO_PUSH. A missing or stale `gates.txt` is never used as a failed invocation's file list or evidence.
 20. **Explicit start-up stderr**, and the residual-risks heading pinned as `## Residual risks`.
+
+Revision 3 (relayed 2026-10-15):
+
+21. **R1, the supplementary append-log check.**
+    - m2's log is measured before and after by sha256 and line count, not by its first line, under the review's PASS, DEFECT and INCONCLUSIVE rules.
+    - d2 bears only on P3.7, and m2 only on P3.8.
+    - Both stay supplementary.
+22. **R2, gate-copy names.**
+    - A copy is `gates-<label>-<HEAD7>-<n>.txt`, with `n` the smallest free positive integer, checked absent before copying.
+    - Existing copies are kept.
+    - The selected path is recorded and used by every later hash and content check.
+23. **R3, harness and cleanup failures.**
+    - A setup or harness failure, or a `removed=` other than `0`, means neither probe passes on that run.
+    - It is not classified automatically as a defect of the scripts under test. The human reports the failed operation, resolves the issue, and re-runs.
+    - Cleanup still touches only the directory this run created.
 
 ### Inherited IDs: where they live now
 
@@ -249,7 +276,17 @@ Inherits plan:471-573 with the changes below.
 8. **Gate records (decision 16).**
    - **The stale-record risk.** Every `gate.sh` run overwrites `TestResults/chore-agents-workflow-skills/gates.txt`. A run that stops at start-up (exit 2) writes nothing and leaves an older record in place.
    - **Remove before each used run.** The used runs are P3.1, P3.2, every tester run and P4.4 step 5. Before each one, the human first copies the live record if it is still needed, then removes it and records `rm -f TestResults/chore-agents-workflow-skills/gates.txt; test ! -e TestResults/chore-agents-workflow-skills/gates.txt; echo "absent=$?"`, which must print `absent=0`.
-   - **Copy after each used run.** Right after each such run, the human copies the new record to `TestResults/chore-agents-workflow-skills/validation/gates-<label>-<HEAD7>.txt` and records both sha256 values. Labels: `p3.1`, `p3.2`, `3-tester`, `4-tester`, `pr-end-tester` and `pr-end-gate`. A copy is never overwritten or reused for another run.
+   - **Copy after each used run (decision 22).** Right after each such run, the human copies the new record with the commands below, with `L` set to the run's label. Labels: `p3.1`, `p3.2`, `3-tester`, `4-tester`, `pr-end-tester` and `pr-end-gate`.
+
+     ```
+     L=<label>; H7=$(git rev-parse --short=7 HEAD); V=TestResults/chore-agents-workflow-skills/validation; n=1
+     while [ -e "$V/gates-$L-$H7-$n.txt" ]; do n=$((n+1)); done; D="$V/gates-$L-$H7-$n.txt"
+     test ! -e "$D" && cp TestResults/chore-agents-workflow-skills/gates.txt "$D" && sha256sum TestResults/chore-agents-workflow-skills/gates.txt "$D"; echo "copied=$? path=$D"
+     ```
+
+     - **Expected:** two equal hashes, then `copied=0` and the destination path.
+     - **Naming.** The name is `gates-<label>-<HEAD7>-<n>.txt`, where `n` is the smallest positive integer whose destination does not exist yet. So a repeated run at the same HEAD gets the next `n`, and an existing copy is never overwritten, moved or reused.
+     - **The recorded path.** The human records `path=…` and uses that path, and no other, for every later check of the copy: G0-G11 (`export GC=<path>`), and the hash comparisons of P3.1, P3.6 and P4.4.
    - **A record belongs to the run that printed its hash.** That run's stdout has the record's path on line 1, a `sha256sum` line on line 2 whose hash equals the copy's sha256, and a `gate-exit=` line as its last line. A run whose stdout lacks these produced no usable record, whatever file exists.
    - **Successful completion** is established without inferring a numeric exit code:
      - the run's stdout ends with `gate-exit=0 failed=`. `gate.sh` prints that line only after verifying its record and printing the whole summary.
@@ -302,7 +339,7 @@ grep -E 'Passed!|Failed!' "$GC"
 tail -n 1 "$GC"
 ```
 
-Before a run, the human sets `export GC=<the copy's path>`.
+Before a run, the human sets `export GC=<the copy's recorded path>` (Probe protocol item 8).
 
 | # | Expected |
 |---|---|
@@ -1162,15 +1199,8 @@ The scripts and contracts are proven by these named probes:
 3. From the main-session transcript `T`, the human records two rows:
    - `grep -n -F 'bash .claude/skills/gate/scripts/gate.sh' "$T" | cut -c1-6000`, the tool_use row
    - the matching tool_result row, by its tool_use id
-4. The human copies the record:
-
-   ```
-   cp "$GATES" TestResults/chore-agents-workflow-skills/validation/gates-p3.1-<HEAD7>.txt
-   sha256sum "$GATES" TestResults/chore-agents-workflow-skills/validation/gates-p3.1-<HEAD7>.txt
-   ```
-
-   The two hashes are equal.
-5. With `GC` pointing at that copy, the human runs `gate-checks.txt` with `K=gate-checks-p3.1`.
+4. The human copies the record by the commands of Probe protocol item 8, with `L=p3.1`, and records the selected path.
+5. With `GC` set to that path, the human runs `gate-checks.txt` with `K=gate-checks-p3.1`.
 
 **P3.3 passes when:**
 - the tool result's first line is `TestResults/chore-agents-workflow-skills/gates.txt`
@@ -1207,7 +1237,7 @@ The two rows' timestamps give the run time (DV2).
 3. The human removes the live record (Probe protocol item 8; P3.1's copy already exists), then runs `bash .claude/skills/gate/scripts/gate.sh; echo "gate=$?"`.
 4. The human runs `grep -x 'exit=1 step=node kind=required' "$GATES"`.
 5. The human runs `awk '/^\$ node --test \.claude\/hooks\/tests\/\*\.test\.js$/{f=1;next} /^exit=[0-9]+ step=node kind=required$/{f=0} f' "$GATES" | grep -E '^(# |ℹ )fail [0-9]+$'`.
-6. The human copies the record to `gates-p3.2-<HEAD7>.txt`.
+6. The human copies the record by the commands of Probe protocol item 8, with `L=p3.2`, and records the selected path.
 7. The main session applies the inverse Edit.
 8. The human runs `git diff --exit-code -- .claude/hooks/tests/path-guard.test.js; echo "restored=$?"` and `git status --short`.
 
@@ -1356,8 +1386,9 @@ chmod u+w TestResults/scratch/gates.txt
 mkdir -p TestResults/scratch/mutations && printf 'old\n' > TestResults/scratch/mutations/ro.txt && chmod a-w TestResults/scratch/mutations/ro.txt
 test ! -w TestResults/scratch/mutations/ro.txt; RO=$?; echo "m2-readonly=$RO"
 if [ "$RO" -eq 0 ]; then
+  echo "m2-before=$(sha256sum < TestResults/scratch/mutations/ro.txt | cut -c1-64) lines=$(wc -l < TestResults/scratch/mutations/ro.txt)"
   out=$(bash "$C" ro f.txt 2>&1); show m2-log $? "$out"
-  echo "m2-first-line=$(head -n 1 TestResults/scratch/mutations/ro.txt)"
+  echo "m2-after=$(sha256sum < TestResults/scratch/mutations/ro.txt | cut -c1-64) lines=$(wc -l < TestResults/scratch/mutations/ro.txt)"
 else echo "m2-skipped"; fi
 chmod u+w TestResults/scratch/mutations/ro.txt
 rm -r TestResults
@@ -1370,7 +1401,7 @@ Each `show` line is `<id> rc=<n>`, followed by the case's whole output, stdout a
 
 | Line | Expected |
 |---|---|
-| `setup=` | `0`. A `STOP:` line instead ends the run, and neither probe passes |
+| `setup=` | `0`. A `STOP:` line instead ends the run: a harness failure (Outcome rules), and neither probe passes |
 | `notree-guard=` | non-zero. If it is `0`, cases a, e8 and f6 print `-skipped` and are INCONCLUSIVE |
 | `a-notree` | `rc=2`; exactly `gate.sh: not inside a git work tree`; then `a-nothing-written=0` |
 | `b-detached` | `rc=2`; exactly `gate.sh: no current branch`; then `b-nothing-written=0` |
@@ -1401,27 +1432,36 @@ Each `show` line is `<id> rc=<n>`, followed by the case's whole output, stdout a
 | `f6-notree` | `rc=2`; exactly `mutate-clean.sh: not inside a git work tree`; then `f6-nothing-written=0` |
 | `f7-open` | `rc=3`; exactly `mutate-clean.sh: I/O error: open TestResults/scratch/mutations/cdir.txt`; then `f7-entries=0` |
 | `q-giterror` | `rc=2`. The output holds `$ git diff --exit-code HEAD -- f.txt`, git's own error, an `exit=<n>` line with n neither 0 nor 1 (128 expected for an unborn HEAD, UNVERIFIED; this line settles it), the second diff's record, and the stderr line `mutate-clean.sh: git diff failed with exit <n>` |
-| `== done`, `removed=` | `== done` is present; `removed=0` |
+| `== done`, `removed=` | `== done` is present; `removed=0`. Anything else on these two lines is a harness failure (Outcome rules) |
 
-**Supplementary lines (never decide a pass).**
+**Supplementary lines (never decide a pass).** d2 bears only on P3.7, and m2 only on P3.8.
 
 | Line | Reading |
 |---|---|
 | `d2-readonly=` | `0` runs case d2. Any other value prints `d2-skipped`: INCONCLUSIVE |
 | `d2-record`, `d2-first-line=` | PASS: `rc=3`, exactly `gate.sh: I/O error: open TestResults/scratch/gates.txt`, and `d2-first-line=old`. DEFECT: an rc other than 3 with `d2-first-line=old`, meaning the open failed and gate.sh mishandled it. INCONCLUSIVE: an rc other than 3 with the record rewritten, meaning the filesystem allowed the open; gate.sh then ran the full gate harmlessly inside `S/repo` |
-| `m2-readonly=`, `m2-log`, `m2-first-line=` | the same reading for `mutate-clean.sh`, with exactly `mutate-clean.sh: I/O error: open TestResults/scratch/mutations/ro.txt` and `m2-first-line=old` |
+| `m2-readonly=` | `0` runs case m2. Any other value prints `m2-skipped`: INCONCLUSIVE |
+| `m2-before=`, `m2-log`, `m2-after=` | The log is opened for appending, so its first line cannot show an allowed open; the reading compares the sha256 and line count before and after. PASS: `rc=3`, exactly `mutate-clean.sh: I/O error: open TestResults/scratch/mutations/ro.txt`, and the log unchanged (`m2-after` equals `m2-before`, with `lines=1`: the one line `old`). DEFECT: an rc other than 3 with the log unchanged, meaning the open failed and mutate-clean.sh mishandled it. INCONCLUSIVE: an rc other than 3 with lines added (`m2-after` shows a higher `lines=` count), meaning the filesystem allowed the open; mutate-clean.sh then ran its two diffs harmlessly inside `S/repo` |
 
 **Outcome rules.**
 - **P3.7 passes when:**
   - `setup=0`, `== done` and `removed=0` are present
   - every required P3.7 line (a-d) is exactly as the table states
-  - no supplementary case is a DEFECT
+  - the supplementary case d2 is not a DEFECT
 - **P3.8 passes when:**
-  - the same holds for every required P3.8 line (e1-e9, f0-f7, h-l, the log content and q)
-  - no supplementary case is a DEFECT
+  - `setup=0`, `== done` and `removed=0` are present
+  - every required P3.8 line (e1-e9, f0-f7, h-l, the log content and q) is exactly as the table states
+  - the supplementary case m2 is not a DEFECT
 - **INCONCLUSIVE never means PASS.** A required case printed as `-skipped` is INCONCLUSIVE, and its probe does not pass.
-- **Supplementary cases never make a probe pass.** Their INCONCLUSIVE outcome does not fail it. Their DEFECT outcome is a script defect and fails the probe.
-- **A required line that differs from the table** is a defect. The phase goes back to the coder (Probe protocol item 2).
+- **Supplementary cases never make a probe pass.** Their INCONCLUSIVE outcome does not fail it. A DEFECT in d2 fails P3.7 only; a DEFECT in m2 fails P3.8 only.
+- **Harness failures (decision 23).** These are harness or environment failures:
+  - a `STOP:` line
+  - a missing `== done` line
+  - a missing `removed=` line, or one other than `removed=0`
+  - a visible error from a harness command inside a case, such as `git checkout`, `printf`, `rm` or `mkdir -p`
+
+  Neither probe passes on that run. It is not classified automatically as a defect of the scripts under test, and it does not by itself send the phase back to the coder. The human records the failed operation, resolves the environment or setup issue, and re-runs the script. Cleanup touches only the directory this run created (Rollback notes).
+- **A required line that differs from the table,** on a run without a harness failure, is a defect of the scripts under test. The phase goes back to the coder (Probe protocol item 2).
 - **What follows an INCONCLUSIVE required case.** Only the guarded cases a, e8 and f6 can be inconclusive. The human records the cause, for example `GIT_CEILING_DIRECTORIES` not honored, and then takes one of two recorded decisions:
   - re-run with a corrected script, saved under a new name (`script-checks-r2.sh`) with its sha256, never overwriting the first
   - accept the branch as unexecuted. Residual item (10) then gains the text "; and, from inconclusive P3.7/P3.8 cases, the not-a-work-tree start-up failure of <`gate.sh`, `mutate-run.sh`, `mutate-clean.sh`, as applicable> (cases <ids>)" before its closing full stop.
@@ -1491,18 +1531,19 @@ sha256sum "$GATES"
 head -n 1 "$GATES"
 diff <(awk '/^\$ git diff --name-only main\.\.\.HEAD$/{f=1;next} /^exit=[0-9]+ step=files kind=info$/{f=0} f' "$GATES") <(awk '/^## Changed files$/{s=1;next} s&&/^```/{if(f)exit;f=1;next} f' TestResults/chore-agents-workflow-skills/tester-verdict.md); echo "list-diff=$?"
 git diff --exit-code HEAD -- .claude/skills/gate/scripts/gate.sh; echo "gate-sh-clean=$?"
-cp "$GATES" TestResults/chore-agents-workflow-skills/validation/gates-3-tester-<HEAD7>.txt && sha256sum TestResults/chore-agents-workflow-skills/validation/gates-3-tester-<HEAD7>.txt
 ```
+
+Then the human copies the record by the commands of Probe protocol item 8, with `L=3-tester`, and records the selected path.
 
 **Pass:**
 - the first command prints H
 - `head -n 4` shows `Verdict:`, `Head: H`, `Branch: chore/agents-workflow-skills` and `Gates-sha256: <hash>`, where `<hash>` is 64 hex characters, not `none`, for a READY_TO_PUSH verdict
-- `sha256sum` gives `<hash>`, which also equals the second line of the tester's `gate.sh` tool_result
+- `sha256sum` gives `<hash>`, which also equals the second line of the tester's `gate.sh` tool_result and the sha256 of the recorded copy
 - that tool_result is complete: line 1 is the record path, and its last line is `gate-exit=0 failed=`
 - the record's first line contains `head=H`
 - `list-diff=0`
 - `gate-sh-clean=0`. This is plan:565's known limit: no hash of the executed content is kept.
-- `gate-checks.txt`, run on the copy with `K=gate-checks-3-tester`, shows G0-G11 as expected
+- `gate-checks.txt`, run on the recorded copy's path with `K=gate-checks-3-tester`, shows G0-G11 as expected
 
 **From the tester's transcript `T`** (found with the `agentType` grep):
 - exactly one Bash tool_use whose command is exactly `bash .claude/skills/gate/scripts/gate.sh`, with its tool_result
@@ -1531,7 +1572,7 @@ A missing record is recorded as missing. The tester's verdict is a model report;
 
 **Human, after the tester:**
 - `commands-3.txt` (X1-X12) with `K=validation-3`
-- `gate-checks.txt` on the `3-tester` copy
+- `gate-checks.txt` on the recorded path of the `3-tester` copy (Probe protocol item 8)
 
 ## Phase 4: CLAUDE.md, roadmap, `docs/ai-workflow.md`, explainer.md; journal; PR end
 
@@ -1740,20 +1781,20 @@ It starts on a clean tree at H_E, with C4.2 and H4.1 recorded.
 4. **Tester.**
    - First: retention (Probe protocol item 6), and the live record removed (item 8, `absent=0`).
    - The tester runs (`PR-end`) on H_R.
-   - The human makes the P3.6 records as its correlation, copies the record to `gates-pr-end-tester-<HEAD7>.txt`, and runs `gate-checks.txt` on that copy. The copy stays as it is: step 5 neither uses nor replaces it.
+   - The human makes the P3.6 records as its correlation. The human copies the record by the commands of item 8 with `L=pr-end-tester`, records the selected path, and runs `gate-checks.txt` on that copy. The copy stays as it is: step 5 neither uses nor replaces it.
 5. **`/gate`** (decision 16). The PR-end sequence re-runs the gate on purpose, at the same head (plan:66).
    - **Before:** the human removes the live record again (item 8) and records `absent=0`.
    - **Run:** the human invokes `/gate`, then records its Bash tool_use and tool_result rows from the main-session transcript.
-   - **Copy:** the human copies the new record to `gates-pr-end-gate-<HEAD7>.txt` and runs `gate-checks.txt` on that copy.
+   - **Copy:** the human copies the new record by the commands of item 8 with `L=pr-end-gate`, records the selected path, and runs `gate-checks.txt` on that copy.
    - **Step 5 passes when:**
      - the tool_result's first line is `TestResults/chore-agents-workflow-skills/gates.txt`
-     - its second line is a `sha256sum` line whose hash equals G0's hash of the `pr-end-gate` copy
+     - its second line is a `sha256sum` line whose hash equals G0's hash of the copy just recorded
      - its last line is `gate-exit=0 failed=`
      - where the transcript row carries an error flag, the flag is not set
      - G0-G11 hold on the copy, with G1 showing `head=H_R`
-     - the copy's header time is later than the `pr-end-tester` copy's
+     - the copy's header time is later than that of the `pr-end-tester` copy recorded in step 4
    - **How success is established.** The live record was absent before the call. `gate.sh` prints `gate-exit=0 failed=` as its last stdout line only after verifying its record and printing the whole summary. So that line, together with the matching hash, shows that this invocation produced the copied record and completed. No numeric exit code is claimed unless a record shows one.
-   - **If any condition fails,** the record is not used and no older copy stands in for it. The human removes the live record again and re-runs `/gate`. `/pr` is not invoked until step 5 passes.
+   - **If any condition fails,** the record is not used and no older copy stands in for it. The human removes the live record again and re-runs `/gate`. The new run's copy takes the next `n`, and the failed run's copy is kept but never used. `/pr` is not invoked until step 5 passes.
 6. **Human validation and READY_TO_PUSH.** The human runs `commands-pr-end.txt` with `K=validation-pr-end` at H_R. Then, in `pr-end.md`, the human records READY_TO_PUSH and V = H_R. This is the human's decision.
 7. **`/pr thoughts/shared/plans/2026-10-13_chore-agents-workflow-skills.md`.**
    - preconditions 1-7; precondition 7 is not required here
@@ -1793,7 +1834,7 @@ Title: `chore(agents): complete workflow skills and documentation`.
 - the "both" commands of X5-X11 and D1, D3, D4 and D6-D10
 
 **Human:**
-- `commands-4.txt` with `K=validation-4` after the Phase 4 tester, and `gate-checks.txt` on the `4-tester` copy
+- `commands-4.txt` with `K=validation-4` after the Phase 4 tester, and `gate-checks.txt` on the recorded path of the `4-tester` copy (Probe protocol item 8)
 - at PR end, steps 4-6 above
 
 ## Rollback notes
@@ -1817,7 +1858,7 @@ Title: `chore(agents): complete workflow skills and documentation`.
 - **If the P3.7/P3.8 scratch path exists before the run:**
   - The script stops without changing anything (`removed=skipped`).
   - The human inspects the path. A leftover of an earlier run of this script may be removed by hand, and the removal is recorded. Anything else is left alone, and the run waits for the human's decision.
-  - If a run prints `removed=` with a non-zero value, the human removes the path it created by hand and records it.
+  - If a run prints `removed=` with a non-zero value, the human removes, by hand, the path that run created, and records it. That run is a harness failure: neither probe passes on it, and the script is re-run after the cleanup (decision 23).
 - **If the new `/commit` cannot write `TestResults/COMMIT_MSG.txt`:** the human commits with `git commit -F` in an external Git Bash and records it. P3.5 fails, and the correction loop follows.
 - **If `/security-review` is unavailable or errors at P4.4 step 2:** precondition 6 cannot pass. `/pr` stops, and the human decides and records the decision. No agent writes a security verdict.
 - **If `/pr` stops after `gh pr create`:**
