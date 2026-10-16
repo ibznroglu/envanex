@@ -1,8 +1,9 @@
 # Plan: patch vulnerable System.Security.Cryptography.Pkcs and .Xml (`fix/cryptography-vulnerabilities`)
 
 Date: 2026-10-16. Branch: `fix/cryptography-vulnerabilities` (from `2e8497a`). Input: the research the
-human accepted in the planner prompt (no research file). Revised the same day in the human's
-correction pass.
+human accepted in the planner prompt (no research file). Revised the same day in two correction
+passes; the second applies the required changes of
+`thoughts/shared/reviews/2026-10-16_fix-cryptography-vulnerabilities-plan-review.md`.
 
 ## Goal
 
@@ -82,7 +83,8 @@ way. Edit the props file first, then the csproj.
 - No `PrivateAssets` or `IncludeAssets`. The reference must flow through project references so that
   Web and Worker resolve 9.0.21, as Infrastructure does, instead of SqlClient's 9.0.11.
   IntegrationTests resolves 10.0.13 because of its Xml dependency (see the table under Validation).
-  A private reference silently reopens the vulnerability in Web and Worker.
+  A private reference would leave Web and Worker on SqlClient's Pkcs 9.0.11, so their restore fails
+  with NU1902/NU1903.
 - A brief XML comment directly above it states:
   1. it is a security override, and no Infrastructure code uses Pkcs;
   2. the chain: EF Core SqlServer 10.0.11 -> Microsoft.Data.SqlClient 6.1.6 -> Pkcs 9.0.11;
@@ -111,13 +113,20 @@ phase with no tests is incomplete" does not apply, so do not add a test.
 - **Regression guard:** NuGet audit at restore. Under `TreatWarningsAsErrors`, any graph that
   reintroduces a vulnerable Pkcs or Xml fails restore, locally and in CI. A test that pattern-matches
   the csproj would pin text rather than resolved versions, and would duplicate that guard more weakly.
-- **Compatibility evidence:** the full existing suite.
-  - `Envanex.IntegrationTests` drives EF Core -> SqlClient against a real SQL Server (Testcontainers),
-    with the bumped packages in its graph.
+- **What the existing suite shows.** It runs in full and unchanged against the new graph. That shows
+  the existing behavior still passes with the patched packages restored. It does not show that the
+  patched assemblies are loaded or exercised.
+  - IntegrationTests' graph and output contain Pkcs 10.0.13 and Xml 10.0.13. Its tests drive EF Core
+    -> SqlClient against a real SQL Server (Testcontainers).
+  - No code in `src/` or `tests/` calls a Pkcs or Xml API, so the suite is not shown to load either
+    assembly at any version. Whether SqlClient or ASP.NET Core internals load them during the run is
+    unverified, and no command in this plan settles it.
+  - Pkcs 9.0.21, the version Web and Worker resolve, reaches no test process. Restore and build are
+    its only coverage.
+  - The tested versions therefore differ from production's: 10.0.13 in the test graph, 9.0.21 in Web
+    and Worker.
   - `ArchitectureTests` re-reads the edited Infrastructure csproj.
-  - Limits: the integration suite exercises Pkcs 10.0.13 (IntegrationTests resolves it through Xml),
-    not the 9.0.21 that the production consumers, Web and Worker, resolve. SoapApi and Worker are
-    empty shells (roadmap, Known gaps) and have no tests.
+  - SoapApi and Worker are empty shells (roadmap, Known gaps) and have no tests.
 
 ### Validation
 
@@ -243,8 +252,15 @@ Runtime remediation is outside this package-only implementation.
 - If compatibility fails, stop and report; the human decides the next step. This plan does not
   authorize a fix-forward from Pkcs 9.x to 10.x. That change needs a separately reviewed decision and
   its own validation.
-- Later removal: delete the Infrastructure `PackageReference` and its `PackageVersion` together once
-  `dotnet list package --include-transitive` shows SqlClient pulling a patched Pkcs on its own.
+- **Later removal.** The trigger is SqlClient's own dependency requirement, not the resolved Pkcs
+  version.
+  - While the override exists, `dotnet list package --include-transitive` reports Infrastructure's own
+    top-level 9.0.21 and cannot show what SqlClient requests.
+  - After a restore, read the `dependencies` of the `Microsoft.Data.SqlClient/<version>` entry in
+    `src/Envanex.Infrastructure/obj/project.assets.json`. Today 6.1.6 requires Pkcs 9.0.11.
+  - Remove the override only once that entry itself requires a patched Pkcs. Delete the Infrastructure
+    `PackageReference` and its `PackageVersion` together.
+  - The removal must still pass restore, the resolution check and the audit (Validation steps 1-3).
 
 ## Open questions
 
