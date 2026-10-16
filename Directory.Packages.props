@@ -47,7 +47,11 @@
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.4" />
 
     <!-- Transitive override: SoapCore depends on System.Security.Cryptography.Xml 8.0.2 which has
-         known high severity vulnerabilities (NU1903). Force upgrade to a patched version. -->
-    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.11" />
+         known high severity vulnerabilities (NU1903). Force upgrade to a patched version.
+         Advisories addressed: GHSA-r955-8q5j-3h83, GHSA-7hqp-7c5m-4vq6, GHSA-c399-9853-6jmj. -->
+    <PackageVersion Include="System.Security.Cryptography.Xml" Version="10.0.13" />
+    <!-- Override for Microsoft.Data.SqlClient's transitive Pkcs dependency. Central transitive pinning
+         is off, so it takes effect only via the direct reference in Envanex.Infrastructure.csproj. -->
+    <PackageVersion Include="System.Security.Cryptography.Pkcs" Version="9.0.21" />
   </ItemGroup>
 </Project>
