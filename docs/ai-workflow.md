@@ -93,7 +93,7 @@ never force-pushes, and it updates `main` with `git pull --ff-only`.
 The model and effort come from each agent's frontmatter (`.claude/agents/<agent>.md:5-6`). "File
 tools" is the matcher `Write|Edit|MultiEdit|NotebookEdit`. The `microsoft_docs_*` and
 `microsoft_code_sample_search` names are the Microsoft Learn MCP tools, written out in full
-(`mcp__microsoft-learn__…`) in the files. Every hook command ends in `|| exit 2` (see
+(`mcp__microsoft-learn__…`) in the files. Every PreToolUse hook command ends in `|| exit 2` (see
 [Why hooks fail closed](#why-hooks-fail-closed)). The project-wide permissions and path-guard live
 in `.claude/settings.json` (see [The guards](#the-guards)).
 
@@ -273,8 +273,9 @@ the index or `HEAD`. The label must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`, so it 
 `HEAD` both in the working tree (`git diff --exit-code HEAD --`) and in the index
 (`git diff --cached --exit-code --`). A plain `git diff --exit-code` compares the working tree with
 the index and would miss a staged change. A mutation is restored by the inverse Edit, never by
-`git checkout --`, which is denied. Only the human invokes `/mutate`; a coder turn calls the two
-scripts directly.
+`git checkout --`, which is denied. By the workflow's rule only the human invokes `/mutate`; the
+skill's `disable-model-invocation: true` is an unproven enforcement boundary for that rule
+(Residual risks, item 22). A coder turn never invokes `/mutate`; it calls the two scripts directly.
 
 ## Why hooks fail closed
 
@@ -289,8 +290,8 @@ Two layers close it:
 - Every guard enters through `runGuard` in `.claude/hooks/lib/guard-common.js`. It turns any throw
   or rejection (invalid JSON on stdin, no project dir, an empty target) into a block with the
   reason `guard error: <message>` and exit 2.
-- Every hook command ends in `|| exit 2`, so a `node` that cannot start, or a script that dies
-  before `runGuard`, still blocks. P1.10 checked this wiring with a missing script.
+- Every PreToolUse hook command ends in `|| exit 2`, so a `node` that cannot start, or a script
+  that dies before `runGuard`, still blocks. P1.10 checked this wiring with a missing script.
 
 The price is that every hook error becomes a false positive that stops work. If a misfire ever
 blocks everything, the switch is `"disableAllHooks": true` in `.claude/settings.local.json`, edited
@@ -592,7 +593,7 @@ without a tool call (six) or never requested (ten):
 - the eight write-scope targets: `src/LIVEPROBE-4-<agent>.txt` for code-reviewer, plan-reviewer,
   db-reviewer, researcher, planner, tester and explainer, and the sibling-directory target
   `thoughts/shared/reviews-probe/LIVEPROBE-4-code-reviewer.md`
-- tester allowlist targets 5a, 5b, 5f and 5d
+- the allowlist targets 5a, 5b and 5f (tester) and 5d (explainer)
 
 Hook decision tests and per-profile live allow records give separate, narrower evidence, not the
 original negative end-to-end proof. The human accepted this on 2026-10-09 (Revision 8 of the
@@ -636,9 +637,9 @@ file outside `.claude/hooks/tests/`. The tester's allowlist does not share the g
 
 **(17) Matcher case.** `git switch -C*` did not deny `git switch -c`: P1.13a ran without a prompt
 and printed git's usage text (exit 129), so the matcher did not fold case for this pair
-(`2026-09-25_chore-agents-hardening.md:2772-2774`). Rollback R4-1, which would have removed the
-`git switch -C` denies, was not applied, and `git switch -C` stays denied. A deny entry covers the
-letter case it is written in. **Settling:** done by P1.13a. **Reopens:** if a Claude Code update
+(`2026-09-25_chore-agents-hardening.md:2766`, `:2772-2774`). Rollback R4-1, which would have
+removed the `git switch -C` denies, was not applied, and `git switch -C` stays denied. The probe
+covers this one pair only. **Settling:** done by P1.13a. **Reopens:** if a Claude Code update
 changes how rules match, or a deny entry is added whose meaning depends on case.
 
 **(18) Path-guard alias classes, UNVERIFIED.** These come from finding 12 of the Phase 1 code
