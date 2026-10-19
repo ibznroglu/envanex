@@ -55,8 +55,8 @@ in the README. That branch is never merged.
 | 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | done (#8) |
 | 6a | `feat(auth)` — ASP.NET Core Identity, JWT with rotating refresh tokens, login/refresh/logout | done (#11) |
 | 6b | `feat(web)` — policy-based authorization (a fallback policy with named exemptions), a Blazor cookie scheme, a read-only demo account | done (#12) |
-| — | `fix(db)` — stop publishing the local SQL Server SA password | |
-| — | `chore(agents)` — enforce the agent pipeline's rules and tier models by risk | |
+| — | `fix(db)` — stop publishing the local SQL Server SA password | done (#14) |
+| — | `chore(agents)` — enforce the agent pipeline's rules and tier models by risk | Phases 1–2 done (#15); Phases 3–4 in [this follow-up](../thoughts/shared/plans/2026-10-13_chore-agents-workflow-skills.md) |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
 Roadmap numbers and GitHub PR numbers are not the same. The status cell of a completed row
@@ -194,20 +194,27 @@ Tracked deliberately rather than hidden. Each one names where it closes: a PR, o
 | The integration suite ran at 53–59 s across PR 6b's final runs, against the 60 s decision line in ADR 0007, and the next PR's tests will cross it. Measure the median of three runs with the SQL Server container's start-up separated out, then decide between fewer `ResetIdentityAsync` calls (the first suspect, weakens nothing), fewer `ConcurrencyIterations`, parallel test collections (which break `DatabaseCollection`'s serialisation), or a higher line (which revises ADR 0007) | before PR 7 adds tests |
 | PR 7's "deploy on merge to `main`" has no recorded method: there is no Dockerfile, `docker-compose.yml` starts only SQL Server, and the tests use Testcontainers | PR 7's research — App Service publish profile, GitHub Actions, or a container |
 | The UI is still the Blazor template's: a full-width Bootstrap login form, the "About" link in the top bar, and an https-redirect warning on the http profile. PR 7 must meet a senior-frontend bar; its design phase is described under PR 7 above | PR 7 — design phase first |
-| The agent pipeline's rules are enforced only by prompts. `chore(agents)` replaces them with permission deny rules and per-agent hooks (including a working Windows path guard), gives each agent a model and effort tier, renames `/verify` to `/gate` backed by a script, adds a `/mutate` skill for the mutation discipline, tightens `CLAUDE.md`'s scope and verification rules, adds the missing `ENVANEX_CONNECTION_STRING` note to its migration commands, adds the `csharp-lsp` and Microsoft Learn plugins, and brings the "How the work is run" section and the `/commit` skill's scope list up to date (`roadmap`, `adr` and `journal` are in use but not listed) | `chore(agents)`, before PR 7 |
-| Review verdicts are not persisted. Per-phase verdicts from earlier sessions exist only in session transcripts, so `/pr`, which accepts only verdicts from its own session, cannot cite them. Each reviewer should write its verdict, and the commit range it covered, under `thoughts/shared/reviews/`, and `/pr` should cite those files | `chore(agents)` |
 | Nothing enforces endpoint policy coverage. The fallback policy is only an authentication floor (ADR 0008), so a mutating endpoint without `CanWrite` admits a signed-in `Viewer` and nothing catches the omission. An endpoint-metadata test should enumerate every `/api/*` endpoint and fail when a mutating endpoint lacks `CanWrite` or a read endpoint lacks `CanRead`, apart from the named exemptions | before PR 8 adds write endpoints |
 | No test proves that the REST login and the form login share one rate-limit bucket. Both name the same policy constant and partition key, so it holds by construction, but a page given its own policy with identical limits would pass every current test. Write it as a mixed case: one `POST /api/auth/login`, one form POST, then a third request that expects 429 | before PR 8, with the policy-coverage test and after the 60 s decision |
+| Hook tests are not run in CI. `node --test .claude/hooks/tests/*.test.js` runs only locally and through `gate.sh` (the `/gate` skill and the tester). `normalizePath` is pure string logic, so a step on the `ubuntu-latest` CI job can be added without a rewrite | not scheduled — recorded |
+| **Residual risks of the agent guards** — the residual record; [`docs/ai-workflow.md`](ai-workflow.md#residual-risks) repeats it with each item's detail, settling command and reopen trigger. (1) Threat model: the guards stop accidental destructive actions by a cooperative agent and are no boundary against code the model writes and runs itself (`dotnet run`, including file-based `dotnet run x.cs`, `dotnet test`, `dotnet build`, `node`, a script), which can call any denied command. (2) The Bash guards are string heuristics: a variable holding `git`, or script indirection, bypasses them; `gate.sh` and the `/mutate` scripts run commands no hook inspects, so what they write is bounded by their reviewed content, not by a hook. (3) coder-bash-guard blocks any command that names `git` as a word. (4) bash-allowlist splits on `\|` without regard to quotes. (5) path-guard does not see Bash writes. (6) Windows path aliasing, UNVERIFIED. (7) A quoted `user-secrets set` value is redacted only up to a `;`, `\|` or `&&`. (8) Agents can edit `.claude/`, including `settings.json`, which path-guard does not cover; `disableBundledSkills` and `disableClaudeAiConnectors` are no authorization boundary. (9) User-level settings sit outside the repository; `Bash(find *)` there allows `find -delete`. (10) Reviewed, not executed: the base-check failure path of `gate.sh`; the `cd` failure of `gate.sh`, `mutate-run.sh` and `mutate-clean.sh`; and the append, read and final-record failures that follow a successful open of the gate record or a mutation log. (11) No allowlist rule for pipes: a tester pipeline's exit status is its last segment's. (12) Runtime tool access outside P2.6's two pairs is not verified. (13) 16 negative live paths of Phase 2 stay UNVERIFIED end to end. (14) Deny forms not covered: other global git options, `git.exe`, a flag after another flag, bare `git rebase`, some `git checkout` and `git branch` forms. (15) git long-option abbreviations, UNVERIFIED. (16) The `*.test.js` allow entry's wildcard crosses `..` (P1.13g2). (17) Matcher case: `git switch -C*` did not deny `git switch -c` (P1.13a). (18) Path-guard alias classes (8.3 names, junctions and links, drive-relative paths, case folding), UNVERIFIED. (19) Hook timeouts and regex cost, UNVERIFIED. (20) Redaction is pattern-based. (21) Open non-blocking review findings F2, F3, N1, N2, N4 and DBR-1; F4–F6, DBR-2 and R3-6 to R3-8 stay as their review files record. (22) `disable-model-invocation: true` is an unproven enforcement boundary in this environment: in P3.4 attempt M1.1 a human request naming `/mutate` arrived as pasted text rather than as a slash command, and a model-made Skill tool call to `/mutate` then succeeded while `.claude/skills/mutate/SKILL.md` sets the flag; this does not establish autonomous invocation without a human request, whether the runtime should have refused the call (that is, whether the observed behavior is a runtime bug or the intended semantics of the flag), or the same behavior for `/commit` and `/pr`; `/pr`'s `allowed-tools` include `Bash(git push *)` and `Bash(gh pr *)`, a potential implication only, not evidence of any automatic push or PR, and `/pr`'s existing merge protections are unchanged; any verification is UNVERIFIED and unscheduled, uses only a harmless test skill, and distinguishes a human request that names the skill from one that does not | not scheduled — recorded |
 
 ## How the work is run
 
-Each PR follows the same loop, and the human drives every transition — agents stop and wait.
+Each PR follows one of two lanes, and the human drives every transition — agents stop and wait.
 
 ```
-researcher → planner → plan-reviewer → coder (one phase at a time)
-           → code-reviewer → db-reviewer (if schema changed) → tester
-           → explainer → human writes the ADR → /pr
+feature lane    researcher → planner → plan-reviewer → coder (one phase at a time)
+                → code-reviewer → db-reviewer (if schema changed) → tester
+light lane      short plan file → coder (one phase at a time) → code-reviewer → tester
+before PR end   explainer → human writes the ADR
+PR end          whole-branch code-reviewer → /security-review → tester → /gate → /pr
 ```
+
+In both lanes the human commits every review file before the tester runs, and every evidence,
+journal and ADR commit lands before the PR end. `/security-review` is skipped only when every
+changed file is under `docs/` or `thoughts/`, and `/pr` refuses a verdict file that is not bound
+to the current `HEAD`. [`docs/ai-workflow.md`](ai-workflow.md) explains each step.
 
 Rules that were learned the hard way and are not negotiable:
 
@@ -217,7 +224,9 @@ Rules that were learned the hard way and are not negotiable:
   step.
 - **Reviewers have no shell.** Any claim about whether code compiles, what an API accepts, or what
   git history contains is a guess until a command proves it. Six such claims turned out to be wrong
-  during PRs 1–4. Use `/verify`, which prints raw command output and never summarises.
+  during PRs 1–4. Use `/gate`: its script writes the raw output to
+  `TestResults/<branch-slug>/gates.txt` and prints a summary computed from that file, never
+  composed by the model.
 - **Settle disputes by experiment.** When the implementing agent and the reviewing agent disagree
   about a technical necessity, change the code and run the tests. This is how the parameterless
   constructor on `Money` was removed — it was reported as required and was not.
@@ -233,5 +242,4 @@ Rules that were learned the hard way and are not negotiable:
   stayed green when the behaviour they claimed to guard was removed. When a test exists to
   prevent a regression, delete the code it guards and watch it go red.
 
-Agent models: `planner`, `plan-reviewer`, `coder`, `db-reviewer` and `explainer` run on Opus;
-`code-reviewer` on Sonnet; `researcher` and `tester` on Haiku.
+Agent models and effort tiers: see [`docs/ai-workflow.md`](ai-workflow.md#roles-and-tiers).
