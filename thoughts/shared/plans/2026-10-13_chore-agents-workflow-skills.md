@@ -4286,3 +4286,548 @@ $ git status --short
 exit=0
 
 <!-- PHASE4-EVIDENCE-END -->
+
+## As built — Phase 4, late records 1
+
+<!-- PHASE4-LATE-1-EVIDENCE-START -->
+
+## Records for Phase 4 made after its As built commit
+Recorded-at: 2026-10-20T02:17:26+03:00
+Made before the Phase 4 correction-loop coder turn (code review phase4: NEEDS_REVISION, R1 and R2).
+
+$ git branch --show-current; git rev-parse HEAD; git --no-optional-locks status --porcelain --untracked-files=all
+chore/agents-workflow-skills
+2e5dc7c9a54951fae081d97df00d1d6df713e171
+exit=0
+
+### Human decisions for the correction loop
+Human decision: the fix applies E1-E5 of the planner proposal, limited to docs/ai-workflow.md (R1, R2, N3, N6).
+Human decision: the -r2 re-review covers the whole Phase 4 range, 2e8dc16a115840562c215308a814b7f11f38e0de..<late-records commit>.
+
+### H0.2 (before the correction-loop coder turn)
+
+$ git ls-files --eol -- docs/ai-workflow.md
+i/lf    w/lf    attr/text=auto eol=lf 	docs/ai-workflow.md
+exit=0
+
+### Phase 4 As built transfer log
+
+$ printf 'transfer log: %s\n' 'TestResults/chore-agents-workflow-skills/validation/as-built-4-77f07f8-20261019T221903.log'; sha256sum 'TestResults/chore-agents-workflow-skills/validation/as-built-4-77f07f8-20261019T221903.log'; tail -n 1 'TestResults/chore-agents-workflow-skills/validation/as-built-4-77f07f8-20261019T221903.log'
+transfer log: TestResults/chore-agents-workflow-skills/validation/as-built-4-77f07f8-20261019T221903.log
+db8eddef622cc39d4cf8df7613f3ba0517be2a811cb6977a92ba766fb4ff1724 *TestResults/chore-agents-workflow-skills/validation/as-built-4-77f07f8-20261019T221903.log
+transfer-checks=0
+exit=0
+
+### N8: body of the Phase 4 code commit 77f07f8
+
+$ git log -1 --format=%B 77f07f8a5f89bd41abe7430d052757db7ff9118a
+docs(agents): implement Phase 4 workflow documentation
+
+- CLAUDE.md becomes exactly the plan's Appendix A (DV10).
+- docs/roadmap.md: the planned row, lane and /gate edits, stale /verify
+  references removed, and the residual record row with items (1)-(22).
+- docs/ai-workflow.md: new, sections 1-10, with residual risks (1)-(22).
+- .claude/agents/explainer.md: the three planned journal-number edits.
+
+exit=0
+Human observation: the body above does not state plan:1618-1619 and cites neither #15 nor "this follow-up", as plan:1620 and DV11 (plan:585) require. It cites no PR number.
+This is a missed requirement of 77f07f8. History is not rewritten. The fix commit body and the PR body (plan:1829) carry the statement forward; that does not make 77f07f8 compliant.
+
+### Phase 4 scope of docs/roadmap.md and .claude/agents/explainer.md (2e8dc16..a4a1eb0)
+
+$ git diff 2e8dc16a115840562c215308a814b7f11f38e0de a4a1eb0904bb749ede6d41eca6dead20a14f36a0 -- docs/roadmap.md
+diff --git a/docs/roadmap.md b/docs/roadmap.md
+index 5481ea6..ae67e5d 100644
+--- a/docs/roadmap.md
++++ b/docs/roadmap.md
+@@ -55,8 +55,8 @@ in the README. That branch is never merged.
+ | 5b | `feat(api)` — REST endpoints, hardened grid datasource, integration tests | done (#8) |
+ | 6a | `feat(auth)` — ASP.NET Core Identity, JWT with rotating refresh tokens, login/refresh/logout | done (#11) |
+ | 6b | `feat(web)` — policy-based authorization (a fallback policy with named exemptions), a Blazor cookie scheme, a read-only demo account | done (#12) |
+-| — | `fix(db)` — stop publishing the local SQL Server SA password | |
+-| — | `chore(agents)` — enforce the agent pipeline's rules and tier models by risk | |
++| — | `fix(db)` — stop publishing the local SQL Server SA password | done (#14) |
++| — | `chore(agents)` — enforce the agent pipeline's rules and tier models by risk | Phases 1–2 done (#15); Phases 3–4 in [this follow-up](../thoughts/shared/plans/2026-10-13_chore-agents-workflow-skills.md) |
+ | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
+ 
+ Roadmap numbers and GitHub PR numbers are not the same. The status cell of a completed row
+@@ -194,21 +194,28 @@ Tracked deliberately rather than hidden. Each one names where it closes: a PR, o
+ | The integration suite ran at 53–59 s across PR 6b's final runs, against the 60 s decision line in ADR 0007, and the next PR's tests will cross it. Measure the median of three runs with the SQL Server container's start-up separated out, then decide between fewer `ResetIdentityAsync` calls (the first suspect, weakens nothing), fewer `ConcurrencyIterations`, parallel test collections (which break `DatabaseCollection`'s serialisation), or a higher line (which revises ADR 0007) | before PR 7 adds tests |
+ | PR 7's "deploy on merge to `main`" has no recorded method: there is no Dockerfile, `docker-compose.yml` starts only SQL Server, and the tests use Testcontainers | PR 7's research — App Service publish profile, GitHub Actions, or a container |
+ | The UI is still the Blazor template's: a full-width Bootstrap login form, the "About" link in the top bar, and an https-redirect warning on the http profile. PR 7 must meet a senior-frontend bar; its design phase is described under PR 7 above | PR 7 — design phase first |
+-| The agent pipeline's rules are enforced only by prompts. `chore(agents)` replaces them with permission deny rules and per-agent hooks (including a working Windows path guard), gives each agent a model and effort tier, renames `/verify` to `/gate` backed by a script, adds a `/mutate` skill for the mutation discipline, tightens `CLAUDE.md`'s scope and verification rules, adds the missing `ENVANEX_CONNECTION_STRING` note to its migration commands, adds the `csharp-lsp` and Microsoft Learn plugins, and brings the "How the work is run" section and the `/commit` skill's scope list up to date (`roadmap`, `adr` and `journal` are in use but not listed) | `chore(agents)`, before PR 7 |
+-| Review verdicts are not persisted. Per-phase verdicts from earlier sessions exist only in session transcripts, so `/pr`, which accepts only verdicts from its own session, cannot cite them. Each reviewer should write its verdict, and the commit range it covered, under `thoughts/shared/reviews/`, and `/pr` should cite those files | `chore(agents)` |
+ | Nothing enforces endpoint policy coverage. The fallback policy is only an authentication floor (ADR 0008), so a mutating endpoint without `CanWrite` admits a signed-in `Viewer` and nothing catches the omission. An endpoint-metadata test should enumerate every `/api/*` endpoint and fail when a mutating endpoint lacks `CanWrite` or a read endpoint lacks `CanRead`, apart from the named exemptions | before PR 8 adds write endpoints |
+ | No test proves that the REST login and the form login share one rate-limit bucket. Both name the same policy constant and partition key, so it holds by construction, but a page given its own policy with identical limits would pass every current test. Write it as a mixed case: one `POST /api/auth/login`, one form POST, then a third request that expects 429 | before PR 8, with the policy-coverage test and after the 60 s decision |
++| Hook tests are not run in CI. `node --test .claude/hooks/tests/*.test.js` runs only locally and through `gate.sh` (the `/gate` skill and the tester). `normalizePath` is pure string logic, so a step on the `ubuntu-latest` CI job can be added without a rewrite | not scheduled — recorded |
++| **Residual risks of the agent guards** — the residual record; [`docs/ai-workflow.md`](ai-workflow.md#residual-risks) repeats it with each item's detail, settling command and reopen trigger. (1) Threat model: the guards stop accidental destructive actions by a cooperative agent and are no boundary against code the model writes and runs itself (`dotnet run`, including file-based `dotnet run x.cs`, `dotnet test`, `dotnet build`, `node`, a script), which can call any denied command. (2) The Bash guards are string heuristics: a variable holding `git`, or script indirection, bypasses them; `gate.sh` and the `/mutate` scripts run commands no hook inspects, so what they write is bounded by their reviewed content, not by a hook. (3) coder-bash-guard blocks any command that names `git` as a word. (4) bash-allowlist splits on `\|` without regard to quotes. (5) path-guard does not see Bash writes. (6) Windows path aliasing, UNVERIFIED. (7) A quoted `user-secrets set` value is redacted only up to a `;`, `\|` or `&&`. (8) Agents can edit `.claude/`, including `settings.json`, which path-guard does not cover; `disableBundledSkills` and `disableClaudeAiConnectors` are no authorization boundary. (9) User-level settings sit outside the repository; `Bash(find *)` there allows `find -delete`. (10) Reviewed, not executed: the base-check failure path of `gate.sh`; the `cd` failure of `gate.sh`, `mutate-run.sh` and `mutate-clean.sh`; and the append, read and final-record failures that follow a successful open of the gate record or a mutation log. (11) No allowlist rule for pipes: a tester pipeline's exit status is its last segment's. (12) Runtime tool access outside P2.6's two pairs is not verified. (13) 16 negative live paths of Phase 2 stay UNVERIFIED end to end. (14) Deny forms not covered: other global git options, `git.exe`, a flag after another flag, bare `git rebase`, some `git checkout` and `git branch` forms. (15) git long-option abbreviations, UNVERIFIED. (16) The `*.test.js` allow entry's wildcard crosses `..` (P1.13g2). (17) Matcher case: `git switch -C*` did not deny `git switch -c` (P1.13a). (18) Path-guard alias classes (8.3 names, junctions and links, drive-relative paths, case folding), UNVERIFIED. (19) Hook timeouts and regex cost, UNVERIFIED. (20) Redaction is pattern-based. (21) Open non-blocking review findings F2, F3, N1, N2, N4 and DBR-1; F4–F6, DBR-2 and R3-6 to R3-8 stay as their review files record. (22) `disable-model-invocation: true` is an unproven enforcement boundary in this environment: in P3.4 attempt M1.1 a human request naming `/mutate` arrived as pasted text rather than as a slash command, and a model-made Skill tool call to `/mutate` then succeeded while `.claude/skills/mutate/SKILL.md` sets the flag; this does not establish autonomous invocation without a human request, whether the runtime should have refused the call (that is, whether the observed behavior is a runtime bug or the intended semantics of the flag), or the same behavior for `/commit` and `/pr`; `/pr`'s `allowed-tools` include `Bash(git push *)` and `Bash(gh pr *)`, a potential implication only, not evidence of any automatic push or PR, and `/pr`'s existing merge protections are unchanged; any verification is UNVERIFIED and unscheduled, uses only a harmless test skill, and distinguishes a human request that names the skill from one that does not | not scheduled — recorded |
+ 
+ ## How the work is run
+ 
+-Each PR follows the same loop, and the human drives every transition — agents stop and wait.
++Each PR follows one of two lanes, and the human drives every transition — agents stop and wait.
+ 
+ ```
+-researcher → planner → plan-reviewer → coder (one phase at a time)
+-           → code-reviewer → db-reviewer (if schema changed) → tester
+-           → explainer → human writes the ADR → /pr
++feature lane    researcher → planner → plan-reviewer → coder (one phase at a time)
++                → code-reviewer → db-reviewer (if schema changed) → tester
++light lane      short plan file → coder (one phase at a time) → code-reviewer → tester
++before PR end   explainer → human writes the ADR
++PR end          whole-branch code-reviewer → /security-review → tester → /gate → /pr
+ ```
+ 
++In both lanes the human commits every review file before the tester runs, and every evidence,
++journal and ADR commit lands before the PR end. `/security-review` is skipped only when every
++changed file is under `docs/` or `thoughts/`, and `/pr` refuses a verdict file that is not bound
++to the current `HEAD`. [`docs/ai-workflow.md`](ai-workflow.md) explains each step.
++
+ Rules that were learned the hard way and are not negotiable:
+ 
+ - **Commit immediately after each phase completes**, before review. A phase was lost once by not
+@@ -217,7 +224,9 @@ Rules that were learned the hard way and are not negotiable:
+   step.
+ - **Reviewers have no shell.** Any claim about whether code compiles, what an API accepts, or what
+   git history contains is a guess until a command proves it. Six such claims turned out to be wrong
+-  during PRs 1–4. Use `/verify`, which prints raw command output and never summarises.
++  during PRs 1–4. Use `/gate`: its script writes the raw output to
++  `TestResults/<branch-slug>/gates.txt` and prints a summary computed from that file, never
++  composed by the model.
+ - **Settle disputes by experiment.** When the implementing agent and the reviewing agent disagree
+   about a technical necessity, change the code and run the tests. This is how the parameterless
+   constructor on `Money` was removed — it was reported as required and was not.
+@@ -233,5 +242,4 @@ Rules that were learned the hard way and are not negotiable:
+   stayed green when the behaviour they claimed to guard was removed. When a test exists to
+   prevent a regression, delete the code it guards and watch it go red.
+ 
+-Agent models: `planner`, `plan-reviewer`, `coder`, `db-reviewer` and `explainer` run on Opus;
+-`code-reviewer` on Sonnet; `researcher` and `tester` on Haiku.
++Agent models and effort tiers: see [`docs/ai-workflow.md`](ai-workflow.md#roles-and-tiers).
+exit=0
+
+$ git diff 2e8dc16a115840562c215308a814b7f11f38e0de a4a1eb0904bb749ede6d41eca6dead20a14f36a0 -- .claude/agents/explainer.md
+diff --git a/.claude/agents/explainer.md b/.claude/agents/explainer.md
+index f67a671..a29cd8d 100644
+--- a/.claude/agents/explainer.md
++++ b/.claude/agents/explainer.md
+@@ -19,7 +19,7 @@ You are a senior engineer mentoring someone who is strong in frontend (React, Ty
+ React Native) and new to backend, .NET and relational databases. Your job is to turn a finished
+ PR into study material.
+ 
+-Input: $ARGUMENTS (plan file path + PR number)
++Input: $ARGUMENTS (plan file path + journal number)
+ 
+ **You write files ONLY under `docs/journal/`.** A hook (write-scope) blocks every Write
+ outside it. You never touch `src/`, `tests/`, `db/`, `docs/adr/`, `thoughts/`, or any config file.
+@@ -33,13 +33,15 @@ Your Bash access is read-only and hook-scoped: a hook (bash-allowlist) allows on
+ 
+ 1. Read the plan file to learn what this PR set out to do.
+ 2. Run `git diff main...HEAD --stat`, then read every changed file that matters.
+-3. Write `docs/journal/NNNN-<slug>.md` using the structure below. NNNN matches the PR number,
+-   zero-padded to four digits.
++3. Write `docs/journal/NNNN-<slug>.md` using the structure below. NNNN is the journal number the
++   caller gives, zero-padded to four digits: the next number after the highest `NNNN-` entry in
++   `docs/journal/`. It is a sequence number, not the GitHub PR or roadmap number. If an entry with
++   that number already exists, stop and report it; a number is never reused.
+ 
+ ## Structure
+ 
+ ```markdown
+-# PR NNNN — <title>
++# NNNN — <title>
+ 
+ ## Ne yaptık
+ (3-5 cümle, teknik ama sade. Bu PR'ın sonunda repoda ne var, öncekinden farkı ne.)
+exit=0
+
+### N7: record form of two earlier sections
+Human observation: the records under "Phase 4 human prerequisites (H4.0, H0.2)" and "R4 restart and H4.1" have a blank line before each exit= line, which the plan's run (plan:482-490) does not write.
+Those records name no recorder, and no other record establishes which one made them, so their exact provenance is not established. Their commands, outputs and exit codes stand as recorded.
+The R4 launch time was not recorded (Probe protocol 2.4); this stays a disclosed deviation.
+
+### N5 / O4 and the DV15 coverage gap
+Human decision: N5 is carried, not published in residual item (10). No new probe and no plan amendment.
+The Phase 3 review O4 static-only paths stay as recorded in Phase 3 section D: the missing: and sha256=unavailable branches of gate.sh, the dotnet mode of mutate-run.sh, and mutate-clean.sh with several files.
+DV15 (plan:594) says every unexecuted branch is named in residual item (10); that does not hold for the missing: and sha256=unavailable branches of gate.sh.
+Both are carried in this late evidence and in the PR body's carried findings (plan:1832).
+
+## Records for Phase 4 made after its As built commit: correction dc37158
+Recorded-at: 2026-10-20T02:31:32+03:00
+
+$ git branch --show-current; git rev-parse HEAD; git rev-parse HEAD~1; git --no-optional-locks status --porcelain --untracked-files=all
+chore/agents-workflow-skills
+dc37158cb28150c853770c8e2fb2412506e7150b
+2e5dc7c9a54951fae081d97df00d1d6df713e171
+exit=0
+
+### Correction commit dc37158 (correction loop step 1)
+
+$ git log -1 --format=%B dc37158cb28150c853770c8e2fb2412506e7150b
+docs(agents): correct Phase 4 workflow documentation
+
+- R1: residual item (13) now attributes allowlist targets 5a, 5b and 5f
+  to the tester and 5d to the explainer, as the hardening plan records.
+- R2: the /mutate sentence separates the workflow rule (only the human
+  invokes it) from enforcement: disable-model-invocation: true is an
+  unproven boundary (residual item 22, which is unchanged).
+- N3: residual item (17) cites hardening:2766 as well as :2772-2774 and
+  limits the case-matching claim to the one probed pair.
+- N6: both hook-command sentences now say PreToolUse; the PostToolUse
+  format hook does not end in || exit 2.
+- Late record for 77f07f8, whose body missed the workflow-skills
+  plan:1620: that commit removed the two Known-gaps rows because #15
+  closed the deny-and-hook part, the tiers and the persisted verdict
+  files, and this follow-up closes /gate, /mutate, the /commit scope
+  list, CLAUDE.md, the roadmap section, and /pr citing and gating the
+  verdict files.
+- This records the earlier omission; it does not make 77f07f8 compliant,
+  and the remaining Phase 4 checks and re-review are still pending.
+
+exit=0
+
+$ git show --name-only --format= dc37158cb28150c853770c8e2fb2412506e7150b
+docs/ai-workflow.md
+exit=0
+
+$ git diff 2e5dc7c9a54951fae081d97df00d1d6df713e171 dc37158cb28150c853770c8e2fb2412506e7150b -- docs/ai-workflow.md
+diff --git a/docs/ai-workflow.md b/docs/ai-workflow.md
+index 1909440..a9f3d51 100644
+--- a/docs/ai-workflow.md
++++ b/docs/ai-workflow.md
+@@ -93,7 +93,7 @@ never force-pushes, and it updates `main` with `git pull --ff-only`.
+ The model and effort come from each agent's frontmatter (`.claude/agents/<agent>.md:5-6`). "File
+ tools" is the matcher `Write|Edit|MultiEdit|NotebookEdit`. The `microsoft_docs_*` and
+ `microsoft_code_sample_search` names are the Microsoft Learn MCP tools, written out in full
+-(`mcp__microsoft-learn__…`) in the files. Every hook command ends in `|| exit 2` (see
++(`mcp__microsoft-learn__…`) in the files. Every PreToolUse hook command ends in `|| exit 2` (see
+ [Why hooks fail closed](#why-hooks-fail-closed)). The project-wide permissions and path-guard live
+ in `.claude/settings.json` (see [The guards](#the-guards)).
+ 
+@@ -273,8 +273,9 @@ the index or `HEAD`. The label must match `^[A-Za-z0-9][A-Za-z0-9._-]*$`, so it
+ `HEAD` both in the working tree (`git diff --exit-code HEAD --`) and in the index
+ (`git diff --cached --exit-code --`). A plain `git diff --exit-code` compares the working tree with
+ the index and would miss a staged change. A mutation is restored by the inverse Edit, never by
+-`git checkout --`, which is denied. Only the human invokes `/mutate`; a coder turn calls the two
+-scripts directly.
++`git checkout --`, which is denied. By the workflow's rule only the human invokes `/mutate`; the
++skill's `disable-model-invocation: true` is an unproven enforcement boundary for that rule
++(Residual risks, item 22). A coder turn never invokes `/mutate`; it calls the two scripts directly.
+ 
+ ## Why hooks fail closed
+ 
+@@ -289,8 +290,8 @@ Two layers close it:
+ - Every guard enters through `runGuard` in `.claude/hooks/lib/guard-common.js`. It turns any throw
+   or rejection (invalid JSON on stdin, no project dir, an empty target) into a block with the
+   reason `guard error: <message>` and exit 2.
+-- Every hook command ends in `|| exit 2`, so a `node` that cannot start, or a script that dies
+-  before `runGuard`, still blocks. P1.10 checked this wiring with a missing script.
++- Every PreToolUse hook command ends in `|| exit 2`, so a `node` that cannot start, or a script
++  that dies before `runGuard`, still blocks. P1.10 checked this wiring with a missing script.
+ 
+ The price is that every hook error becomes a false positive that stops work. If a misfire ever
+ blocks everything, the switch is `"disableAllHooks": true` in `.claude/settings.local.json`, edited
+@@ -592,7 +593,7 @@ without a tool call (six) or never requested (ten):
+ - the eight write-scope targets: `src/LIVEPROBE-4-<agent>.txt` for code-reviewer, plan-reviewer,
+   db-reviewer, researcher, planner, tester and explainer, and the sibling-directory target
+   `thoughts/shared/reviews-probe/LIVEPROBE-4-code-reviewer.md`
+-- tester allowlist targets 5a, 5b, 5f and 5d
++- the allowlist targets 5a, 5b and 5f (tester) and 5d (explainer)
+ 
+ Hook decision tests and per-profile live allow records give separate, narrower evidence, not the
+ original negative end-to-end proof. The human accepted this on 2026-10-09 (Revision 8 of the
+@@ -636,9 +637,9 @@ file outside `.claude/hooks/tests/`. The tester's allowlist does not share the g
+ 
+ **(17) Matcher case.** `git switch -C*` did not deny `git switch -c`: P1.13a ran without a prompt
+ and printed git's usage text (exit 129), so the matcher did not fold case for this pair
+-(`2026-09-25_chore-agents-hardening.md:2772-2774`). Rollback R4-1, which would have removed the
+-`git switch -C` denies, was not applied, and `git switch -C` stays denied. A deny entry covers the
+-letter case it is written in. **Settling:** done by P1.13a. **Reopens:** if a Claude Code update
++(`2026-09-25_chore-agents-hardening.md:2766`, `:2772-2774`). Rollback R4-1, which would have
++removed the `git switch -C` denies, was not applied, and `git switch -C` stays denied. The probe
++covers this one pair only. **Settling:** done by P1.13a. **Reopens:** if a Claude Code update
+ changes how rules match, or a deny entry is added whose meaning depends on case.
+ 
+ **(18) Path-guard alias classes, UNVERIFIED.** These come from finding 12 of the Phase 1 code
+exit=0
+
+### P4.1 (D3) and P4.3 (D5) again at dc37158 (correction loop step 3)
+Commands exactly as in the plan, Doc checks D1-D10. C4.1 (D1), P4.2 (D4) and D6 read files dc37158 did not change; their a4a1eb0 records stand.
+
+$ grep -rn "/verify" CLAUDE.md docs/roadmap.md docs/ai-workflow.md .claude
+docs/ai-workflow.md:446:`/gate` replaces the project's earlier `/verify` skill.
+exit=0
+
+$ grep -ohE '\]\([^)#]+' docs/ai-workflow.md docs/roadmap.md | cut -c3- | grep -vE '^(https?:|mailto:)' | sort -u | (cd docs && while IFS= read -r t; do if [ -e "$t" ]; then echo "ok $t"; else echo "MISSING $t"; fi; done)
+ok ../thoughts/shared/plans/2026-09-25_chore-agents-hardening.md
+ok ../thoughts/shared/plans/2026-10-13_chore-agents-workflow-skills.md
+ok ../thoughts/shared/research/2026-09-24_agent-workflow-hardening.md
+ok adr/
+ok ai-workflow.md
+ok roadmap.md
+exit=0
+
+### Correction coder: blocked Bash heredoc (reported event)
+Source: the correction coder handback (model report) says its first attempt to write the anchor texts with a Bash heredoc was blocked by coder-bash-guard because the text contains git checkout, and that nothing ran and no file changed.
+The structured record below is the transcript and hook log of that call. Checker written by the main session; run only after its sha256 matched.
+It records the block decision and the error result. That the command did not run follows from the PreToolUse block, not from a separate test. This is the known false positive of residual item (3).
+
+$ sha256sum '/c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block.js'; cat '/c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block.js'
+fc0faafd8c0d487ca5023abcba33cd85a0959f2a3a881420d6ce035995e31eea */c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block.js
+// Records the Phase 4 correction coder's blocked Bash call from transcripts and the hook log.
+// Usage (repository root): node rows-p4-fix-block.js
+// It reads only. The coder is correlated by its Agent launch tool_use id, not by file age.
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const NL = String.fromCharCode(10);
+const SESSION = '405c7baf-15a1-468e-9597-35298317ba17';
+const LAUNCH = 'toolu_017a379Ur9CgWtgKwkLyEXAW';
+const CALL = 'toolu_01LhQLLa8KPontid3qJfuWy2';
+const D = path.join(os.homedir(), '.claude', 'projects', 'C--projects-envanex');
+const parse = l => { try { return JSON.parse(l); } catch (e) { return null; } };
+const text = c => typeof c === 'string' ? c : (c || []).map(x => x.text || '').join('');
+let ok = true;
+const check = (c, msg) => { console.log((c ? 'ok   ' : 'FAIL ') + msg); if (!c) ok = false; };
+const done = () => { console.log('block-match=' + (ok ? 0 : 1)); process.exit(ok ? 0 : 1); };
+
+// 1. The launch in the main transcript.
+const main = fs.readFileSync(path.join(D, SESSION + '.jsonl'), 'utf8').split(NL);
+const L = [];
+main.forEach((l, i) => {
+  const o = parse(l);
+  if (!o || o.type !== 'assistant' || !Array.isArray(o.message && o.message.content)) return;
+  for (const it of o.message.content) if (it.type === 'tool_use' && it.id === LAUNCH) L.push({ row: i + 1, ts: o.timestamp, name: it.name, input: it.input });
+});
+check(L.length === 1 && L[0].name === 'Agent' && L[0].input.subagent_type === 'coder' && L[0].input.model === undefined && L[0].input.effort === undefined,
+  'main row ' + (L[0] && L[0].row) + ': Agent ' + LAUNCH + ', subagent_type=coder, description=' + JSON.stringify(L[0] && L[0].input.description) + ', no model, no effort, ts=' + (L[0] && L[0].ts));
+
+// 2. Exactly one meta file for that launch.
+const SD = path.join(D, SESSION, 'subagents');
+const hits = fs.readdirSync(SD).filter(f => f.endsWith('.meta.json'))
+  .filter(f => { const m = parse(fs.readFileSync(path.join(SD, f), 'utf8')); return m && m.toolUseId === LAUNCH; });
+check(hits.length === 1, 'exactly one meta file has toolUseId ' + LAUNCH + ': ' + hits.join(', '));
+if (hits.length !== 1) done();
+const meta = parse(fs.readFileSync(path.join(SD, hits[0]), 'utf8'));
+console.log('     meta: ' + JSON.stringify(meta));
+const AID = hits[0].replace(/^agent-/, '').replace(/[.]meta[.]json$/, '');
+const rows = fs.readFileSync(path.join(SD, 'agent-' + AID + '.jsonl'), 'utf8').split(NL);
+
+// 3. The blocked Bash call and its result.
+let call = null; let res = null;
+rows.forEach((l, i) => {
+  const o = parse(l);
+  if (!o || !Array.isArray(o.message && o.message.content)) return;
+  for (const it of o.message.content) {
+    if (it.type === 'tool_use' && it.id === CALL) call = { row: i + 1, ts: o.timestamp, name: it.name, cmd: it.input.command };
+    if (it.type === 'tool_result' && it.tool_use_id === CALL) res = { row: i + 1, ts: o.timestamp, err: it.is_error, out: text(it.content) };
+  }
+});
+check(Boolean(call) && call.name === 'Bash' && call.cmd.includes("<<'EOF'") && call.cmd.includes('git checkout --'),
+  'coder row ' + (call && call.row) + ': Bash ' + CALL + ' with a heredoc whose text contains "git checkout --", ts=' + (call && call.ts));
+check(Boolean(res) && res.err === true && res.out.startsWith('PreToolUse:Bash hook error:') && res.out.includes('Blocked by coder-bash-guard: git subcommand "checkout" is not in the read allowlist'),
+  'coder row ' + (res && res.row) + ': its result is_error=true, PreToolUse coder-bash-guard block message, ts=' + (res && res.ts));
+if (res) console.log('     result first line: ' + res.out.split(NL)[0]);
+
+// 4. The hook log: one coder-bash-guard block line for this agent inside the call/result window.
+const hook = fs.readFileSync('TestResults/hook-log/hooks.jsonl', 'utf8').split(NL).map(parse).filter(Boolean)
+  .filter(l => l.session_id === SESSION && l.agent_id === AID);
+const win = call && res ? hook.filter(l => l.ts >= call.ts && l.ts <= res.ts) : [];
+check(win.length === 1 && win[0].hook === 'coder-bash-guard' && win[0].decision === 'block' && win[0].target === call.cmd,
+  'hook log in the window: ' + JSON.stringify(win.map(x => x.ts + ' ' + x.hook + ' ' + x.decision + ' ' + x.reason)));
+const blocks = hook.filter(l => l.decision !== 'allow');
+check(blocks.length === 1, 'this agent has exactly one non-allow hook line: ' + blocks.length);
+
+// 5. The coder's own report of the event (a model report).
+const hb = [];
+rows.forEach(l => {
+  const o = parse(l);
+  if (o && o.type === 'assistant' && Array.isArray(o.message && o.message.content)) for (const it of o.message.content) if (it.type === 'tool_use' && it.name === 'SubagentHandback') hb.push(it.input.message);
+});
+check(hb.length === 1 && hb[0].includes('coder-bash-guard blocked it'), 'exactly one handback, and it reports the block');
+console.log('     observation: a PreToolUse block stops the call before it runs by design; this record does not test that separately.');
+done();
+exit=0
+
+$ node '/c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block.js'
+ok   main row 791: Agent toolu_017a379Ur9CgWtgKwkLyEXAW, subagent_type=coder, description="Phase 4 correction E1-E5", no model, no effort, ts=2026-10-19T23:19:12.950Z
+ok   exactly one meta file has toolUseId toolu_017a379Ur9CgWtgKwkLyEXAW: agent-a76cc9e7810625b81.meta.json
+     meta: {"agentType":"coder","launchedWithDefaults":true,"description":"Phase 4 correction E1-E5","toolUseId":"toolu_017a379Ur9CgWtgKwkLyEXAW","spawnDepth":1,"requestShape":"background","requestNonInteractive":true,"finished":true}
+ok   coder row 59: Bash toolu_01LhQLLa8KPontid3qJfuWy2 with a heredoc whose text contains "git checkout --", ts=undefined
+ok   coder row 57: its result is_error=true, PreToolUse coder-bash-guard block message, ts=2026-10-19T23:19:40.294Z
+     result first line: PreToolUse:Bash hook error: [node "$CLAUDE_PROJECT_DIR/.claude/hooks/coder-bash-guard.js" || exit 2]: Blocked by coder-bash-guard: git subcommand "checkout" is not in the read allowlist -> S='C:/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad'
+FAIL hook log in the window: []
+ok   this agent has exactly one non-allow hook line: 1
+ok   exactly one handback, and it reports the block
+     observation: a PreToolUse block stops the call before it runs by design; this record does not test that separately.
+block-match=1
+exit=1
+
+### Carried forward unchanged
+N8: 77f07f8 missed plan:1620 and DV11 (recorded above in this file); the dc37158 body carries the forward correction and does not make 77f07f8 compliant.
+N7: the provenance of the two earlier record forms stays not established (recorded above in this file).
+N5 / O4 and the DV15 coverage gap: carried in late evidence and the PR body, no probe and no plan amendment (recorded above in this file).
+O1 open; G10 accepted pattern collision; M1.1 not a pass; M1.1-r2 accepted with procedural deviations; residual code-only branches never executed; the live /pr path first used at P4.4.
+
+### Phase 4 cleanup after the correction (Probe protocol step 6)
+
+$ git status --short
+exit=0
+
+## Correction: Phase 4 correction-coder block checker (r2)
+Recorded-at: 2026-10-20T02:38:42+03:00
+The record under "Correction coder: blocked Bash heredoc (reported event)" stays as it is, including its FAIL line and block-match=1.
+Diagnosis by the main session in R4 session 405c7baf-15a1-468e-9597-35298317ba17: r1 took the last row carrying the tool_use id, whatever its record type.
+Coder row 59 is an api-request-blob record without a timestamp that repeats the assistant message of row 56, so it replaced row 56 and the hook window was empty.
+r2 selects assistant tool_use and user tool_result records only, requires exactly one of each with valid timestamps, and requires call <= hook <= result.
+r1 also compared the hook-log target with the whole command, but logDecision stores redactSecrets(target).slice(0, 300) (guard-common.js:8, :219); r1 never reached that comparison.
+r2 compares the logged target with that exact transform of the call command, using the hook's exported redactSecrets.
+The tool id, command, hook, decision and reason comparisons are kept. Checker written by the main session; run only after both sha256 values matched.
+
+$ git branch --show-current; git rev-parse HEAD; git --no-optional-locks status --porcelain --untracked-files=all
+chore/agents-workflow-skills
+dc37158cb28150c853770c8e2fb2412506e7150b
+exit=0
+
+$ sha256sum '/c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block.js' '/c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block-r2.js'
+fc0faafd8c0d487ca5023abcba33cd85a0959f2a3a881420d6ce035995e31eea */c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block.js
+1e38b98a25bbbb9e2386c39563a22559033b30fdb98f7c7e7fb5e82f855f26c8 */c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block-r2.js
+exit=0
+
+$ diff '/c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block.js' '/c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block-r2.js'
+1,2c1,4
+< // Records the Phase 4 correction coder's blocked Bash call from transcripts and the hook log.
+< // Usage (repository root): node rows-p4-fix-block.js
+---
+> // r2 of rows-p4-fix-block.js. r1 took any row carrying the tool_use id, so a later api-request-blob row
+> // (no timestamp, the same message re-sent) replaced the assistant row. r2 selects records by their
+> // top-level type, requires one call and one result, and checks timestamps and their order.
+> // Usage (repository root): node rows-p4-fix-block-r2.js
+10a13
+> const REASON = 'git subcommand "checkout" is not in the read allowlist';
+13a17
+> const tsOk = t => typeof t === 'string' && !Number.isNaN(Date.parse(t));
+16a21
+> const items = o => (o && Array.isArray(o.message && o.message.content)) ? o.message.content : [];
+18c23
+< // 1. The launch in the main transcript.
+---
+> // 1. The launch: an assistant record in the main transcript.
+23,24c28,29
+<   if (!o || o.type !== 'assistant' || !Array.isArray(o.message && o.message.content)) return;
+<   for (const it of o.message.content) if (it.type === 'tool_use' && it.id === LAUNCH) L.push({ row: i + 1, ts: o.timestamp, name: it.name, input: it.input });
+---
+>   if (!o || o.type !== 'assistant') return;
+>   for (const it of items(o)) if (it.type === 'tool_use' && it.id === LAUNCH) L.push({ row: i + 1, ts: o.timestamp, name: it.name, input: it.input });
+26,27c31,32
+< check(L.length === 1 && L[0].name === 'Agent' && L[0].input.subagent_type === 'coder' && L[0].input.model === undefined && L[0].input.effort === undefined,
+<   'main row ' + (L[0] && L[0].row) + ': Agent ' + LAUNCH + ', subagent_type=coder, description=' + JSON.stringify(L[0] && L[0].input.description) + ', no model, no effort, ts=' + (L[0] && L[0].ts));
+---
+> check(L.length === 1 && tsOk(L[0].ts) && L[0].name === 'Agent' && L[0].input.subagent_type === 'coder' && L[0].input.model === undefined && L[0].input.effort === undefined,
+>   'main row ' + (L[0] && L[0].row) + ': the one assistant Agent ' + LAUNCH + ', subagent_type=coder, description=' + JSON.stringify(L[0] && L[0].input.description) + ', no model, no effort, ts=' + (L[0] && L[0].ts));
+36a42
+> check(meta.agentType === 'coder' && meta.finished === true, 'meta agentType=coder, finished=true');
+40,41c46,47
+< // 3. The blocked Bash call and its result.
+< let call = null; let res = null;
+---
+> // 3. The call: assistant records only. The result: user records only. One of each.
+> const calls = []; const results = []; const other = [];
+44,47c50,56
+<   if (!o || !Array.isArray(o.message && o.message.content)) return;
+<   for (const it of o.message.content) {
+<     if (it.type === 'tool_use' && it.id === CALL) call = { row: i + 1, ts: o.timestamp, name: it.name, cmd: it.input.command };
+<     if (it.type === 'tool_result' && it.tool_use_id === CALL) res = { row: i + 1, ts: o.timestamp, err: it.is_error, out: text(it.content) };
+---
+>   if (!o) return;
+>   for (const it of items(o)) {
+>     const isCall = it.type === 'tool_use' && it.id === CALL;
+>     const isRes = it.type === 'tool_result' && it.tool_use_id === CALL;
+>     if (isCall && o.type === 'assistant') calls.push({ row: i + 1, ts: o.timestamp, aid: o.agentId, name: it.name, cmd: it.input.command });
+>     else if (isRes && o.type === 'user') results.push({ row: i + 1, ts: o.timestamp, aid: o.agentId, err: it.is_error, out: text(it.content) });
+>     else if (isCall || isRes) other.push((i + 1) + ' type=' + o.type + ' ts=' + o.timestamp + ' ' + it.type);
+50,54c59,67
+< check(Boolean(call) && call.name === 'Bash' && call.cmd.includes("<<'EOF'") && call.cmd.includes('git checkout --'),
+<   'coder row ' + (call && call.row) + ': Bash ' + CALL + ' with a heredoc whose text contains "git checkout --", ts=' + (call && call.ts));
+< check(Boolean(res) && res.err === true && res.out.startsWith('PreToolUse:Bash hook error:') && res.out.includes('Blocked by coder-bash-guard: git subcommand "checkout" is not in the read allowlist'),
+<   'coder row ' + (res && res.row) + ': its result is_error=true, PreToolUse coder-bash-guard block message, ts=' + (res && res.ts));
+< if (res) console.log('     result first line: ' + res.out.split(NL)[0]);
+---
+> console.log('     observation: other records carrying ' + CALL + ' (not used): ' + (other.length ? other.join('; ') : 'none'));
+> const C = calls[0]; const R = results[0];
+> check(calls.length === 1 && tsOk(C.ts) && C.aid === AID && C.name === 'Bash' && C.cmd.includes("<<'EOF'") && C.cmd.includes('git checkout --'),
+>   'exactly one assistant tool_use ' + CALL + ': coder row ' + (C && C.row) + ', Bash, heredoc text contains "git checkout --", ts=' + (C && C.ts) + ' (count ' + calls.length + ')');
+> check(results.length === 1 && tsOk(R.ts) && R.aid === AID && R.err === true && R.out.startsWith('PreToolUse:Bash hook error:') && R.out.includes('Blocked by coder-bash-guard: ' + REASON),
+>   'exactly one user tool_result for ' + CALL + ': coder row ' + (R && R.row) + ', is_error=true, PreToolUse coder-bash-guard block message, ts=' + (R && R.ts) + ' (count ' + results.length + ')');
+> if (calls.length !== 1 || results.length !== 1 || !tsOk(C.ts) || !tsOk(R.ts)) done();
+> check(C.row < R.row && Date.parse(C.ts) <= Date.parse(R.ts), 'the call (row ' + C.row + ') precedes its result (row ' + R.row + ') in rows and time');
+> console.log('     result first line: ' + R.out.split(NL)[0]);
+56c69,75
+< // 4. The hook log: one coder-bash-guard block line for this agent inside the call/result window.
+---
+> // 4. The hook log: exactly one line for this call, a coder-bash-guard block, with call <= hook <= result.
+> // logDecision stores redactSecrets(target).slice(0, TARGET_LOG_LIMIT) (guard-common.js:8, :219), so the
+> // logged target is compared with that exact transform of the call command, using the hook's own function.
+> const { redactSecrets } = require(path.resolve('.claude/hooks/lib/guard-common.js'));
+> const LIMIT = 300;
+> const logged = redactSecrets(C.cmd).slice(0, LIMIT);
+> console.log('     call command length ' + C.cmd.length + '; logged form is its redacted first ' + LIMIT + ' characters');
+59,61c78,82
+< const win = call && res ? hook.filter(l => l.ts >= call.ts && l.ts <= res.ts) : [];
+< check(win.length === 1 && win[0].hook === 'coder-bash-guard' && win[0].decision === 'block' && win[0].target === call.cmd,
+<   'hook log in the window: ' + JSON.stringify(win.map(x => x.ts + ' ' + x.hook + ' ' + x.decision + ' ' + x.reason)));
+---
+> const forCall = hook.filter(l => l.tool_name === 'Bash' && l.target === logged);
+> const H = forCall[0];
+> check(forCall.length === 1 && tsOk(H.ts) && H.hook === 'coder-bash-guard' && H.decision === 'block' && H.reason === REASON,
+>   'exactly one hook-log line whose target equals the logged form of the call command: ' + JSON.stringify(forCall.map(x => x.ts + ' ' + x.hook + ' ' + x.decision + ' ' + x.reason)));
+> if (H && tsOk(H.ts)) check(Date.parse(C.ts) <= Date.parse(H.ts) && Date.parse(H.ts) <= Date.parse(R.ts), 'call ' + C.ts + ' <= hook ' + H.ts + ' <= result ' + R.ts);
+63c84
+< check(blocks.length === 1, 'this agent has exactly one non-allow hook line: ' + blocks.length);
+---
+> check(blocks.length === 1 && blocks[0] === H, 'this agent has exactly one non-allow hook line, and it is that line');
+65c86
+< // 5. The coder's own report of the event (a model report).
+---
+> // 5. The coder's own report of the event (a model report): assistant records only.
+69c90
+<   if (o && o.type === 'assistant' && Array.isArray(o.message && o.message.content)) for (const it of o.message.content) if (it.type === 'tool_use' && it.name === 'SubagentHandback') hb.push(it.input.message);
+---
+>   if (o && o.type === 'assistant') for (const it of items(o)) if (it.type === 'tool_use' && it.name === 'SubagentHandback') hb.push(it.input.message);
+71c92
+< check(hb.length === 1 && hb[0].includes('coder-bash-guard blocked it'), 'exactly one handback, and it reports the block');
+---
+> check(hb.length === 1 && hb[0].includes('coder-bash-guard blocked it'), 'exactly one assistant SubagentHandback, and it reports the block');
+exit=1
+
+$ node '/c/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad/rows-p4-fix-block-r2.js'
+ok   main row 791: the one assistant Agent toolu_017a379Ur9CgWtgKwkLyEXAW, subagent_type=coder, description="Phase 4 correction E1-E5", no model, no effort, ts=2026-10-19T23:19:12.950Z
+ok   exactly one meta file has toolUseId toolu_017a379Ur9CgWtgKwkLyEXAW: agent-a76cc9e7810625b81.meta.json
+     meta: {"agentType":"coder","launchedWithDefaults":true,"description":"Phase 4 correction E1-E5","toolUseId":"toolu_017a379Ur9CgWtgKwkLyEXAW","spawnDepth":1,"requestShape":"background","requestNonInteractive":true,"finished":true}
+ok   meta agentType=coder, finished=true
+     observation: other records carrying toolu_01LhQLLa8KPontid3qJfuWy2 (not used): 59 type=api-request-blob ts=undefined tool_use
+ok   exactly one assistant tool_use toolu_01LhQLLa8KPontid3qJfuWy2: coder row 56, Bash, heredoc text contains "git checkout --", ts=2026-10-19T23:19:40.056Z (count 1)
+ok   exactly one user tool_result for toolu_01LhQLLa8KPontid3qJfuWy2: coder row 57, is_error=true, PreToolUse coder-bash-guard block message, ts=2026-10-19T23:19:40.294Z (count 1)
+ok   the call (row 56) precedes its result (row 57) in rows and time
+     result first line: PreToolUse:Bash hook error: [node "$CLAUDE_PROJECT_DIR/.claude/hooks/coder-bash-guard.js" || exit 2]: Blocked by coder-bash-guard: git subcommand "checkout" is not in the read allowlist -> S='C:/Users/jesus/AppData/Local/Temp/claude/C--projects-envanex/405c7baf-15a1-468e-9597-35298317ba17/scratchpad'
+     call command length 2648; logged form is its redacted first 300 characters
+ok   exactly one hook-log line whose target equals the logged form of the call command: ["2026-10-19T23:19:40.274Z coder-bash-guard block git subcommand \"checkout\" is not in the read allowlist"]
+ok   call 2026-10-19T23:19:40.056Z <= hook 2026-10-19T23:19:40.274Z <= result 2026-10-19T23:19:40.294Z
+ok   this agent has exactly one non-allow hook line, and it is that line
+ok   exactly one assistant SubagentHandback, and it reports the block
+     observation: a PreToolUse block stops the call before it runs by design; this record does not test that separately.
+block-match=0
+exit=0
+
+## Phase 4 correction-loop assessment and late-copy layout decision
+Recorded-at: 2026-10-20T02:46:09+03:00
+Human decision: the D3 (P4.1) and D5 (P4.3) results recorded at dc37158 under "P4.1 (D3) and P4.3 (D5) again at dc37158 (correction loop step 3)" are accepted.
+Human decision: the corrected block correlation (rows-p4-fix-block-r2.js, sha256 1e38b98a25bbbb9e2386c39563a22559033b30fdb98f7c7e7fb5e82f855f26c8, block-match=0, exit=0) is accepted with its stated limits: that the blocked command did not run follows from the PreToolUse block design and was not tested separately. The r1 record, with its FAIL line and block-match=1, stays as it is.
+Human decision (an implementation decision that fills a gap in the plan: plan:245 fixes the layout only for a phase's first As built copy): Phase 4's late records are copied into the plan after its line 4288, in the plan:245 layout, under the level-2 heading "As built — Phase 4, late records 1", between the HTML-comment markers PHASE4-LATE-1-EVIDENCE-START and PHASE4-LATE-1-EVIDENCE-END.
+The copy holds phase-4.md from line 1336 to its final line, with CRLF-to-LF normalization only. Lines 1-1335 stay the original Phase 4 copy (plan:2952-4286).
+
+$ git rev-parse HEAD; git --no-optional-locks status --porcelain --untracked-files=all
+dc37158cb28150c853770c8e2fb2412506e7150b
+exit=0
+
+<!-- PHASE4-LATE-1-EVIDENCE-END -->
