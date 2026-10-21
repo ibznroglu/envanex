@@ -46,6 +46,9 @@
       "Bash(node --test .claude/hooks/tests/bash-allowlist.test.js)",
       "Bash(node --test .claude/hooks/tests/write-scope.test.js)",
       "Bash(node --test .claude/hooks/tests/*.test.js)",
+      "Bash(bash .claude/skills/gate/scripts/gate.sh)",
+      "Bash(bash .claude/skills/mutate/scripts/mutate-run.sh *)",
+      "Bash(bash .claude/skills/mutate/scripts/mutate-clean.sh *)",
       "mcp__microsoft-learn__microsoft_docs_search",
       "mcp__microsoft-learn__microsoft_docs_fetch",
       "mcp__microsoft-learn__microsoft_code_sample_search"

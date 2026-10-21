@@ -32,8 +32,12 @@ Rules:
 - The hook also blocks any command that names `git` as a word outside a git call, such as
   `ls .git/hooks`, `ls tools/git/x` or `grep -rn "git" docs`. This is a known false positive.
   Use the Grep or Glob tool instead.
-- Restore a mutation with the inverse Edit, then check it with `git diff --exit-code -- <file>`.
-  Never use `git checkout --`.
+- Mutation proofs follow `.claude/skills/mutate/SKILL.md` (its steps 0-4 and its rules), but you
+  never invoke `/mutate`: only the human can. Call its scripts directly with the Bash tool:
+  `bash .claude/skills/mutate/scripts/mutate-clean.sh <label> <file>` first (it must exit 0), then
+  the mutation with Edit, then `bash .claude/skills/mutate/scripts/mutate-run.sh <label> <file> ...`
+  (timeout 600000 in `dotnet` mode), then the inverse Edit, then `mutate-clean.sh` again (it must
+  exit 0). Never use `git checkout --`.
 - If the plan leaves open a decision that affects user-facing behavior, a public contract,
   security or data integrity, do not guess. Stop without undoing your changes, and report the
   files changed, the work done, the work left, and the open decision with the plan section it
