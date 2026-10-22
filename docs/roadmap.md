@@ -24,8 +24,8 @@ gap is tracked rather than hidden.
 | Runtime | .NET 10 (LTS) |
 | UI | Blazor Web App (Server interactive) + Radzen Blazor Components (MIT) |
 | API | ASP.NET Core REST, OpenAPI + Scalar, `DevExtreme.AspNet.Data` grid protocol (MIT) |
-| Integration | SoapCore XML web service |
-| Background | .NET Worker Service hosted as a Windows Service |
+| Integration | SoapCore XML web service — cut (see Scope); the empty `Envanex.SoapApi` shell project remains (see the known-gaps row on `Envanex.SoapApi` and `Envanex.Worker`) |
+| Background | .NET Worker Service hosted as a Windows Service — cut (see Scope); the empty `Envanex.Worker` shell project remains (see the known-gaps row on `Envanex.SoapApi` and `Envanex.Worker`) |
 | Data | EF Core 10 + SQL Server 2022 |
 | Tests | xUnit, Shouldly, Testcontainers |
 
@@ -56,7 +56,8 @@ in the README. That branch is never merged.
 | 6a | `feat(auth)` — ASP.NET Core Identity, JWT with rotating refresh tokens, login/refresh/logout | done (#11) |
 | 6b | `feat(web)` — policy-based authorization (a fallback policy with named exemptions), a Blazor cookie scheme, a read-only demo account | done (#12) |
 | — | `fix(db)` — stop publishing the local SQL Server SA password | done (#14) |
-| — | `chore(agents)` — enforce the agent pipeline's rules and tier models by risk | Phases 1–2 done (#15); Phases 3–4 in [this follow-up](../thoughts/shared/plans/2026-10-13_chore-agents-workflow-skills.md) |
+| — | `chore(agents)` — enforce the agent pipeline's rules and tier models by risk | done (#15, #17) |
+| — | `fix(infra)` — patch vulnerable System.Security.Cryptography.Pkcs and Xml packages | done (#16) |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
 Roadmap numbers and GitHub PR numbers are not the same. The status cell of a completed row
@@ -67,7 +68,8 @@ PR 7 is the point where the project becomes publicly visible: Azure SQL free tie
 automatic deployment on merge to `main`, and realistic Turkish seed data. The read-only demo
 account's mechanism shipped in 6b, off by default; PR 7 turns it on publicly. Three blockers in
 the known-gaps table must close first: the demo account's lifecycle, cookie-session revalidation,
-and the login rate-limit partition key behind the reverse proxy. PR 7 also starts with a design
+and the login rate-limit partition key behind the reverse proxy. The runtime verification row
+for #16 in the same table must also close before the first deploy. PR 7 also starts with a design
 phase, because the UI must meet a senior-frontend bar rather than the Blazor template's: design
 tokens and a Radzen theme built from them, a login card with every state, an app shell without
 the template's leftovers, a responsive layout down to mobile widths, keyboard and screen-reader
@@ -176,7 +178,7 @@ Tracked deliberately rather than hidden. Each one names where it closes: a PR, o
 | `DataSourceGuard` can throw on a sort entry with no selector (`sort=[{"desc":true}]`), producing 500 where the guard intends 400 | PR 7 |
 | Grouped paging stability is untested; the group theory never combines with skip/take | PR 7 |
 | `DataSourceGuard` has no unit tests; its constructor invariant is unprotected | PR 7 |
-| `.gitattributes` declares `* text=auto eol=lf` and CLAUDE.md forbids committing CRLF, but every file at HEAD is CRLF, `.gitattributes` itself included — nothing has ever been renormalized. `dotnet format --verify-no-changes` passes on CRLF files, so the CI check this file credits with enforcing LF does not check line endings at all. The rule is written and unenforced. Pre-existing and repo-wide; not introduced by PR 6a | its own chore — `git add --renormalize .` plus a check that actually fails on CRLF. Deliberately not folded into an auth PR, where it would touch every file and drown the diff |
+| `.gitattributes` declares `* text=auto eol=lf` and CLAUDE.md forbids committing CRLF. **Observed state:** the index is LF. At `98b90c5`, `git ls-files --eol` shows 408 files as `i/lf`; the other 30 are binary or contain no line ending (29 `i/none`, 1 `i/-text`). `git grep -l -I -P '\r'` finds no file there, nor at `f62c4e1`, `f6df221`, `2e8497a` or `4f0fa30`. **Remaining gap — enforcement:** `.github/workflows/ci.yml` runs restore, `dotnet format --no-restore --verify-no-changes`, build and test, and no step checks line endings directly. That shows only the absence of a dedicated check; whether the existing enforcement — `.gitattributes` normalization and the format step — stops a CRLF file is not established. The repository's records disagree on whether `dotnet format --verify-no-changes` rejects CRLF: PR 6a recorded that it passes on CRLF files, while `.gitattributes:1-3`, journal 0001 and the 2026-08-30 solution-scaffolding plan record that CRLF makes it fail, and `.editorconfig` sets `end_of_line = lf`. None of these historical claims has been re-verified. Pre-existing and repo-wide; not introduced by PR 6a | its own chore — settle whether the existing enforcement stops CRLF, and add a dedicated CI check if it does not |
 | README.md still describes the project as "inventory, purchasing and sales" and lists purchase and sales order state machines, SoapCore and a Windows Service in its stack — all of them in the deferred section above. It reads as an unfinished promise where it should state the scope as a finished boundary | PR 7, when the project first becomes publicly visible |
 | Dangling PR triggers in the ADRs: ADR 0006 names PR 17 as the trigger for revisiting the error-mapping table, and ADR 0005 and the **Outbox** line under "Decisions carried forward" both point at PR 18. Both PRs sit in the deferred section and will not happen. The ADRs are historical records and are not being rewritten, so the triggers are recorded here rather than left silently waiting | **needs an owner** — nothing carries either trigger once PR 17 and PR 18 are cut |
 | `Envanex.SoapApi` and `Envanex.Worker` are empty shell projects. Their scope was cut, but a reader opening the repository sees two empty projects and reads "did not finish" rather than "chose not to build". They cannot simply be deleted: `ArchitectureTests` pins `Envanex.SoapApi` in the Web project's expected references, so removing them means updating that test. Either resolution is acceptable — delete both and update the architecture test, or state in README that the scaffolding is kept deliberately | PR 7, where the project first becomes publicly visible |
@@ -193,6 +195,7 @@ Tracked deliberately rather than hidden. Each one names where it closes: a PR, o
 | The demo user's first seeding is not safe against two hosts starting at once: the loser fails its boot and heals on restart. An App Service overlapped restart or slot swap can briefly run two processes even on one instance; it matters only when both are first-seeding with the demo on | not scheduled — accepted while production is a single instance |
 | The integration suite ran at 53–59 s across PR 6b's final runs, against the 60 s decision line in ADR 0007, and the next PR's tests will cross it. Measure the median of three runs with the SQL Server container's start-up separated out, then decide between fewer `ResetIdentityAsync` calls (the first suspect, weakens nothing), fewer `ConcurrencyIterations`, parallel test collections (which break `DatabaseCollection`'s serialisation), or a higher line (which revises ADR 0007) | before PR 7 adds tests |
 | PR 7's "deploy on merge to `main`" has no recorded method: there is no Dockerfile, `docker-compose.yml` starts only SQL Server, and the tests use Testcontainers | PR 7's research — App Service publish profile, GitHub Actions, or a container |
+| The cryptography fix in #16 changed package references only. It recorded that Web's build output and `deps.json` contain neither the `System.Security.Cryptography.Pkcs` nor the `System.Security.Cryptography.Xml` DLL, so both are expected to come from the shared `Microsoft.AspNetCore.App` framework, which the package fix does not change. Which copy actually loads at run time, and whether the cryptography APIs run at all, was not observed. Establish which cryptography assemblies Web actually loads and, if the shared runtime supplies them, verify that the deployed runtime is patched for the advisories #16 addresses | PR 7 — before the first deploy |
 | The UI is still the Blazor template's: a full-width Bootstrap login form, the "About" link in the top bar, and an https-redirect warning on the http profile. PR 7 must meet a senior-frontend bar; its design phase is described under PR 7 above | PR 7 — design phase first |
 | Nothing enforces endpoint policy coverage. The fallback policy is only an authentication floor (ADR 0008), so a mutating endpoint without `CanWrite` admits a signed-in `Viewer` and nothing catches the omission. An endpoint-metadata test should enumerate every `/api/*` endpoint and fail when a mutating endpoint lacks `CanWrite` or a read endpoint lacks `CanRead`, apart from the named exemptions | before PR 8 adds write endpoints |
 | No test proves that the REST login and the form login share one rate-limit bucket. Both name the same policy constant and partition key, so it holds by construction, but a page given its own policy with identical limits would pass every current test. Write it as a mixed case: one `POST /api/auth/login`, one form POST, then a third request that expects 429 | before PR 8, with the policy-coverage test and after the 60 s decision |
