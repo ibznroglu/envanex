@@ -56,9 +56,12 @@ file it cites at `cb4b079`. Suggested PR title:
 - `TurkishErrorMessages.cs`: "Product - domain" at `:25-35`, "Product - validator" at `:37-42`,
   "UnitOfMeasure" at `:44-55`. All three groups use `\u` escapes.
 - `tests/Envanex.IntegrationTests/Api/ResultMappingTests.cs:37-123`: a new `public static readonly
-  Error` field turns three facts red until both tables have the code. So every phase that adds a
+  Error` field turns two facts red until both tables have the code:
+  `ResultMapping_EveryErrorCode_ShouldHaveAnExplicitMapping` (`:67`) and
+  `ResultMapping_EveryErrorCode_ShouldHaveATurkishMessage` (`:81`). So every phase that adds a
   field also adds both table entries.
-- The fakes already expose everything T3 needs:
+- The fakes already expose everything the undecorated-handler tests (U-H1, U-H2, P-HC1..P-HC3,
+  P-HU1..P-HU3) need:
   - `FakeUnitOfWork.SaveChangesCalled` (`FakeUnitOfWork.cs:9`);
   - `FakeProductRepository.Products` (`:11`) and `SetOriginalRowVersionCallCount` (`:18`);
   - `FakeUnitOfMeasureRepository.Units` (`:11`) and `SeedActiveStatus` (`:24`).
@@ -130,7 +133,8 @@ M4 = `99999999999999.9999` (`decimal(18,4)`); M6 = `999999999999.999999` (`decim
 | Base factor: `1.000000000` | accept (`Equal(1m)` compares by value) | as typed | accept | U-V6, U-D6 |
 
 Through the API, every validator rule is at least as strict as the matching domain check. A domain
-code for these fields therefore reaches a caller only on an undecorated path (T3). The domain's
+code for these fields therefore reaches a caller only on an undecorated path, which the handler
+tests U-H1, U-H2, P-HC1..P-HC3 and P-HU1..P-HU3 cover. The domain's
 `ListPriceAmountNegative` accepts `[-0.00005, 0)` as zero. That asymmetry is deliberate (D2) and
 does not extend to `ReorderPoint`.
 
@@ -196,7 +200,8 @@ Suggested commit subjects. The human writes the commits.
 
 Test IDs: `U-` marks unit-of-measure tests and `P-` product tests. Then `D` is domain, `V` the
 validator (`VC`/`VU` for the create/update product validators), `H` the handler (`HC`/`HU`), `P`
-persistence, `S` schema and `A` API. The mutation table uses these IDs.
+persistence, `S` schema, `A` API, `T` the Turkish message text (`TurkishErrorMessagesTests`) and
+`M` the status mapping (`ResultExtensionsTests`). The mutation table uses these IDs.
 
 Theory data: `decimal` cannot appear in `[InlineData]`, so every decimal theory uses
 `[MemberData(nameof(X))]` over a `public static TheoryData<decimal> X` property. Precedent:
@@ -206,12 +211,15 @@ xUnit enumerates each decimal row as its own case. Record the observed totals ei
 Expected Turkish messages. Tests compare against the escaped literal, in the style of
 `ProductsApiTests.cs:150`.
 
-**Source form of these messages (D3).** In `TurkishErrorMessages.cs`, and in every test literal
+**Source form of these messages (D3).** In `TurkishErrorMessages.cs`, and in every API-test literal
 that pins one of these messages, each non-ASCII letter is written as a backslash, the letter u, and
-four hexadecimal digits. The letters these messages use are ı (0131), ş (015F), ö (00F6),
-ü (00FC) and ç (00E7). Every other character is written as itself. The existing Product and
+four hexadecimal digits. The letters these messages use are ı (0131), ş (015f), ö (00f6),
+ü (00fc) and ç (00e7). Every other character is written as itself. The existing Product and
 UnitOfMeasure entries, and `ProductsApiTests.cs:150` and `:175`, already follow this rule, with the
 hexadecimal digits in lower case; the new entries and test literals do the same.
+`TurkishErrorMessagesTests` is the one exception: its expected texts use literal Turkish letters on
+purpose (its class comment), so that its assertion proves the shipped escapes decode to the
+intended characters (U-T1, P-T1).
 
 | Code | Shown to the user | English `Error.Message` |
 |---|---|---|
@@ -220,7 +228,7 @@ hexadecimal digits in lower case; the new entries and test literals do the same.
 | `Product.ListPriceAmountTooLarge` | Liste fiyatı en fazla 99.999.999.999.999,9999 olabilir. | `"List price amount must not exceed 99999999999999.9999."` |
 | `Product.ReorderPointTooLarge` | Yeniden sipariş noktası en fazla 999.999.999.999,999999 olabilir. | `"Reorder point must not exceed 999999999999.999999."` |
 
-Source form: in `TurkishErrorMessages.cs` and in the tests, each message above is written as the rule above gives it, and the test placeholders `<TooPrecise literal>`, `<TooLarge literal>` and `<literal>` stand for that form.
+Source form: in `TurkishErrorMessages.cs` and in the API tests, each message above is written as the rule above gives it, and the test placeholders `<TooPrecise literal>`, `<TooLarge literal>` and `<literal>` stand for that form.
 
 ## Phase 1: UnitOfMeasure — the conversion factor's precision and upper bound
 
@@ -246,6 +254,10 @@ Schema, migration, EF configuration and production queries: none. db-reviewer: n
   two private helpers.
 - `tests/Envanex.IntegrationTests/Api/UnitOfMeasuresApiTests.cs` — modified — U-A1..U-A4 and one
   private helper.
+- `tests/Envanex.IntegrationTests/Api/TurkishErrorMessagesTests.cs` — modified — U-T1: a theory and
+  its data member, with the two UnitOfMeasure rows.
+- `tests/Envanex.IntegrationTests/Api/ResultExtensionsTests.cs` — modified — U-M1: a theory and its
+  data member, with the two UnitOfMeasure rows.
 
 ### Signatures
 
@@ -329,6 +341,10 @@ Test-side signatures:
     `errors.TryGetProperty(fieldName, ...)` is true. It returns the array's strings. The status
     assertion comes before any JSON read, so a non-JSON 500 under a mutation fails on a Shouldly
     assertion, not on a parse.
+- `TurkishErrorMessagesTests`: `public static TheoryData<string, string> NumericFieldMessages`; add
+  `using Envanex.Domain.Aggregates.UnitOfMeasures;`.
+- `ResultExtensionsTests`: `public static TheoryData<string> NumericFieldErrorCodes`; add
+  `using Envanex.Domain.Aggregates.UnitOfMeasures;`.
 
 ### Tests to add
 
@@ -402,8 +418,8 @@ calls `_repository.SeedActiveStatus(baseId, true)` and sends
 - **U-P2** `[Fact]` `DerivedUnit_WithFactorWithTrailingZeros_ShouldRoundTripByValue`.
   - Input: `1.500000000m`.
   - Asserts: the re-read value `ShouldBe(1.5m)`.
-  - Added beyond T4: the domain accepts trailing zeros (D2), and no other test shows that such a
-    factor persists.
+  - Added beyond the required persistence cases (U-P1, P-P1, P-P2): the domain accepts trailing
+    zeros (D2), and no other test shows that such a factor persists.
 
 `SchemaPrecisionTests` (IntegrationTests). Each test runs its own inline query, in the style of
 `:22-30`: `NUMERIC_PRECISION AS Precision, NUMERIC_SCALE AS Scale` with literal `TABLE_NAME` and
@@ -441,8 +457,38 @@ POSTs `new CreateUnitOfMeasureCommand("GR", "Gram", baseId, <factor>)` to `/api/
     - `baseUnitId` read with `GetGuid()` `ShouldBe(baseId)`.
   - This is the first API test that creates a derived unit successfully.
 
+`TurkishErrorMessagesTests` (IntegrationTests, in memory, no collection). This is the transcription
+guard: the expected texts use literal Turkish letters, so the assertion proves that the shipped
+escapes decode to the intended characters.
+
+- **U-T1** `[Theory]` `NumericFieldMessage_ShouldBeExactlyTheShownText(string errorCode, string expected)`,
+  in the class's style.
+  - Data: `NumericFieldMessages`. Each row carries two strings, so xUnit enumerates every row as
+    its own test case: the code, taken from its declared `Error` field as the class does with
+    `AuthErrors.InvalidCredentials.Code`, and the exact "Shown to the user" text from the message
+    table, written with literal Turkish letters.
+  - Phase 1 rows: `UnitOfMeasureErrors.ConversionFactorTooPrecise.Code` and
+    `UnitOfMeasureErrors.ConversionFactorTooLarge.Code`, each with its text.
+  - Asserts: `TurkishErrorMessages.GetMessage(errorCode, Fallback).ShouldBe(expected)`.
+
+`ResultExtensionsTests` (IntegrationTests, in memory). `ResultMappingTests` pins that each code is
+mapped, not to which status: a wrong value such as 422 or 500 would pass it, and the API tests stop
+at the validator before any of these codes is mapped. This theory pins the 400.
+
+- **U-M1** `[Theory]` `ToActionResult_NumericFieldErrorCode_ShouldMapTo400(string errorCode)`, in the
+  style of `UnmappedErrorCode_ShouldFallBackTo400NotServerError`.
+  - Data: `NumericFieldErrorCodes`. Rows carry the codes as strings, as `AuthErrorCodes` does, so
+    each row is its own test case. Each code is taken from its declared `Error` field, not retyped.
+  - Phase 1 rows: `UnitOfMeasureErrors.ConversionFactorTooPrecise.Code` and
+    `UnitOfMeasureErrors.ConversionFactorTooLarge.Code`.
+  - It maps `Result.Failure<Guid>(new Error(errorCode, "English fallback message."))` through
+    `ToActionResult()`, as `ToActionResult_EveryAuthErrorCode_ShouldMapTo400Or401` builds its
+    failure.
+  - Asserts: the result is an `ObjectResult` whose `StatusCode` is 400, and its `Value` is a
+    `ProblemDetails` whose `Status` is 400.
+
 Count deltas against the previous full run: Domain.Tests +14, Application.Tests +15,
-IntegrationTests +12.
+IntegrationTests +16.
 
 ### Validation
 
@@ -456,6 +502,8 @@ dotnet test tests/Envanex.Application.Tests --filter FullyQualifiedName~Envanex.
 dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Api.UnitOfMeasuresApiTests
 dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Persistence
 dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Api.ResultMappingTests
+dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Api.TurkishErrorMessagesTests
+dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Api.ResultExtensionsTests
 dotnet format --verify-no-changes
 dotnet test
 git status --short
@@ -467,13 +515,16 @@ Expected:
 - Every `dotnet test` reports `Failed: 0`. The full run shows the deltas above. Record the
   `Envanex.IntegrationTests.dll` duration line.
 - `dotnet format` exits 0.
-- `git status --short` lists exactly the eleven Files above: ten ` M` and one `??`. Nothing under
-  `src/Envanex.Infrastructure/` appears. Plan or review files may also appear if not yet committed.
+- `git status --short` is the coder's check, run before the human's commit. It lists exactly the
+  thirteen Files above: twelve ` M` and one `??`. Nothing under `src/Envanex.Infrastructure/`
+  appears. Plan or review files may also appear if not yet committed.
+- The tester's run of `git status --short` prints nothing, because the tester runs on a clean tree.
+  The phase's changed files come from the `files` section of `gates.txt`.
 
 Grep tool checks:
 
-- `WithErrorCode(UnitOfMeasureErrors.ConversionFactorTooPrecise.Code)` and
-  `WithErrorCode(UnitOfMeasureErrors.ConversionFactorTooLarge.Code)`: one match each, in
+- `WithErrorCode\(UnitOfMeasureErrors\.ConversionFactorTooPrecise\.Code\)` and
+  `WithErrorCode\(UnitOfMeasureErrors\.ConversionFactorTooLarge\.Code\)`: one match each, in
   `CreateUnitOfMeasureCommandValidator.cs`.
 - `\.WithMessage\(` in `src/Envanex.Application`: no match.
 - `\r` in every changed and created file: no match (LF only).
@@ -503,14 +554,20 @@ Schema, migration, EF configuration and production queries: none. db-reviewer: n
   `ListPriceAmountNegative` moved.
 - `src/Envanex.Web/Extensions/TurkishErrorMessages.cs` — modified — the same.
 - `tests/Envanex.Domain.Tests/Aggregates/Products/ProductTests.cs` — modified — P-D1..P-D21, one
-  private helper, and T7.
+  private helper, and the `UpdatePrice` success assertions.
 - `tests/Envanex.Application.Tests/Products/Commands/CreateProductCommandHandlerTests.cs` — modified — P-HC1..P-HC3.
 - `tests/Envanex.Application.Tests/Products/Commands/UpdateProductCommandHandlerTests.cs` — modified — P-HU1..P-HU3.
 - `tests/Envanex.IntegrationTests/Persistence/MoneyPersistenceTests.cs` — modified — P-P1.
 - `tests/Envanex.IntegrationTests/Persistence/QuantityPersistenceTests.cs` — modified — P-P2.
 - `tests/Envanex.IntegrationTests/Persistence/SchemaPrecisionTests.cs` — modified — P-S1, P-S2.
-- `tests/Envanex.IntegrationTests/Persistence/RepositoryTests.cs` — modified — T7, six calls.
-- `tests/Envanex.IntegrationTests/Persistence/ConcurrencyTests.cs` — modified — T7, two calls.
+- `tests/Envanex.IntegrationTests/Persistence/RepositoryTests.cs` — modified — the `UpdatePrice`
+  success assertions, six calls.
+- `tests/Envanex.IntegrationTests/Persistence/ConcurrencyTests.cs` — modified — the `UpdatePrice`
+  success assertions, two calls.
+- `tests/Envanex.IntegrationTests/Api/TurkishErrorMessagesTests.cs` — modified — P-T1: three Product
+  rows in Phase 1's theory.
+- `tests/Envanex.IntegrationTests/Api/ResultExtensionsTests.cs` — modified — P-M1: three Product rows
+  in Phase 1's theory.
 
 ### Signatures
 
@@ -569,7 +626,8 @@ Tables, `TurkishErrorMessages.Messages`:
   `Product.NotFound`:
   - `Product.ListPriceAmountNegative`, moved byte for byte. Its source stays as it is today at
     `TurkishErrorMessages.cs:40`: `"Liste fiyat`, the escape for ı (0131), then a space and
-    `negatif olamaz."`. No test pins this text, so the Grep check below is its only guard.
+    `negatif olamaz."`. The Grep check below keeps its source byte for byte, and P-T1's
+    `Product.ListPriceAmountNegative` row pins its runtime text.
   - then `Product.ListPriceAmountTooLarge`;
   - then `Product.ReorderPointTooLarge`, with the texts of the message table, in its source form.
 - "Product - validator" loses the `ListPriceAmountNegative` line. Its other entries are unchanged.
@@ -587,6 +645,8 @@ Test-side signatures:
 - `QuantityPersistenceTests`: `public static TheoryData<decimal> ReorderPointsAtOrRoundingToTheMaximum`.
 - `SchemaPrecisionTests`: add `using Envanex.Domain.Aggregates.Products;`. Reuse `ColumnMaximum`
   from Phase 1.
+- `TurkishErrorMessagesTests` and `ResultExtensionsTests`: add
+  `using Envanex.Domain.Aggregates.Products;`.
 
 ### Tests to add
 
@@ -632,7 +692,7 @@ Notes on these tests:
 - `Update` and `UpdatePrice` tests start from `Product.Create("SKU001", "Widget",
   ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value` and capture `product.Id` first.
 
-T7, success asserted explicitly:
+The `UpdatePrice` success assertions (the existing callers now check the returned `Result`):
 
 - **`ProductTests.UpdatePrice_ShouldChangeListPrice`:** keep the returned `Result` and assert
   `IsSuccess.ShouldBeTrue()` before the existing `ListPrice` assertion.
@@ -679,7 +739,19 @@ Schema (`SchemaPrecisionTests`, inline queries as in Phase 1):
   - Reads `Products.ReorderPoint`.
   - Asserts: `Product.ReorderPointMaxValue.ShouldBe(ColumnMaximum(...))`.
 
-Count deltas: Domain.Tests +21, Application.Tests +6, IntegrationTests +6.
+Phase 1's two theories get the Product rows. Codes are taken from their declared `Error` fields;
+the expected texts are written with literal Turkish letters.
+
+- **P-T1** (`TurkishErrorMessagesTests.NumericFieldMessages`), three rows:
+  - `ProductErrors.ListPriceAmountTooLarge.Code` with "Liste fiyatı en fazla 99.999.999.999.999,9999 olabilir.";
+  - `ProductErrors.ReorderPointTooLarge.Code` with "Yeniden sipariş noktası en fazla 999.999.999.999,999999 olabilir.";
+  - `ProductErrors.ListPriceAmountNegative.Code` with "Liste fiyatı negatif olamaz.", the moved
+    entry's runtime text.
+- **P-M1** (`ResultExtensionsTests.NumericFieldErrorCodes`), three rows:
+  `ProductErrors.ListPriceAmountTooLarge.Code`, `ProductErrors.ReorderPointTooLarge.Code` and
+  `ProductErrors.ListPriceAmountNegative.Code`.
+
+Count deltas: Domain.Tests +21, Application.Tests +6, IntegrationTests +12.
 
 ### Validation
 
@@ -689,6 +761,8 @@ dotnet test tests/Envanex.Domain.Tests --filter FullyQualifiedName~Envanex.Domai
 dotnet test tests/Envanex.Application.Tests --filter FullyQualifiedName~Envanex.Application.Tests.Products.Commands
 dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Persistence
 dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Api.ResultMappingTests
+dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Api.TurkishErrorMessagesTests
+dotnet test tests/Envanex.IntegrationTests --filter FullyQualifiedName~Envanex.IntegrationTests.Api.ResultExtensionsTests
 dotnet format --verify-no-changes
 dotnet test
 git status --short
@@ -699,12 +773,14 @@ Expected:
 - The build has 0 warnings and 0 errors.
 - Every `dotnet test` reports `Failed: 0`. The full run shows the deltas. Record the
   integration-suite duration.
-- `git status --short` lists exactly the twelve Files, all ` M`, and nothing under
-  `src/Envanex.Infrastructure/`.
+- `git status --short` is the coder's check, run before the human's commit. It lists exactly the
+  fourteen Files, all ` M`, and nothing under `src/Envanex.Infrastructure/`.
+- The tester's run of `git status --short` prints nothing, because the tester runs on a clean tree.
+  The phase's changed files come from the `files` section of `gates.txt`.
 
 Grep tool checks:
 
-- `Product.ListPriceAmountNegative` in `src/Envanex.Web/Extensions`: exactly two matches, one per
+- `Product\.ListPriceAmountNegative` in `src/Envanex.Web/Extensions`: exactly two matches, one per
   file. Each lies between the "Product domain" / "Product - domain" comment and the
   "Product validator" / "Product - validator" comment.
 - `void UpdatePrice` in `src/`: no match.
@@ -713,7 +789,7 @@ Grep tool checks:
   contains a non-ASCII character. The pattern
   `"(Product|UnitOfMeasure)\.[^"]*"\] = "[^"]*[^\x00-\x7F]`
   has no match, as in Phase 1.
-- In the same file, exactly one line contains `Product.ListPriceAmountNegative`. Its value reads
+- In the same file, exactly one line matches `Product\.ListPriceAmountNegative`. Its value reads
   `"Liste fiyat`, the escape for ı (0131), then a space and `negatif olamaz."`, as at `:40` today.
 
 Stop condition: P-P1 or P-P2 does not read back the maximum exactly.
@@ -829,16 +905,19 @@ Expected:
 - The build has 0 warnings and 0 errors.
 - Every test run reports `Failed: 0`, with the deltas. The `ProductsApiTests` run includes P-A1 to
   P-A7. Record the integration-suite duration.
-- `git status` lists exactly the five Files.
+- `git status --short` is the coder's check, run before the human's commit. It lists exactly the
+  five Files.
+- The tester's run of `git status --short` prints nothing, because the tester runs on a clean tree.
+  The phase's changed files come from the `files` section of `gates.txt`.
 
 Grep tool checks:
 
-- `WithErrorCode(ProductErrors.ListPriceAmountTooLarge.Code)` and
-  `WithErrorCode(ProductErrors.ReorderPointTooLarge.Code)`: one match each per validator file.
-- `"Product.ListPriceAmountNegative"` and `"Product.ReorderPointNegative"`: still literal, once per
+- `WithErrorCode\(ProductErrors\.ListPriceAmountTooLarge\.Code\)` and
+  `WithErrorCode\(ProductErrors\.ReorderPointTooLarge\.Code\)`: one match each per validator file.
+- `"Product\.ListPriceAmountNegative"` and `"Product\.ReorderPointNegative"`: still literal, once per
   validator file.
 - `\.WithMessage\(` in `src/Envanex.Application`: no match.
-- `\r`: no match.
+- `\r` in each of Phase 3's five Files: no match (LF only).
 - `[^\x00-\x7F]` in `tests/Envanex.IntegrationTests/Api/ProductsApiTests.cs`: no match. The file is
   ASCII-only today.
 
@@ -864,14 +943,17 @@ is left empty; a later roadmap update fills in the PR number:
 | — | `fix(domain)` — bound the persisted numeric fields and reject a negative list price | |
 ```
 
-**(c)** Replace lines 121-122 (the "Money is not nullable" bullet) with exactly these five lines:
+**(c)** Replace lines 121-122 (the "Money is not nullable" bullet) with exactly these six lines.
+They state the technical distinction: ADR 0003's general statement does not hold for EF Core 10,
+and the project's decision is unchanged. ADR 0003 itself is not edited:
 
 ```text
 - **Money is not nullable.** EF Core 10 supports optional complex types, provided the complex type
   has at least one required property
-  (https://learn.microsoft.com/ef/core/what-is-new/ef-core-10.0/whatsnew). The project keeps
-  `Money` required by choice, and an optional amount is still expressed as `Money.Zero` or as
-  separate columns. See ADR 0003.
+  (https://learn.microsoft.com/ef/core/what-is-new/ef-core-10.0/whatsnew), so ADR 0003's general
+  statement that complex types cannot be null does not hold for EF Core 10. The project's
+  decision to keep `Money` required is unchanged: an optional amount is still expressed as
+  `Money.Zero` or as separate columns. See ADR 0003.
 ```
 
 **(d)** Insert these six lines after line 124, the end of the "Every `Money` property needs an
@@ -894,7 +976,7 @@ this one line. The table keeps its two columns:
 | The integration suite's duration against the 60 s decision line in ADR 0007. **Measured on 2026-10-23 at `56fd6d4`:** three runs of `dotnet test` at the repository root, in Debug, gave `1 m 2 s`, `55 s` and `52 s` on the `Envanex.IntegrationTests.dll` summary line: a median of 55 s, the same metric as the earlier records. The raw output is in the measurement turn of Claude Code session `3e1d4467-7a9c-42b7-b757-526d3617ea84`. **The condition this row set is only partly met:** the SQL Server container's start-up was not separated out. No timestamped Testcontainers log lines were observed in these three runs, so their output gives no start-up time. No change is made while the median is below the line. **Follow-up:** when a `/gate` record shows the integration suite at `1 m` or more, repeat the three-run median. If the median is 60 s or more, measure the container's start-up directly, in a step approved separately. Then decide between fewer `ResetIdentityAsync` calls (the first suspect, weakens nothing), fewer `ConcurrencyIterations`, parallel test collections (which break `DatabaseCollection`'s serialisation), or a higher line (which revises ADR 0007). | when a `/gate` record reaches `1 m`; the start-up separation stays open until then |
 ```
 
-Note on the suite's duration. Phases 1-3 add 25 integration tests. If a gate record during this PR
+Note on the suite's duration. Phases 1-3 add 35 integration tests. If a gate record during this PR
 shows the integration suite at `1 m` or more, row (b)'s follow-up is triggered. This plan does not
 schedule it, and the human decides. It is not a phase failure.
 
@@ -908,11 +990,13 @@ The coder runs these before the human commits:
 
 1. `dotnet build -warnaserror` (`coder.md:26`). 0 warnings, 0 errors.
 2. `git status --short`: ` M docs/roadmap.md` only, plus any uncommitted review or plan files.
-3. `git diff --unified=0 HEAD -- docs/roadmap.md`: exactly four hunks, headed
+3. `git diff --unified=0 HEAD -- docs/roadmap.md`: exactly four hunks. Each hunk header line
+   begins with the text below. Git appends a context line after the second `@@`; a scratch diff of
+   `docs/roadmap.md` showed `@@ -60,0 +61 @@ in the README. That branch is never merged.`.
    - `@@ -60,0 +61 @@`
-   - `@@ -121,2 +122,5 @@`
-   - `@@ -124,0 +129,6 @@`
-   - `@@ -196 +206 @@`
+   - `@@ -121,2 +122,6 @@`
+   - `@@ -124,0 +130,6 @@`
+   - `@@ -196 +207 @@`
 
    They change only (a), (c), (d) and (b).
 4. `git diff --check HEAD -- docs/roadmap.md`: no output.
@@ -922,10 +1006,11 @@ The coder runs these before the human commits:
    - no match for `Complex types cannot be null in EF Core` or
      `The integration suite ran at 53–59 s`;
    - exactly one match each for `bound the persisted numeric fields`, `Measured on 2026-10-23 at`,
-     `Persisted numeric fields carry their column's bound` and `ef-core-10.0/whatsnew`.
+     `Persisted numeric fields carry their column's bound` and `ef-core-10\.0/whatsnew`.
 
 The tester, after the commit: `git log --oneline -3 -- docs/roadmap.md`, then
-`git show --unified=0 <that commit> -- docs/roadmap.md`. It expects the same four hunks.
+`git show --unified=0 <that commit> -- docs/roadmap.md`. It expects the same four hunks, each header
+line beginning with the same text.
 
 ## Mutation proofs
 
@@ -965,7 +1050,20 @@ that purpose (the coder never invokes `/mutate`), or by the human through `/muta
 - The PostToolUse format hook runs after each Edit; the final `mutate-clean.sh` proves the restore.
 - If a row's observed reds differ from its expected reds, record the observation, do not edit any
   test, and report to the human.
-- The "Observed" column stays `pending` until a log exists, and is filled from the logs only.
+
+**Recording the results.** The coder fills the Observed column, from the logs only. Until then each
+cell stays `pending`.
+
+- **Allowed write.** In steps S1 and S3 the coder may edit this plan file,
+  `thoughts/shared/plans/2026-10-24_numeric-bounds.md`, limited to the Observed cells of that
+  step's rows. `coder.md:23` forbids modifying any file the plan does not list; this is the listing.
+- **Order.** Each row completes the procedure above before the next row starts: the initial
+  `mutate-clean.sh` check, only that row's mutation, its test run, its inverse edits, and its final
+  `mutate-clean.sh` check. Only after every row of the step has completed and passed its final
+  check does the coder fill that step's Observed cells from the logs. This keeps the proof that the
+  code is restored separate from the documentation change.
+- **Nothing else changes.** No other line of the plan changes. The human commits the update as its
+  own docs commit.
 
 Filters:
 
@@ -1022,7 +1120,7 @@ Required: MU1-MU4 and MU7. Risk-based:
 Required: MP1-MP12 and MP15. Risk-based:
 
 - MP13 and MP14: no partial update in `Update` and `UpdatePrice`, the human's acceptance criterion.
-- MP20: an exclusive bound at the maximum (R1).
+- MP20: an exclusive bound at the maximum, which P-VC1 and P-A6 pin.
 
 | ID | File: mutation | Filter | Expected red | Expected green (notable) | Why | Observed |
 |---|---|---|---|---|---|---|
@@ -1061,8 +1159,11 @@ Required: MP1-MP12 and MP15. Risk-based:
   - Phase 3 alone can be reverted; the domain still guards.
   - Phase 2 cannot be reverted while Phase 3 stays, because Phase 3's rules reference
     `Product.ListPriceAmountMaxValue`, `ReorderPointMaxValue` and Phase 2's errors.
-  - Phase 1 is independent of Phases 2-3.
-- Reverting Phase 2 brings back `void UpdatePrice`. Its T7 assertions go in the same commit.
+  - Phase 1 cannot be reverted alone while Phase 2 stays: Phase 2's P-S1 and P-S2 use Phase 1's
+    `ColumnMaximum` helper, and Phase 2 adds its rows to the two theories Phase 1 creates in
+    `TurkishErrorMessagesTests` and `ResultExtensionsTests`.
+- Reverting Phase 2 brings back `void UpdatePrice`. Its `UpdatePrice` success assertions go in the
+  same commit.
 - Reads are unaffected in either direction:
   - EF materializes through constructors and setters, not `Create`;
   - `Money` bypasses `Money.Of` (ADR 0003);
