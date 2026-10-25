@@ -92,4 +92,34 @@ public class CreateUnitOfMeasureCommandHandlerTests
         result.IsSuccess.ShouldBeTrue();
         _unitOfWork.SaveChangesCalled.ShouldBe(1);
     }
+
+    [Fact]
+    public async Task HandleAsync_WithDerivedFactorBeyondSixDecimalPlaces_ShouldReturnTooPreciseWithoutSaving()
+    {
+        Guid baseId = Guid.CreateVersion7();
+        _repository.SeedActiveStatus(baseId, true);
+        var command = new CreateUnitOfMeasureCommand("GR", "Gram", baseId, 0.0000001m);
+
+        Result<Guid> result = await _handler.HandleAsync(command);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.ConversionFactorTooPrecise);
+        _unitOfWork.SaveChangesCalled.ShouldBe(0);
+        _repository.Units.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithDerivedFactorAboveMaximum_ShouldReturnTooLargeWithoutSaving()
+    {
+        Guid baseId = Guid.CreateVersion7();
+        _repository.SeedActiveStatus(baseId, true);
+        var command = new CreateUnitOfMeasureCommand("GR", "Gram", baseId, 1000000000000m);
+
+        Result<Guid> result = await _handler.HandleAsync(command);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.ConversionFactorTooLarge);
+        _unitOfWork.SaveChangesCalled.ShouldBe(0);
+        _repository.Units.Count.ShouldBe(0);
+    }
 }

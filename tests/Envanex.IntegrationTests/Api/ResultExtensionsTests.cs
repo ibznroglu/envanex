@@ -1,5 +1,6 @@
 using System.Reflection;
 using Envanex.Application.Authentication;
+using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.Domain.Common;
 using Envanex.Web.Extensions;
 using Microsoft.AspNetCore.Mvc;
@@ -30,6 +31,12 @@ public sealed class ResultExtensionsTests
             return data;
         }
     }
+
+    public static TheoryData<string> NumericFieldErrorCodes => new()
+    {
+        UnitOfMeasureErrors.ConversionFactorTooPrecise.Code,
+        UnitOfMeasureErrors.ConversionFactorTooLarge.Code,
+    };
 
     [Fact]
     public void UnmappedErrorCode_ShouldFallBackTo400NotServerError()
@@ -182,5 +189,20 @@ public sealed class ResultExtensionsTests
         // 403 would tell the caller the credentials were understood but refused, which is exactly
         // the distinction login must never make. No auth code maps to 403 in this PR.
         objectResult.StatusCode.ShouldNotBeNull().ShouldBeOneOf(400, 401);
+    }
+
+    [Theory]
+    [MemberData(nameof(NumericFieldErrorCodes))]
+    public void ToActionResult_NumericFieldErrorCode_ShouldMapTo400(string errorCode)
+    {
+        var failedResult = Result.Failure<Guid>(new Error(errorCode, "English fallback message."));
+
+        var actionResult = failedResult.ToActionResult();
+
+        var objectResult = actionResult.ShouldBeOfType<ObjectResult>();
+        objectResult.StatusCode.ShouldBe(400);
+
+        var problemDetails = objectResult.Value.ShouldBeOfType<ProblemDetails>();
+        problemDetails.Status.ShouldBe(400);
     }
 }

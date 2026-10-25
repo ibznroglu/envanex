@@ -1,3 +1,4 @@
+using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.IntegrationTests.Fixtures;
 using Microsoft.EntityFrameworkCore;
 using Shouldly;
@@ -87,6 +88,78 @@ public sealed class SchemaPrecisionTests : IAsyncLifetime
 
         result.DataType.ShouldBe("nvarchar");
         result.MaxLength.ShouldBe(3);
+    }
+
+    [Fact]
+    public async Task ConversionFactorColumn_ShouldBeDecimal18_6()
+    {
+        await using var context = _fixture.CreateDbContext();
+
+        var result = await context.Database
+            .SqlQueryRaw<ColumnInfo>(
+                """
+                SELECT NUMERIC_PRECISION AS Precision, NUMERIC_SCALE AS Scale
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'UnitOfMeasures'
+                  AND COLUMN_NAME = 'ConversionFactor'
+                """)
+            .SingleAsync();
+
+        result.Precision.ShouldBe((byte)18);
+        result.Scale.ShouldBe(6);
+    }
+
+    [Fact]
+    public async Task ConversionFactorMaxValue_ShouldEqualTheColumnMaximum()
+    {
+        await using var context = _fixture.CreateDbContext();
+
+        var result = await context.Database
+            .SqlQueryRaw<ColumnInfo>(
+                """
+                SELECT NUMERIC_PRECISION AS Precision, NUMERIC_SCALE AS Scale
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'UnitOfMeasures'
+                  AND COLUMN_NAME = 'ConversionFactor'
+                """)
+            .SingleAsync();
+
+        UnitOfMeasure.ConversionFactorMaxValue.ShouldBe(ColumnMaximum(result.Precision, result.Scale));
+    }
+
+    [Fact]
+    public async Task ConversionFactorDecimalPlaces_ShouldEqualTheColumnScale()
+    {
+        await using var context = _fixture.CreateDbContext();
+
+        var result = await context.Database
+            .SqlQueryRaw<ColumnInfo>(
+                """
+                SELECT NUMERIC_PRECISION AS Precision, NUMERIC_SCALE AS Scale
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'UnitOfMeasures'
+                  AND COLUMN_NAME = 'ConversionFactor'
+                """)
+            .SingleAsync();
+
+        UnitOfMeasure.ConversionFactorDecimalPlaces.ShouldBe(result.Scale);
+    }
+
+    private static decimal PowerOfTen(int exponent)
+    {
+        decimal result = 1m;
+
+        for (int i = 0; i < exponent; i++)
+        {
+            result *= 10m;
+        }
+
+        return result;
+    }
+
+    private static decimal ColumnMaximum(int precision, int scale)
+    {
+        return (PowerOfTen(precision) - 1m) / PowerOfTen(scale);
     }
 
     // EF Core's SqlQueryRaw requires a type with a parameterless constructor.

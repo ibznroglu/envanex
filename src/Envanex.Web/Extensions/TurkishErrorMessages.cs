@@ -47,6 +47,8 @@ public static class TurkishErrorMessages
         ["UnitOfMeasure.InvalidBaseUnitId"] = "Temel birim kimli\u011fi bo\u015f GUID olamaz.",
         ["UnitOfMeasure.BaseUnitFactorMustBeOne"] = "Temel birim i\u00e7in d\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 1 olmal\u0131d\u0131r.",
         ["UnitOfMeasure.ConversionFactorMustBePositive"] = "T\u00fcretilmi\u015f birim i\u00e7in d\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 s\u0131f\u0131rdan b\u00fcy\u00fck olmal\u0131d\u0131r.",
+        ["UnitOfMeasure.ConversionFactorTooPrecise"] = "D\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 en fazla 6 ondal\u0131k basamak i\u00e7erebilir; sondaki s\u0131f\u0131rlar say\u0131lmaz.",
+        ["UnitOfMeasure.ConversionFactorTooLarge"] = "D\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 en fazla 999.999.999.999,999999 olabilir.",
         ["UnitOfMeasure.CodeTooLong"] = "\u00d6l\u00e7\u00fc birimi kodu en fazla 20 karakter olabilir.",
         ["UnitOfMeasure.NameTooLong"] = "\u00d6l\u00e7\u00fc birimi ad\u0131 en fazla 200 karakter olabilir.",
         ["UnitOfMeasure.DuplicateCode"] = "Bu \u00f6l\u00e7\u00fc birimi kodu zaten kullan\u0131l\u0131yor.",

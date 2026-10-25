@@ -21,6 +21,28 @@ public class CreateUnitOfMeasureCommandValidatorTests
         BaseUnitId: Guid.CreateVersion7(),
         ConversionFactor: 0.001m);
 
+    public static TheoryData<decimal> RepresentableFactorsWithinMaximum => new()
+    {
+        0.000001m,
+        0.0000010m,
+        1.500000000m,
+        999999999999.999998m,
+        999999999999.999999m,
+    };
+
+    public static TheoryData<decimal> FactorsBeyondSixDecimalPlaces => new()
+    {
+        0.0000001m,
+        0.0000005m,
+        0.1234567m,
+    };
+
+    public static TheoryData<decimal> FactorsTooPreciseAndAboveMaximum => new()
+    {
+        1000000000000.0000001m,
+        999999999999.9999994m,
+    };
+
     [Fact]
     public void Validate_WithValidBaseUnitCommand_ShouldPass()
     {
@@ -121,6 +143,85 @@ public class CreateUnitOfMeasureCommandValidatorTests
     {
         string name = new('A', UnitOfMeasure.NameMaxLength);
         var command = ValidBaseUnitCommand with { Name = name };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Theory]
+    [MemberData(nameof(RepresentableFactorsWithinMaximum))]
+    public void Validate_DerivedUnitWithRepresentableFactorWithinMaximum_ShouldPass(decimal factor)
+    {
+        var command = ValidDerivedUnitCommand with { ConversionFactor = factor };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Theory]
+    [MemberData(nameof(FactorsBeyondSixDecimalPlaces))]
+    public void Validate_DerivedUnitWithFactorBeyondSixDecimalPlaces_ShouldFailWithTooPrecise(decimal factor)
+    {
+        var command = ValidDerivedUnitCommand with { ConversionFactor = factor };
+
+        var result = _validator.Validate(command);
+
+        result.Errors
+            .Where(e => e.PropertyName == "ConversionFactor")
+            .Select(e => e.ErrorCode)
+            .ToArray()
+            .ShouldBe(["UnitOfMeasure.ConversionFactorTooPrecise"]);
+    }
+
+    [Fact]
+    public void Validate_DerivedUnitWithFactorAboveMaximum_ShouldFailWithTooLarge()
+    {
+        var command = ValidDerivedUnitCommand with { ConversionFactor = 1000000000000.000000m };
+
+        var result = _validator.Validate(command);
+
+        result.Errors
+            .Where(e => e.PropertyName == "ConversionFactor")
+            .Select(e => e.ErrorCode)
+            .ToArray()
+            .ShouldBe(["UnitOfMeasure.ConversionFactorTooLarge"]);
+    }
+
+    [Theory]
+    [MemberData(nameof(FactorsTooPreciseAndAboveMaximum))]
+    public void Validate_DerivedUnitWithFactorTooPreciseAndAboveMaximum_ShouldReportBothFailures(decimal factor)
+    {
+        var command = ValidDerivedUnitCommand with { ConversionFactor = factor };
+
+        var result = _validator.Validate(command);
+
+        result.Errors
+            .Where(e => e.PropertyName == "ConversionFactor")
+            .Select(e => e.ErrorCode)
+            .ToArray()
+            .ShouldBe(["UnitOfMeasure.ConversionFactorTooPrecise", "UnitOfMeasure.ConversionFactorTooLarge"]);
+    }
+
+    [Fact]
+    public void Validate_DerivedUnitWithNegativeFactorBeyondSixDecimalPlaces_ShouldReportPositivityAndPrecision()
+    {
+        var command = ValidDerivedUnitCommand with { ConversionFactor = -0.0000001m };
+
+        var result = _validator.Validate(command);
+
+        result.Errors
+            .Where(e => e.PropertyName == "ConversionFactor")
+            .Select(e => e.ErrorCode)
+            .ToArray()
+            .ShouldBe(["UnitOfMeasure.ConversionFactorMustBePositive", "UnitOfMeasure.ConversionFactorTooPrecise"]);
+    }
+
+    [Fact]
+    public void Validate_BaseUnitWithOneAndTrailingZeros_ShouldPass()
+    {
+        var command = ValidBaseUnitCommand with { ConversionFactor = 1.000000000m };
 
         var result = _validator.Validate(command);
 

@@ -69,6 +69,8 @@ public static class ResultExtensions
         ["UnitOfMeasure.InvalidBaseUnitId"] = StatusCodes.Status400BadRequest,
         ["UnitOfMeasure.BaseUnitFactorMustBeOne"] = StatusCodes.Status400BadRequest,
         ["UnitOfMeasure.ConversionFactorMustBePositive"] = StatusCodes.Status400BadRequest,
+        ["UnitOfMeasure.ConversionFactorTooPrecise"] = StatusCodes.Status400BadRequest,
+        ["UnitOfMeasure.ConversionFactorTooLarge"] = StatusCodes.Status400BadRequest,
 
         // 400 Bad Request - Warehouse
         ["Warehouse.CodeRequired"] = StatusCodes.Status400BadRequest,
