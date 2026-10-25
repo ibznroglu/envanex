@@ -53,11 +53,13 @@ public static class ResultExtensions
         ["Product.UnitOfMeasureRequired"] = StatusCodes.Status400BadRequest,
         ["Product.CodeTooLong"] = StatusCodes.Status400BadRequest,
         ["Product.NameTooLong"] = StatusCodes.Status400BadRequest,
+        ["Product.ListPriceAmountNegative"] = StatusCodes.Status400BadRequest,
+        ["Product.ListPriceAmountTooLarge"] = StatusCodes.Status400BadRequest,
+        ["Product.ReorderPointTooLarge"] = StatusCodes.Status400BadRequest,
 
         // 400 Bad Request - Product validator
         ["Product.IdRequired"] = StatusCodes.Status400BadRequest,
         ["Product.RowVersionRequired"] = StatusCodes.Status400BadRequest,
-        ["Product.ListPriceAmountNegative"] = StatusCodes.Status400BadRequest,
         ["Product.ReorderPointNegative"] = StatusCodes.Status400BadRequest,
         ["Product.ListPriceCurrencyRequired"] = StatusCodes.Status400BadRequest,
 

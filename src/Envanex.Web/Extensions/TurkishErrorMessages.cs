@@ -28,6 +28,9 @@ public static class TurkishErrorMessages
         ["Product.UnitOfMeasureRequired"] = "\u00d6l\u00e7\u00fc birimi se\u00e7ilmelidir.",
         ["Product.CodeTooLong"] = "\u00dcr\u00fcn kodu en fazla 50 karakter olabilir.",
         ["Product.NameTooLong"] = "\u00dcr\u00fcn ad\u0131 en fazla 200 karakter olabilir.",
+        ["Product.ListPriceAmountNegative"] = "Liste fiyat\u0131 negatif olamaz.",
+        ["Product.ListPriceAmountTooLarge"] = "Liste fiyat\u0131 en fazla 99.999.999.999.999,9999 olabilir.",
+        ["Product.ReorderPointTooLarge"] = "Yeniden sipari\u015f noktas\u0131 en fazla 999.999.999.999,999999 olabilir.",
         ["Product.NotFound"] = "\u00dcr\u00fcn bulunamad\u0131.",
         ["Product.ConcurrencyConflict"] = "Kay\u0131t ba\u015fka bir kullan\u0131c\u0131 taraf\u0131ndan de\u011fi\u015ftirilmi\u015f. L\u00fctfen sayfay\u0131 yenileyip tekrar deneyin.",
         ["Product.DuplicateCode"] = "Bu \u00fcr\u00fcn kodu zaten kullan\u0131l\u0131yor.",
@@ -37,7 +40,6 @@ public static class TurkishErrorMessages
         // Product - validator
         ["Product.IdRequired"] = "\u00dcr\u00fcn kimli\u011fi zorunludur.",
         ["Product.RowVersionRequired"] = "E\u015fzamanl\u0131l\u0131k kontrol\u00fc i\u00e7in sat\u0131r s\u00fcr\u00fcm\u00fc zorunludur.",
-        ["Product.ListPriceAmountNegative"] = "Liste fiyat\u0131 negatif olamaz.",
         ["Product.ReorderPointNegative"] = "Yeniden sipari\u015f noktas\u0131 negatif olamaz.",
         ["Product.ListPriceCurrencyRequired"] = "Liste fiyat\u0131 para birimi zorunludur.",
 

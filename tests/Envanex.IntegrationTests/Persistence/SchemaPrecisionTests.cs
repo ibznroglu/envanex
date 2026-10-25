@@ -1,3 +1,4 @@
+using Envanex.Domain.Aggregates.Products;
 using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.IntegrationTests.Fixtures;
 using Microsoft.EntityFrameworkCore;
@@ -143,6 +144,42 @@ public sealed class SchemaPrecisionTests : IAsyncLifetime
             .SingleAsync();
 
         UnitOfMeasure.ConversionFactorDecimalPlaces.ShouldBe(result.Scale);
+    }
+
+    [Fact]
+    public async Task ListPriceAmountMaxValue_ShouldEqualTheColumnMaximum()
+    {
+        await using var context = _fixture.CreateDbContext();
+
+        var result = await context.Database
+            .SqlQueryRaw<ColumnInfo>(
+                """
+                SELECT NUMERIC_PRECISION AS Precision, NUMERIC_SCALE AS Scale
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'Products'
+                  AND COLUMN_NAME = 'ListPrice_Amount'
+                """)
+            .SingleAsync();
+
+        Product.ListPriceAmountMaxValue.ShouldBe(ColumnMaximum(result.Precision, result.Scale));
+    }
+
+    [Fact]
+    public async Task ReorderPointMaxValue_ShouldEqualTheColumnMaximum()
+    {
+        await using var context = _fixture.CreateDbContext();
+
+        var result = await context.Database
+            .SqlQueryRaw<ColumnInfo>(
+                """
+                SELECT NUMERIC_PRECISION AS Precision, NUMERIC_SCALE AS Scale
+                FROM INFORMATION_SCHEMA.COLUMNS
+                WHERE TABLE_NAME = 'Products'
+                  AND COLUMN_NAME = 'ReorderPoint'
+                """)
+            .SingleAsync();
+
+        Product.ReorderPointMaxValue.ShouldBe(ColumnMaximum(result.Precision, result.Scale));
     }
 
     private static decimal PowerOfTen(int exponent)

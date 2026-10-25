@@ -1,4 +1,5 @@
 using Envanex.Application.Authentication;
+using Envanex.Domain.Aggregates.Products;
 using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.Web.Extensions;
 using Shouldly;
@@ -21,6 +22,9 @@ public sealed class TurkishErrorMessagesTests
     {
         { UnitOfMeasureErrors.ConversionFactorTooPrecise.Code, "Dönüşüm katsayısı en fazla 6 ondalık basamak içerebilir; sondaki sıfırlar sayılmaz." },
         { UnitOfMeasureErrors.ConversionFactorTooLarge.Code, "Dönüşüm katsayısı en fazla 999.999.999.999,999999 olabilir." },
+        { ProductErrors.ListPriceAmountTooLarge.Code, "Liste fiyatı en fazla 99.999.999.999.999,9999 olabilir." },
+        { ProductErrors.ReorderPointTooLarge.Code, "Yeniden sipariş noktası en fazla 999.999.999.999,999999 olabilir." },
+        { ProductErrors.ListPriceAmountNegative.Code, "Liste fiyatı negatif olamaz." },
     };
 
     [Fact]

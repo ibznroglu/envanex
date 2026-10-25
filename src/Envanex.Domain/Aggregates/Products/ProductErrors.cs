@@ -17,6 +17,8 @@ public static class ProductErrors
     public static readonly Error IdRequired = new("Product.IdRequired", "Product identifier is required.");
     public static readonly Error RowVersionRequired = new("Product.RowVersionRequired", "Row version is required for concurrency control.");
     public static readonly Error ListPriceAmountNegative = new("Product.ListPriceAmountNegative", "List price amount must not be negative.");
+    public static readonly Error ListPriceAmountTooLarge = new("Product.ListPriceAmountTooLarge", "List price amount must not exceed 99999999999999.9999.");
     public static readonly Error ReorderPointNegative = new("Product.ReorderPointNegative", "Reorder point must not be negative.");
+    public static readonly Error ReorderPointTooLarge = new("Product.ReorderPointTooLarge", "Reorder point must not exceed 999999999999.999999.");
     public static readonly Error ListPriceCurrencyRequired = new("Product.ListPriceCurrencyRequired", "List price currency is required.");
 }

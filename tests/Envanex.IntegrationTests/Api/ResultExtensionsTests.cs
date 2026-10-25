@@ -1,5 +1,6 @@
 using System.Reflection;
 using Envanex.Application.Authentication;
+using Envanex.Domain.Aggregates.Products;
 using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.Domain.Common;
 using Envanex.Web.Extensions;
@@ -36,6 +37,9 @@ public sealed class ResultExtensionsTests
     {
         UnitOfMeasureErrors.ConversionFactorTooPrecise.Code,
         UnitOfMeasureErrors.ConversionFactorTooLarge.Code,
+        ProductErrors.ListPriceAmountTooLarge.Code,
+        ProductErrors.ReorderPointTooLarge.Code,
+        ProductErrors.ListPriceAmountNegative.Code,
     };
 
     [Fact]

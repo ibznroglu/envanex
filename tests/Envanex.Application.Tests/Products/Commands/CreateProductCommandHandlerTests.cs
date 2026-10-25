@@ -119,4 +119,43 @@ public class CreateProductCommandHandlerTests
 
         _unitOfWork.SaveChangesCalled.ShouldBe(1);
     }
+
+    [Fact]
+    public async Task HandleAsync_WithListPriceAmountRoundingAboveMaximum_ShouldReturnListPriceAmountTooLargeWithoutSaving()
+    {
+        var command = ValidCommand() with { ListPriceAmount = 99999999999999.99995m };
+
+        Result<Guid> result = await _handler.HandleAsync(command);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountTooLarge);
+        _unitOfWork.SaveChangesCalled.ShouldBe(0);
+        _productRepository.Products.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithNegativeListPriceAmount_ShouldReturnListPriceAmountNegativeWithoutSaving()
+    {
+        var command = ValidCommand() with { ListPriceAmount = -0.0001m };
+
+        Result<Guid> result = await _handler.HandleAsync(command);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountNegative);
+        _unitOfWork.SaveChangesCalled.ShouldBe(0);
+        _productRepository.Products.Count.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithReorderPointRoundingAboveMaximum_ShouldReturnReorderPointTooLargeWithoutSaving()
+    {
+        var command = ValidCommand() with { ReorderPoint = 999999999999.9999995m };
+
+        Result<Guid> result = await _handler.HandleAsync(command);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ReorderPointTooLarge);
+        _unitOfWork.SaveChangesCalled.ShouldBe(0);
+        _productRepository.Products.Count.ShouldBe(0);
+    }
 }
