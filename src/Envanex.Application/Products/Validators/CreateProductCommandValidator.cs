@@ -32,6 +32,10 @@ public sealed class CreateProductCommandValidator : AbstractValidator<CreateProd
             .GreaterThanOrEqualTo(0)
             .WithErrorCode("Product.ListPriceAmountNegative");
 
+        RuleFor(x => x.ListPriceAmount)
+            .LessThanOrEqualTo(Product.ListPriceAmountMaxValue)
+            .WithErrorCode(ProductErrors.ListPriceAmountTooLarge.Code);
+
         RuleFor(x => x.ListPriceCurrency)
             .NotEmpty()
             .WithErrorCode("Product.ListPriceCurrencyRequired");
@@ -43,5 +47,9 @@ public sealed class CreateProductCommandValidator : AbstractValidator<CreateProd
         RuleFor(x => x.ReorderPoint)
             .GreaterThanOrEqualTo(0)
             .WithErrorCode("Product.ReorderPointNegative");
+
+        RuleFor(x => x.ReorderPoint)
+            .LessThanOrEqualTo(Product.ReorderPointMaxValue)
+            .WithErrorCode(ProductErrors.ReorderPointTooLarge.Code);
     }
 }

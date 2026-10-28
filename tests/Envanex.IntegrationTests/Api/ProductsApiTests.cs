@@ -71,6 +71,19 @@ public sealed class ProductsApiTests : IAsyncLifetime
         return await response.Content.ReadFromJsonAsync<JsonElement>();
     }
 
+    private static async Task<string[]> ReadFieldValidationMessagesAsync(HttpResponseMessage response, string fieldName)
+    {
+        // The status comes first, so a non-JSON 500 fails on this assertion rather than on a parse.
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("title").GetString().ShouldBe("Validation Failed");
+        body.TryGetProperty("errors", out var errors).ShouldBeTrue();
+        errors.TryGetProperty(fieldName, out var fieldErrors).ShouldBeTrue();
+
+        return [.. fieldErrors.EnumerateArray().Select(e => e.GetString()!)];
+    }
+
     [Fact]
     public async Task GetProductById_WithExistingProduct_ShouldReturn200WithProductDetail()
     {
@@ -397,5 +410,112 @@ public sealed class ProductsApiTests : IAsyncLifetime
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetProperty("status").GetInt32().ShouldBe(400);
         body.GetProperty("detail").GetString()!.ShouldContain("Route id and body Id do not match");
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithListPriceAmountAboveMaximum_ShouldReturn400WithTurkishMessage()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+
+        var command = new CreateProductCommand("BOUND-001", "Bound Product", uomId, 100000000000000m, "TRY", 10m);
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        var messages = await ReadFieldValidationMessagesAsync(response, "ListPriceAmount");
+        messages.ShouldBe(["Liste fiyat\u0131 en fazla 99.999.999.999.999,9999 olabilir."]);
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithListPriceAmountRoundingToTheMaximum_ShouldReturn400WithTurkishMessage()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+
+        var command = new CreateProductCommand("BOUND-001", "Bound Product", uomId, 99999999999999.99994m, "TRY", 10m);
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        var messages = await ReadFieldValidationMessagesAsync(response, "ListPriceAmount");
+        messages.ShouldBe(["Liste fiyat\u0131 en fazla 99.999.999.999.999,9999 olabilir."]);
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithReorderPointAboveMaximum_ShouldReturn400WithTurkishMessage()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+
+        var command = new CreateProductCommand("BOUND-001", "Bound Product", uomId, 100m, "TRY", 1000000000000m);
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        var messages = await ReadFieldValidationMessagesAsync(response, "ReorderPoint");
+        messages.ShouldBe(["Yeniden sipari\u015f noktas\u0131 en fazla 999.999.999.999,999999 olabilir."]);
+    }
+
+    [Fact]
+    public async Task UpdateProduct_WithListPriceAmountAboveMaximum_ShouldReturn400WithTurkishMessage()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var productId = await SeedProductViaApiAsync(uomId);
+        var detail = await GetProductDetailAsync(productId);
+        var rowVersion = detail.GetProperty("rowVersion").GetString()!;
+
+        var command = new UpdateProductCommand(
+            productId, "Updated", uomId, 100000000000000m, "TRY", 10m,
+            Convert.FromBase64String(rowVersion));
+        var response = await _client.PutAsJsonAsync($"/api/products/{productId}", command);
+
+        var messages = await ReadFieldValidationMessagesAsync(response, "ListPriceAmount");
+        messages.ShouldBe(["Liste fiyat\u0131 en fazla 99.999.999.999.999,9999 olabilir."]);
+    }
+
+    [Fact]
+    public async Task UpdateProduct_WithReorderPointAboveMaximum_ShouldReturn400WithTurkishMessage()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var productId = await SeedProductViaApiAsync(uomId);
+        var detail = await GetProductDetailAsync(productId);
+        var rowVersion = detail.GetProperty("rowVersion").GetString()!;
+
+        var command = new UpdateProductCommand(
+            productId, "Updated", uomId, 100m, "TRY", 1000000000000m,
+            Convert.FromBase64String(rowVersion));
+        var response = await _client.PutAsJsonAsync($"/api/products/{productId}", command);
+
+        var messages = await ReadFieldValidationMessagesAsync(response, "ReorderPoint");
+        messages.ShouldBe(["Yeniden sipari\u015f noktas\u0131 en fazla 999.999.999.999,999999 olabilir."]);
+    }
+
+    [Fact]
+    public async Task CreateProduct_WithListPriceAmountAndReorderPointAtMaximum_ShouldReturn201AndGetShouldReturnThem()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+
+        var command = new CreateProductCommand(
+            "BOUND-001", "Bound Product", uomId, 99999999999999.9999m, "TRY", 999999999999.999999m);
+        var response = await _client.PostAsJsonAsync("/api/products", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var productId = await response.Content.ReadFromJsonAsync<Guid>();
+
+        var detail = await GetProductDetailAsync(productId);
+        detail.GetProperty("listPriceAmount").GetDecimal().ShouldBe(99999999999999.9999m);
+        detail.GetProperty("reorderPoint").GetDecimal().ShouldBe(999999999999.999999m);
+    }
+
+    [Fact]
+    public async Task UpdateProduct_WithListPriceAmountAndReorderPointAtMaximum_ShouldSucceedAndGetShouldReturnThem()
+    {
+        var uomId = await SeedUnitOfMeasureAsync();
+        var productId = await SeedProductViaApiAsync(uomId);
+        var detail = await GetProductDetailAsync(productId);
+        var rowVersion = detail.GetProperty("rowVersion").GetString()!;
+
+        var command = new UpdateProductCommand(
+            productId, "Updated", uomId, 99999999999999.9999m, "TRY", 999999999999.999999m,
+            Convert.FromBase64String(rowVersion));
+        var response = await _client.PutAsJsonAsync($"/api/products/{productId}", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var updatedDetail = await GetProductDetailAsync(productId);
+        updatedDetail.GetProperty("listPriceAmount").GetDecimal().ShouldBe(99999999999999.9999m);
+        updatedDetail.GetProperty("reorderPoint").GetDecimal().ShouldBe(999999999999.999999m);
     }
 }

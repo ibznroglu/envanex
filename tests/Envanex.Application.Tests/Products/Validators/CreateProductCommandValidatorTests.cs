@@ -17,6 +17,32 @@ public class CreateProductCommandValidatorTests
         ListPriceCurrency: "TRY",
         ReorderPoint: 10m);
 
+    public static TheoryData<decimal> ListPriceAmountsAtOrJustBelowMaximum => new()
+    {
+        99999999999999.9998m,
+        99999999999999.9999m,
+    };
+
+    public static TheoryData<decimal> ListPriceAmountsAboveMaximum => new()
+    {
+        100000000000000.0000m,
+        99999999999999.99994m,
+        99999999999999.99995m,
+    };
+
+    public static TheoryData<decimal> ReorderPointsAtOrJustBelowMaximum => new()
+    {
+        999999999999.999998m,
+        999999999999.999999m,
+    };
+
+    public static TheoryData<decimal> ReorderPointsAboveMaximum => new()
+    {
+        1000000000000.000000m,
+        999999999999.9999994m,
+        999999999999.9999995m,
+    };
+
     [Fact]
     public void Validate_WithValidCommand_ShouldPass()
     {
@@ -135,5 +161,71 @@ public class CreateProductCommandValidatorTests
         var result = _validator.Validate(command);
 
         result.IsValid.ShouldBeTrue();
+    }
+
+    [Theory]
+    [MemberData(nameof(ListPriceAmountsAtOrJustBelowMaximum))]
+    public void Validate_WithListPriceAmountAtOrJustBelowMaximum_ShouldPass(decimal amount)
+    {
+        var command = ValidCommand with { ListPriceAmount = amount };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Theory]
+    [MemberData(nameof(ListPriceAmountsAboveMaximum))]
+    public void Validate_WithListPriceAmountAboveMaximum_ShouldFailWithListPriceAmountTooLarge(decimal amount)
+    {
+        var command = ValidCommand with { ListPriceAmount = amount };
+
+        var result = _validator.Validate(command);
+
+        result.Errors
+            .Where(e => e.PropertyName == "ListPriceAmount")
+            .Select(e => e.ErrorCode)
+            .ToArray()
+            .ShouldBe(["Product.ListPriceAmountTooLarge"]);
+    }
+
+    [Fact]
+    public void Validate_WithNegativeListPriceAmountThatRoundsToZero_ShouldFailWithListPriceAmountNegative()
+    {
+        var command = ValidCommand with { ListPriceAmount = -0.00004m };
+
+        var result = _validator.Validate(command);
+
+        result.Errors
+            .Where(e => e.PropertyName == "ListPriceAmount")
+            .Select(e => e.ErrorCode)
+            .ToArray()
+            .ShouldBe(["Product.ListPriceAmountNegative"]);
+    }
+
+    [Theory]
+    [MemberData(nameof(ReorderPointsAtOrJustBelowMaximum))]
+    public void Validate_WithReorderPointAtOrJustBelowMaximum_ShouldPass(decimal value)
+    {
+        var command = ValidCommand with { ReorderPoint = value };
+
+        var result = _validator.Validate(command);
+
+        result.IsValid.ShouldBeTrue();
+    }
+
+    [Theory]
+    [MemberData(nameof(ReorderPointsAboveMaximum))]
+    public void Validate_WithReorderPointAboveMaximum_ShouldFailWithReorderPointTooLarge(decimal value)
+    {
+        var command = ValidCommand with { ReorderPoint = value };
+
+        var result = _validator.Validate(command);
+
+        result.Errors
+            .Where(e => e.PropertyName == "ReorderPoint")
+            .Select(e => e.ErrorCode)
+            .ToArray()
+            .ShouldBe(["Product.ReorderPointTooLarge"]);
     }
 }
