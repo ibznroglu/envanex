@@ -58,6 +58,7 @@ in the README. That branch is never merged.
 | — | `fix(db)` — stop publishing the local SQL Server SA password | done (#14) |
 | — | `chore(agents)` — enforce the agent pipeline's rules and tier models by risk | done (#15, #17) |
 | — | `fix(infra)` — patch vulnerable System.Security.Cryptography.Pkcs and Xml packages | done (#16) |
+| — | `fix(domain)` — bound the persisted numeric fields and reject a negative list price | |
 | 7 | `feat(web)` — Blazor shell, product grid, **first deploy** | |
 
 Roadmap numbers and GitHub PR numbers are not the same. The status cell of a completed row
@@ -118,10 +119,20 @@ ADR.
 - **Migrations:** every schema change gets a migration file committed to the repository. The test
   fixture applies migrations rather than creating the schema from the model, so every test run
   exercises the migration chain.
-- **Money is not nullable.** Complex types cannot be null in EF Core, so an optional amount has to
-  be expressed as `Money.Zero` or split into separate columns. See ADR 0003.
+- **Money is not nullable.** EF Core 10 supports optional complex types, provided the complex type
+  has at least one required property
+  (https://learn.microsoft.com/ef/core/what-is-new/ef-core-10.0/whatsnew), so ADR 0003's general
+  statement that complex types cannot be null does not hold for EF Core 10. The project's
+  decision to keep `Money` required is unchanged: an optional amount is still expressed as
+  `Money.Zero` or as separate columns. See ADR 0003.
 - **Every `Money` property needs an explicit `ComplexProperty` line** in its entity configuration.
   Forgetting it fails silently. See ADR 0003.
+- **Persisted numeric fields carry their column's bound in their aggregate.** `Money` and
+  `Quantity` get no extra bound tied to a column range; their existing sign and rounding rules
+  stay. Each persisted amount, quantity or factor states its maximum as a public constant on its
+  aggregate and checks it there, on the value the aggregate receives. Its validator checks the
+  same maximum on the raw request value, and a schema test links the constant to the live column.
+  PR 8 and PR 9 follow this for every new persisted field.
 - **Grid datasource is a hardened surface.** Max page size, sort/group field allowlist, and a
   default `Take` ship with the endpoint in PR 5b, not later. The read DTO is flat, which makes the
   DTO itself the field allowlist.
@@ -193,7 +204,7 @@ Tracked deliberately rather than hidden. Each one names where it closes: a PR, o
 | The shared demo account can be locked out by anyone: five wrong passwords lock it for 15 minutes, across any number of client addresses. Its password is public, so lockout protects nothing on it. Turn lockout off for the demo account | PR 7, with the demo lifecycle blocker |
 | Every host start needs a reachable, migrated identity database, because the roles are seeded at boot. There is no `EnableRetryOnFailure`, so a slow first connection (an auto-paused Azure SQL free-tier database) fails the whole host. The boot-time queries project every mapped column, so a future Identity migration must be applied before the build that expects it boots | PR 7, with the first deploy |
 | The demo user's first seeding is not safe against two hosts starting at once: the loser fails its boot and heals on restart. An App Service overlapped restart or slot swap can briefly run two processes even on one instance; it matters only when both are first-seeding with the demo on | not scheduled — accepted while production is a single instance |
-| The integration suite ran at 53–59 s across PR 6b's final runs, against the 60 s decision line in ADR 0007, and the next PR's tests will cross it. Measure the median of three runs with the SQL Server container's start-up separated out, then decide between fewer `ResetIdentityAsync` calls (the first suspect, weakens nothing), fewer `ConcurrencyIterations`, parallel test collections (which break `DatabaseCollection`'s serialisation), or a higher line (which revises ADR 0007) | before PR 7 adds tests |
+| The integration suite's duration against the 60 s decision line in ADR 0007. **Measured on 2026-10-23 at `56fd6d4`:** three runs of `dotnet test` at the repository root, in Debug, gave `1 m 2 s`, `55 s` and `52 s` on the `Envanex.IntegrationTests.dll` summary line: a median of 55 s, the same metric as the earlier records. The raw output is in the measurement turn of Claude Code session `3e1d4467-7a9c-42b7-b757-526d3617ea84`. **The condition this row set is only partly met:** the SQL Server container's start-up was not separated out. No timestamped Testcontainers log lines were observed in these three runs, so their output gives no start-up time. No change is made while the median is below the line. **Follow-up:** when a `/gate` record shows the integration suite at `1 m` or more, repeat the three-run median. If the median is 60 s or more, measure the container's start-up directly, in a step approved separately. Then decide between fewer `ResetIdentityAsync` calls (the first suspect, weakens nothing), fewer `ConcurrencyIterations`, parallel test collections (which break `DatabaseCollection`'s serialisation), or a higher line (which revises ADR 0007). | when a `/gate` record reaches `1 m`; the start-up separation stays open until then |
 | PR 7's "deploy on merge to `main`" has no recorded method: there is no Dockerfile, `docker-compose.yml` starts only SQL Server, and the tests use Testcontainers | PR 7's research — App Service publish profile, GitHub Actions, or a container |
 | The cryptography fix in #16 changed package references only. It recorded that Web's build output and `deps.json` contain neither the `System.Security.Cryptography.Pkcs` nor the `System.Security.Cryptography.Xml` DLL, so both are expected to come from the shared `Microsoft.AspNetCore.App` framework, which the package fix does not change. Which copy actually loads at run time, and whether the cryptography APIs run at all, was not observed. Establish which cryptography assemblies Web actually loads and, if the shared runtime supplies them, verify that the deployed runtime is patched for the advisories #16 addresses | PR 7 — before the first deploy |
 | The UI is still the Blazor template's: a full-width Bootstrap login form, the "About" link in the top bar, and an https-redirect warning on the http profile. PR 7 must meet a senior-frontend bar; its design phase is described under PR 7 above | PR 7 — design phase first |
