@@ -323,7 +323,7 @@ Bu gözlemlerin nedeni bu PR'da araştırılmadı.
 ### Sondaki sıfırlar ve theory satırları
 
 D2 sondaki sıfırları olan bir faktörü (`1.500000000`) kabul ediyor, çünkü kontrol değer
-karşılaştırıyor. U-D1, U-V1 ve U-A4'te `0.0000010m` ve `1.500000000m` satırları var; ama xUnit'in
+karşılaştırıyor. U-D1 ve U-V1'de `0.0000010m` ve `1.500000000m`, U-A4'te yalnızca `1.500000000m` satırı var; ama xUnit'in
 bir theory satırındaki decimal'ın scale'ini test metoduna koruyarak taşıyıp taşımadığı Faz 1 code
 review'ında N1 olarak UNVERIFIED kaldı ve çözülmedi. Bu yüzden o satırları sondaki sıfırlar
 hakkında kanıt sayma. Böyle bir faktörün kalıcı olup olmadığı konusunda bu PR'ın tek gözlemi U-P2:
@@ -371,12 +371,17 @@ yalnızca 2026-10-23 ölçümünü taşıyor.
 
 ### Satır sonları ve BOM
 
-Repo yalnızca LF istiyor (`.gitattributes`). Her faz, değiştirdiği dosyalarda `\r` arayan bir Grep
-kontrolü taşıdı; plan yeni oluşturulan dosyalar ve roadmap için BOM kontrolünü `head -c 3 | od`
-ile tanımladı. Bir C# kaynak dosyasındaki CRLF ya da BOM, kod hiç değişmemiş olsa bile
-`dotnet format --verify-no-changes`'i ve dolayısıyla gate'i kırar. `dotnet format` solution'daki
-projelerin dosyalarını denetler, `docs/` altındaki Markdown dosyalarını görmez; roadmap için
-`git ls-files --eol` ve `head -c 3 | od` kontrolleri bu boşluğu kapatıyor.
+Repo yalnızca LF istiyor (`.gitattributes`). Faz 1-3, değiştirdiği dosyalarda `\r` arayan bir Grep
+kontrolü taşıdı; Faz 4 satır sonlarını `git diff --check` ve `git ls-files --eol` ile denetledi.
+Planın tek BOM kontrolü `head -c 3 docs/roadmap.md | od -An -tx1`. Bu dalda oluşturulan tek
+kaynak dosya `ConversionFactorPersistenceTests.cs` için plan bir BOM kontrolü tanımlamadı; Faz 1
+code review'ı bunun için `head -c 3` önerdi, ama bu bir plan adımı değildi. 2026-10-30'da bu
+dosyada çalıştırılan `head -c 3 <dosya> | od -An -tx1` `75 73 69` verdi, yani dosyada BOM yok.
+`.gitattributes`'taki açıklamaya göre bir C# kaynak dosyasındaki CRLF, kod hiç değişmemiş olsa
+bile `dotnet format --verify-no-changes`'i ve dolayısıyla gate'i kırar; BOM'u yakalayıp
+yakalamadığı doğrulanmadı. `dotnet format` solution'daki projelerin dosyalarını denetler,
+`docs/` altındaki Markdown dosyalarını görmez; roadmap için `git ls-files --eol` ve
+`head -c 3 | od` kontrolleri bu boşluğu kapatıyor.
 
 ## Farklı düşündüğüm yer
 
