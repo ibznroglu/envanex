@@ -45,11 +45,11 @@ public sealed class ConcurrencyTests : IAsyncLifetime
         var product2 = await context2.Products.SingleAsync(p => p.Id == product.Id);
 
         // Update and save in context1
-        product1.UpdatePrice(Money.Of(200m, Currency.TRY).Value);
+        product1.UpdatePrice(Money.Of(200m, Currency.TRY).Value).IsSuccess.ShouldBeTrue();
         await context1.SaveChangesAsync();
 
         // Update and try to save in context2 -- should fail
-        product2.UpdatePrice(Money.Of(300m, Currency.TRY).Value);
+        product2.UpdatePrice(Money.Of(300m, Currency.TRY).Value).IsSuccess.ShouldBeTrue();
         await Should.ThrowAsync<DbUpdateConcurrencyException>(
             () => context2.SaveChangesAsync());
     }

@@ -7,6 +7,8 @@ public sealed class Product : AggregateRoot<Guid>
 {
     public const int CodeMaxLength = 50;
     public const int NameMaxLength = 200;
+    public const decimal ListPriceAmountMaxValue = 99999999999999.9999m;
+    public const decimal ReorderPointMaxValue = 999999999999.999999m;
 
     public string Code { get; private set; }
     public string Name { get; private set; }
@@ -63,6 +65,21 @@ public sealed class Product : AggregateRoot<Guid>
             return Result.Failure<Product>(ProductErrors.UnitOfMeasureRequired);
         }
 
+        if (listPrice.Amount < 0m)
+        {
+            return Result.Failure<Product>(ProductErrors.ListPriceAmountNegative);
+        }
+
+        if (listPrice.Amount > ListPriceAmountMaxValue)
+        {
+            return Result.Failure<Product>(ProductErrors.ListPriceAmountTooLarge);
+        }
+
+        if (reorderPoint.Value > ReorderPointMaxValue)
+        {
+            return Result.Failure<Product>(ProductErrors.ReorderPointTooLarge);
+        }
+
         string normalizedCode = code.Trim().ToUpperInvariant();
         string normalizedName = name.Trim();
 
@@ -70,10 +87,23 @@ public sealed class Product : AggregateRoot<Guid>
         return Result.Success(product);
     }
 
-    public void UpdatePrice(Money newPrice)
+    public Result UpdatePrice(Money newPrice)
     {
         ArgumentNullException.ThrowIfNull(newPrice);
+
+        if (newPrice.Amount < 0m)
+        {
+            return Result.Failure(ProductErrors.ListPriceAmountNegative);
+        }
+
+        if (newPrice.Amount > ListPriceAmountMaxValue)
+        {
+            return Result.Failure(ProductErrors.ListPriceAmountTooLarge);
+        }
+
         ListPrice = newPrice;
+
+        return Result.Success();
     }
 
     public void Deactivate()
@@ -103,6 +133,21 @@ public sealed class Product : AggregateRoot<Guid>
         if (unitOfMeasureId == Guid.Empty)
         {
             return Result.Failure(ProductErrors.UnitOfMeasureRequired);
+        }
+
+        if (listPrice.Amount < 0m)
+        {
+            return Result.Failure(ProductErrors.ListPriceAmountNegative);
+        }
+
+        if (listPrice.Amount > ListPriceAmountMaxValue)
+        {
+            return Result.Failure(ProductErrors.ListPriceAmountTooLarge);
+        }
+
+        if (reorderPoint.Value > ReorderPointMaxValue)
+        {
+            return Result.Failure(ProductErrors.ReorderPointTooLarge);
         }
 
         Name = name.Trim();

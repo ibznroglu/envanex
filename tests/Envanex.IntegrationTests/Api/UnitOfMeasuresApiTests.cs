@@ -32,6 +32,13 @@ public sealed class UnitOfMeasuresApiTests : IAsyncLifetime
         return Task.CompletedTask;
     }
 
+    public static TheoryData<decimal> ValidDerivedFactors => new()
+    {
+        0.000001m,
+        999999999999.999999m,
+        1.500000000m,
+    };
+
     private async Task<Guid> SeedBaseUnitViaApiAsync(string code = "ADET", string name = "Adet")
     {
         var command = new CreateUnitOfMeasureCommand(code, name, null, 1m);
@@ -51,6 +58,19 @@ public sealed class UnitOfMeasuresApiTests : IAsyncLifetime
         await context.SaveChangesAsync();
 
         return uom.Id;
+    }
+
+    private static async Task<string[]> ReadFieldValidationMessagesAsync(HttpResponseMessage response, string fieldName)
+    {
+        // The status comes first, so a non-JSON 500 fails on this assertion rather than on a parse.
+        response.StatusCode.ShouldBe(HttpStatusCode.BadRequest);
+
+        var body = await response.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("title").GetString().ShouldBe("Validation Failed");
+        body.TryGetProperty("errors", out var errors).ShouldBeTrue();
+        errors.TryGetProperty(fieldName, out var fieldErrors).ShouldBeTrue();
+
+        return [.. fieldErrors.EnumerateArray().Select(e => e.GetString()!)];
     }
 
     [Fact]
@@ -161,5 +181,66 @@ public sealed class UnitOfMeasuresApiTests : IAsyncLifetime
 
         var body = await response.Content.ReadFromJsonAsync<JsonElement>();
         body.GetArrayLength().ShouldBeGreaterThanOrEqualTo(2);
+    }
+
+    [Fact]
+    public async Task CreateUnitOfMeasure_WithDerivedFactorBeyondSixDecimalPlaces_ShouldReturn400WithTurkishMessage()
+    {
+        var baseId = await SeedBaseUnitViaApiAsync();
+
+        var command = new CreateUnitOfMeasureCommand("GR", "Gram", baseId, 0.0000001m);
+        var response = await _client.PostAsJsonAsync("/api/unit-of-measures", command);
+
+        var messages = await ReadFieldValidationMessagesAsync(response, "ConversionFactor");
+        messages.ShouldBe(["D\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 en fazla 6 ondal\u0131k basamak i\u00e7erebilir; sondaki s\u0131f\u0131rlar say\u0131lmaz."]);
+    }
+
+    [Fact]
+    public async Task CreateUnitOfMeasure_WithDerivedFactorAboveMaximum_ShouldReturn400WithTurkishMessage()
+    {
+        var baseId = await SeedBaseUnitViaApiAsync();
+
+        var command = new CreateUnitOfMeasureCommand("GR", "Gram", baseId, 1000000000000m);
+        var response = await _client.PostAsJsonAsync("/api/unit-of-measures", command);
+
+        var messages = await ReadFieldValidationMessagesAsync(response, "ConversionFactor");
+        messages.ShouldBe(["D\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 en fazla 999.999.999.999,999999 olabilir."]);
+    }
+
+    [Fact]
+    public async Task CreateUnitOfMeasure_WithDerivedFactorTooPreciseAndAboveMaximum_ShouldReturn400WithBothTurkishMessages()
+    {
+        var baseId = await SeedBaseUnitViaApiAsync();
+
+        var command = new CreateUnitOfMeasureCommand("GR", "Gram", baseId, 1000000000000.0000001m);
+        var response = await _client.PostAsJsonAsync("/api/unit-of-measures", command);
+
+        var messages = await ReadFieldValidationMessagesAsync(response, "ConversionFactor");
+        messages.ShouldBe(
+        [
+            "D\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 en fazla 6 ondal\u0131k basamak i\u00e7erebilir; sondaki s\u0131f\u0131rlar say\u0131lmaz.",
+            "D\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 en fazla 999.999.999.999,999999 olabilir.",
+        ]);
+    }
+
+    [Theory]
+    [MemberData(nameof(ValidDerivedFactors))]
+    public async Task CreateUnitOfMeasure_WithValidDerivedFactor_ShouldReturn201AndGetShouldReturnIt(decimal factor)
+    {
+        var baseId = await SeedBaseUnitViaApiAsync();
+
+        var command = new CreateUnitOfMeasureCommand("GR", "Gram", baseId, factor);
+        var response = await _client.PostAsJsonAsync("/api/unit-of-measures", command);
+
+        response.StatusCode.ShouldBe(HttpStatusCode.Created);
+        var id = await response.Content.ReadFromJsonAsync<Guid>();
+
+        var getResponse = await _client.GetAsync($"/api/unit-of-measures/{id}");
+
+        getResponse.StatusCode.ShouldBe(HttpStatusCode.OK);
+
+        var body = await getResponse.Content.ReadFromJsonAsync<JsonElement>();
+        body.GetProperty("conversionFactor").GetDecimal().ShouldBe(factor);
+        body.GetProperty("baseUnitId").GetGuid().ShouldBe(baseId);
     }
 }

@@ -6,6 +6,8 @@ public sealed class UnitOfMeasure : AggregateRoot<Guid>
 {
     public const int CodeMaxLength = 20;
     public const int NameMaxLength = 200;
+    public const decimal ConversionFactorMaxValue = 999999999999.999999m;
+    public const int ConversionFactorDecimalPlaces = 6;
 
     public string Code { get; private set; }
     public string Name { get; private set; }
@@ -72,6 +74,16 @@ public sealed class UnitOfMeasure : AggregateRoot<Guid>
             if (conversionFactor <= 0m)
             {
                 return Result.Failure<UnitOfMeasure>(UnitOfMeasureErrors.ConversionFactorMustBePositive);
+            }
+
+            if (conversionFactor != Math.Round(conversionFactor, ConversionFactorDecimalPlaces, MidpointRounding.ToEven))
+            {
+                return Result.Failure<UnitOfMeasure>(UnitOfMeasureErrors.ConversionFactorTooPrecise);
+            }
+
+            if (conversionFactor > ConversionFactorMaxValue)
+            {
+                return Result.Failure<UnitOfMeasure>(UnitOfMeasureErrors.ConversionFactorTooLarge);
             }
         }
 

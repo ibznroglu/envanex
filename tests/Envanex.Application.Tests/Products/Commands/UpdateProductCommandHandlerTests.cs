@@ -128,4 +128,52 @@ public class UpdateProductCommandHandlerTests
         _unitOfWork.RowVersionWasSetBeforeSave.ShouldNotBeNull();
         _unitOfWork.RowVersionWasSetBeforeSave.Value.ShouldBeTrue();
     }
+
+    [Fact]
+    public async Task HandleAsync_WithListPriceAmountRoundingAboveMaximum_ShouldReturnListPriceAmountTooLargeWithoutSaving()
+    {
+        Product product = SeedProduct();
+        var command = new UpdateProductCommand(
+            product.Id, "Updated Name", ActiveUnitOfMeasureId, 99999999999999.99995m, "TRY", 20m, RowVersion);
+
+        Result<Guid> result = await _handler.HandleAsync(command);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountTooLarge);
+        _unitOfWork.SaveChangesCalled.ShouldBe(0);
+        _productRepository.Products.Count.ShouldBe(1);
+        _productRepository.SetOriginalRowVersionCallCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithNegativeListPriceAmount_ShouldReturnListPriceAmountNegativeWithoutSaving()
+    {
+        Product product = SeedProduct();
+        var command = new UpdateProductCommand(
+            product.Id, "Updated Name", ActiveUnitOfMeasureId, -0.0001m, "TRY", 20m, RowVersion);
+
+        Result<Guid> result = await _handler.HandleAsync(command);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountNegative);
+        _unitOfWork.SaveChangesCalled.ShouldBe(0);
+        _productRepository.Products.Count.ShouldBe(1);
+        _productRepository.SetOriginalRowVersionCallCount.ShouldBe(0);
+    }
+
+    [Fact]
+    public async Task HandleAsync_WithReorderPointRoundingAboveMaximum_ShouldReturnReorderPointTooLargeWithoutSaving()
+    {
+        Product product = SeedProduct();
+        var command = new UpdateProductCommand(
+            product.Id, "Updated Name", ActiveUnitOfMeasureId, 200m, "TRY", 999999999999.9999995m, RowVersion);
+
+        Result<Guid> result = await _handler.HandleAsync(command);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ReorderPointTooLarge);
+        _unitOfWork.SaveChangesCalled.ShouldBe(0);
+        _productRepository.Products.Count.ShouldBe(1);
+        _productRepository.SetOriginalRowVersionCallCount.ShouldBe(0);
+    }
 }

@@ -58,11 +58,11 @@ public sealed class RepositoryTests : IAsyncLifetime
         var product2 = await context2.Products.SingleAsync(p => p.Id == product.Id);
 
         // Save in context1 first
-        product1.UpdatePrice(Money.Of(200m, Currency.TRY).Value);
+        product1.UpdatePrice(Money.Of(200m, Currency.TRY).Value).IsSuccess.ShouldBeTrue();
         await context1.SaveChangesAsync();
 
         // Now try saving in context2 with stale RowVersion through UnitOfWork
-        product2.UpdatePrice(Money.Of(300m, Currency.TRY).Value);
+        product2.UpdatePrice(Money.Of(300m, Currency.TRY).Value).IsSuccess.ShouldBeTrue();
         var unitOfWork = new UnitOfWork(context2);
 
         await Should.ThrowAsync<ConcurrencyConflictException>(
@@ -103,7 +103,7 @@ public sealed class RepositoryTests : IAsyncLifetime
         await using (var context = _fixture.CreateDbContext())
         {
             var loaded = await context.Products.SingleAsync(p => p.Id == product.Id);
-            loaded.UpdatePrice(Money.Of(200m, Currency.TRY).Value);
+            loaded.UpdatePrice(Money.Of(200m, Currency.TRY).Value).IsSuccess.ShouldBeTrue();
             await context.SaveChangesAsync();
         }
 
@@ -114,7 +114,7 @@ public sealed class RepositoryTests : IAsyncLifetime
 
         var productToUpdate = await repo.GetByIdAsync(product.Id);
         productToUpdate.ShouldNotBeNull();
-        productToUpdate.UpdatePrice(Money.Of(300m, Currency.TRY).Value);
+        productToUpdate.UpdatePrice(Money.Of(300m, Currency.TRY).Value).IsSuccess.ShouldBeTrue();
 
         // Set the STALE RowVersion so EF thinks the original was different
         repo.SetOriginalRowVersion(productToUpdate, originalRowVersion);
@@ -268,7 +268,7 @@ public sealed class RepositoryTests : IAsyncLifetime
         await using (var context = _fixture.CreateDbContext())
         {
             var loaded = await context.Products.SingleAsync(p => p.Id == product.Id);
-            loaded.UpdatePrice(Money.Of(200m, Currency.TRY).Value);
+            loaded.UpdatePrice(Money.Of(200m, Currency.TRY).Value).IsSuccess.ShouldBeTrue();
             await context.SaveChangesAsync();
         }
 
@@ -282,7 +282,7 @@ public sealed class RepositoryTests : IAsyncLifetime
 
         var productToUpdate = await repo.GetByIdAsync(product.Id);
         productToUpdate.ShouldNotBeNull();
-        productToUpdate.UpdatePrice(Money.Of(999m, Currency.TRY).Value);
+        productToUpdate.UpdatePrice(Money.Of(999m, Currency.TRY).Value).IsSuccess.ShouldBeTrue();
 
         // Deliberately NOT calling: repo.SetOriginalRowVersion(productToUpdate, staleRowVersion);
         // The save should succeed because OriginalValue == current DB RowVersion

@@ -28,6 +28,9 @@ public static class TurkishErrorMessages
         ["Product.UnitOfMeasureRequired"] = "\u00d6l\u00e7\u00fc birimi se\u00e7ilmelidir.",
         ["Product.CodeTooLong"] = "\u00dcr\u00fcn kodu en fazla 50 karakter olabilir.",
         ["Product.NameTooLong"] = "\u00dcr\u00fcn ad\u0131 en fazla 200 karakter olabilir.",
+        ["Product.ListPriceAmountNegative"] = "Liste fiyat\u0131 negatif olamaz.",
+        ["Product.ListPriceAmountTooLarge"] = "Liste fiyat\u0131 en fazla 99.999.999.999.999,9999 olabilir.",
+        ["Product.ReorderPointTooLarge"] = "Yeniden sipari\u015f noktas\u0131 en fazla 999.999.999.999,999999 olabilir.",
         ["Product.NotFound"] = "\u00dcr\u00fcn bulunamad\u0131.",
         ["Product.ConcurrencyConflict"] = "Kay\u0131t ba\u015fka bir kullan\u0131c\u0131 taraf\u0131ndan de\u011fi\u015ftirilmi\u015f. L\u00fctfen sayfay\u0131 yenileyip tekrar deneyin.",
         ["Product.DuplicateCode"] = "Bu \u00fcr\u00fcn kodu zaten kullan\u0131l\u0131yor.",
@@ -37,7 +40,6 @@ public static class TurkishErrorMessages
         // Product - validator
         ["Product.IdRequired"] = "\u00dcr\u00fcn kimli\u011fi zorunludur.",
         ["Product.RowVersionRequired"] = "E\u015fzamanl\u0131l\u0131k kontrol\u00fc i\u00e7in sat\u0131r s\u00fcr\u00fcm\u00fc zorunludur.",
-        ["Product.ListPriceAmountNegative"] = "Liste fiyat\u0131 negatif olamaz.",
         ["Product.ReorderPointNegative"] = "Yeniden sipari\u015f noktas\u0131 negatif olamaz.",
         ["Product.ListPriceCurrencyRequired"] = "Liste fiyat\u0131 para birimi zorunludur.",
 
@@ -47,6 +49,8 @@ public static class TurkishErrorMessages
         ["UnitOfMeasure.InvalidBaseUnitId"] = "Temel birim kimli\u011fi bo\u015f GUID olamaz.",
         ["UnitOfMeasure.BaseUnitFactorMustBeOne"] = "Temel birim i\u00e7in d\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 1 olmal\u0131d\u0131r.",
         ["UnitOfMeasure.ConversionFactorMustBePositive"] = "T\u00fcretilmi\u015f birim i\u00e7in d\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 s\u0131f\u0131rdan b\u00fcy\u00fck olmal\u0131d\u0131r.",
+        ["UnitOfMeasure.ConversionFactorTooPrecise"] = "D\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 en fazla 6 ondal\u0131k basamak i\u00e7erebilir; sondaki s\u0131f\u0131rlar say\u0131lmaz.",
+        ["UnitOfMeasure.ConversionFactorTooLarge"] = "D\u00f6n\u00fc\u015f\u00fcm katsay\u0131s\u0131 en fazla 999.999.999.999,999999 olabilir.",
         ["UnitOfMeasure.CodeTooLong"] = "\u00d6l\u00e7\u00fc birimi kodu en fazla 20 karakter olabilir.",
         ["UnitOfMeasure.NameTooLong"] = "\u00d6l\u00e7\u00fc birimi ad\u0131 en fazla 200 karakter olabilir.",
         ["UnitOfMeasure.DuplicateCode"] = "Bu \u00f6l\u00e7\u00fc birimi kodu zaten kullan\u0131l\u0131yor.",

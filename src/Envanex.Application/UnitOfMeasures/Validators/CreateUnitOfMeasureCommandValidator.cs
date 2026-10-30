@@ -36,6 +36,14 @@ public sealed class CreateUnitOfMeasureCommandValidator : AbstractValidator<Crea
             RuleFor(x => x.ConversionFactor)
                 .GreaterThan(0m)
                 .WithErrorCode("UnitOfMeasure.ConversionFactorMustBePositive");
+
+            RuleFor(x => x.ConversionFactor)
+                .Must(value => value == Math.Round(value, UnitOfMeasure.ConversionFactorDecimalPlaces, MidpointRounding.ToEven))
+                .WithErrorCode(UnitOfMeasureErrors.ConversionFactorTooPrecise.Code);
+
+            RuleFor(x => x.ConversionFactor)
+                .LessThanOrEqualTo(UnitOfMeasure.ConversionFactorMaxValue)
+                .WithErrorCode(UnitOfMeasureErrors.ConversionFactorTooLarge.Code);
         });
     }
 }

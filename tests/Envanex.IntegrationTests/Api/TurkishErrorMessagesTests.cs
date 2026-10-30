@@ -1,4 +1,6 @@
 using Envanex.Application.Authentication;
+using Envanex.Domain.Aggregates.Products;
+using Envanex.Domain.Aggregates.UnitOfMeasures;
 using Envanex.Web.Extensions;
 using Shouldly;
 
@@ -15,6 +17,15 @@ public sealed class TurkishErrorMessagesTests
 
     private const string InvalidCredentialsMessage =
         "E-posta veya parola hatalı. Arka arkaya birkaç başarısız denemeden sonra hesap bir süreliğine kilitlenir.";
+
+    public static TheoryData<string, string> NumericFieldMessages => new()
+    {
+        { UnitOfMeasureErrors.ConversionFactorTooPrecise.Code, "Dönüşüm katsayısı en fazla 6 ondalık basamak içerebilir; sondaki sıfırlar sayılmaz." },
+        { UnitOfMeasureErrors.ConversionFactorTooLarge.Code, "Dönüşüm katsayısı en fazla 999.999.999.999,999999 olabilir." },
+        { ProductErrors.ListPriceAmountTooLarge.Code, "Liste fiyatı en fazla 99.999.999.999.999,9999 olabilir." },
+        { ProductErrors.ReorderPointTooLarge.Code, "Yeniden sipariş noktası en fazla 999.999.999.999,999999 olabilir." },
+        { ProductErrors.ListPriceAmountNegative.Code, "Liste fiyatı negatif olamaz." },
+    };
 
     [Fact]
     public void InvalidCredentialsMessage_ShouldBeExactlyTheDecision6String()
@@ -73,5 +84,14 @@ public sealed class TurkishErrorMessagesTests
 
         // Goes red if the message is written as "Şifre zorunludur."
         message.ShouldBe("Parola zorunludur.");
+    }
+
+    [Theory]
+    [MemberData(nameof(NumericFieldMessages))]
+    public void NumericFieldMessage_ShouldBeExactlyTheShownText(string errorCode, string expected)
+    {
+        var message = TurkishErrorMessages.GetMessage(errorCode, Fallback);
+
+        message.ShouldBe(expected);
     }
 }

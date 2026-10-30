@@ -84,8 +84,9 @@ public class ProductTests
         var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
         var newPrice = Money.Of(200.75m, Currency.TRY).Value;
 
-        product.UpdatePrice(newPrice);
+        var result = product.UpdatePrice(newPrice);
 
+        result.IsSuccess.ShouldBeTrue();
         product.ListPrice.ShouldBe(newPrice);
     }
 
@@ -273,5 +274,272 @@ public class ProductTests
 
         result.IsFailure.ShouldBeTrue();
         result.Error.ShouldBe(ProductErrors.NameRequired);
+    }
+
+    [Fact]
+    public void Create_WithListPriceAmountAtMaximum_ShouldSucceed()
+    {
+        var price = Money.Of(99999999999999.9999m, Currency.TRY).Value;
+
+        var result = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, price, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ListPrice.Amount.ShouldBe(99999999999999.9999m);
+    }
+
+    [Fact]
+    public void Create_WithListPriceAmountRoundedDownToMaximum_ShouldSucceedWithMaximum()
+    {
+        var price = Money.Of(99999999999999.99994m, Currency.TRY).Value;
+
+        var result = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, price, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ListPrice.Amount.ShouldBe(99999999999999.9999m);
+    }
+
+    [Fact]
+    public void Create_WithListPriceAmountRoundedUpAboveMaximum_ShouldFail()
+    {
+        var price = Money.Of(99999999999999.99995m, Currency.TRY).Value;
+
+        var result = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, price, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountTooLarge);
+    }
+
+    [Fact]
+    public void Create_WithNegativeListPriceAmount_ShouldFail()
+    {
+        var price = Money.Of(-0.0001m, Currency.TRY).Value;
+
+        var result = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, price, DefaultReorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountNegative);
+    }
+
+    [Fact]
+    public void Create_WithNegativeListPriceAmountRoundedToZero_ShouldSucceedWithZero()
+    {
+        var price = Money.Of(-0.00004m, Currency.TRY).Value;
+
+        var result = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, price, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ListPrice.Amount.ShouldBe(0m);
+    }
+
+    [Fact]
+    public void Create_WithReorderPointAtMaximum_ShouldSucceed()
+    {
+        var reorderPoint = Quantity.Of(999999999999.999999m).Value;
+
+        var result = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, reorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ReorderPoint.Value.ShouldBe(999999999999.999999m);
+    }
+
+    [Fact]
+    public void Create_WithReorderPointRoundedDownToMaximum_ShouldSucceedWithMaximum()
+    {
+        var reorderPoint = Quantity.Of(999999999999.9999994m).Value;
+
+        var result = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, reorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ReorderPoint.Value.ShouldBe(999999999999.999999m);
+    }
+
+    [Fact]
+    public void Create_WithReorderPointRoundedUpAboveMaximum_ShouldFail()
+    {
+        var reorderPoint = Quantity.Of(999999999999.9999995m).Value;
+
+        var result = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, reorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ReorderPointTooLarge);
+    }
+
+    [Fact]
+    public void Update_WithListPriceAmountAtMaximum_ShouldSucceed()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var price = Money.Of(99999999999999.9999m, Currency.TRY).Value;
+
+        var result = product.Update("Widget", ValidUnitOfMeasureId, price, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.ListPrice.Amount.ShouldBe(99999999999999.9999m);
+    }
+
+    [Fact]
+    public void Update_WithListPriceAmountRoundedDownToMaximum_ShouldSucceedWithMaximum()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var price = Money.Of(99999999999999.99994m, Currency.TRY).Value;
+
+        var result = product.Update("Widget", ValidUnitOfMeasureId, price, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.ListPrice.Amount.ShouldBe(99999999999999.9999m);
+    }
+
+    [Fact]
+    public void Update_WithListPriceAmountRoundedUpAboveMaximum_ShouldFailAndChangeNothing()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        Guid originalId = product.Id;
+        var price = Money.Of(99999999999999.99995m, Currency.TRY).Value;
+
+        var result = product.Update("Changed Name", Guid.CreateVersion7(), price, Quantity.Of(20m).Value);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountTooLarge);
+        ShouldBeUnchanged(product, originalId);
+    }
+
+    [Fact]
+    public void Update_WithNegativeListPriceAmount_ShouldFailAndChangeNothing()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        Guid originalId = product.Id;
+        var price = Money.Of(-0.0001m, Currency.TRY).Value;
+
+        var result = product.Update("Changed Name", Guid.CreateVersion7(), price, Quantity.Of(20m).Value);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountNegative);
+        ShouldBeUnchanged(product, originalId);
+    }
+
+    [Fact]
+    public void Update_WithNegativeListPriceAmountRoundedToZero_ShouldSucceedWithZero()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var price = Money.Of(-0.00004m, Currency.TRY).Value;
+
+        var result = product.Update("Widget", ValidUnitOfMeasureId, price, DefaultReorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.ListPrice.Amount.ShouldBe(0m);
+    }
+
+    [Fact]
+    public void Update_WithReorderPointAtMaximum_ShouldSucceed()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var reorderPoint = Quantity.Of(999999999999.999999m).Value;
+
+        var result = product.Update("Widget", ValidUnitOfMeasureId, DefaultPrice, reorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.ReorderPoint.Value.ShouldBe(999999999999.999999m);
+    }
+
+    [Fact]
+    public void Update_WithReorderPointRoundedDownToMaximum_ShouldSucceedWithMaximum()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var reorderPoint = Quantity.Of(999999999999.9999994m).Value;
+
+        var result = product.Update("Widget", ValidUnitOfMeasureId, DefaultPrice, reorderPoint);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.ReorderPoint.Value.ShouldBe(999999999999.999999m);
+    }
+
+    [Fact]
+    public void Update_WithReorderPointRoundedUpAboveMaximum_ShouldFailAndChangeNothing()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        Guid originalId = product.Id;
+        var price = Money.Of(200.75m, Currency.TRY).Value;
+        var reorderPoint = Quantity.Of(999999999999.9999995m).Value;
+
+        var result = product.Update("Changed Name", Guid.CreateVersion7(), price, reorderPoint);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ReorderPointTooLarge);
+        ShouldBeUnchanged(product, originalId);
+    }
+
+    [Fact]
+    public void UpdatePrice_WithListPriceAmountAtMaximum_ShouldSucceed()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var price = Money.Of(99999999999999.9999m, Currency.TRY).Value;
+
+        var result = product.UpdatePrice(price);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.ListPrice.Amount.ShouldBe(99999999999999.9999m);
+    }
+
+    [Fact]
+    public void UpdatePrice_WithListPriceAmountRoundedDownToMaximum_ShouldSucceedWithMaximum()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var price = Money.Of(99999999999999.99994m, Currency.TRY).Value;
+
+        var result = product.UpdatePrice(price);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.ListPrice.Amount.ShouldBe(99999999999999.9999m);
+    }
+
+    [Fact]
+    public void UpdatePrice_WithListPriceAmountRoundedUpAboveMaximum_ShouldFailAndChangeNothing()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        Guid originalId = product.Id;
+        var price = Money.Of(99999999999999.99995m, Currency.TRY).Value;
+
+        var result = product.UpdatePrice(price);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountTooLarge);
+        ShouldBeUnchanged(product, originalId);
+    }
+
+    [Fact]
+    public void UpdatePrice_WithNegativeListPriceAmount_ShouldFailAndChangeNothing()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        Guid originalId = product.Id;
+        var price = Money.Of(-0.0001m, Currency.TRY).Value;
+
+        var result = product.UpdatePrice(price);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(ProductErrors.ListPriceAmountNegative);
+        ShouldBeUnchanged(product, originalId);
+    }
+
+    [Fact]
+    public void UpdatePrice_WithNegativeListPriceAmountRoundedToZero_ShouldSucceedWithZero()
+    {
+        var product = Product.Create("SKU001", "Widget", ValidUnitOfMeasureId, DefaultPrice, DefaultReorderPoint).Value;
+        var price = Money.Of(-0.00004m, Currency.TRY).Value;
+
+        var result = product.UpdatePrice(price);
+
+        result.IsSuccess.ShouldBeTrue();
+        product.ListPrice.Amount.ShouldBe(0m);
+    }
+
+    private static void ShouldBeUnchanged(Product product, Guid originalId)
+    {
+        product.Id.ShouldBe(originalId);
+        product.Code.ShouldBe("SKU001");
+        product.Name.ShouldBe("Widget");
+        product.UnitOfMeasureId.ShouldBe(ValidUnitOfMeasureId);
+        product.ListPrice.ShouldBe(DefaultPrice);
+        product.ReorderPoint.ShouldBe(DefaultReorderPoint);
+        product.IsActive.ShouldBeTrue();
+        product.DomainEvents.ShouldBeEmpty();
     }
 }

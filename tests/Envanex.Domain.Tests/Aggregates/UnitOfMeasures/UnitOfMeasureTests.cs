@@ -5,6 +5,28 @@ namespace Envanex.Domain.Tests.Aggregates.UnitOfMeasures;
 
 public class UnitOfMeasureTests
 {
+    public static TheoryData<decimal> RepresentableFactorsWithinMaximum => new()
+    {
+        0.000001m,
+        0.0000010m,
+        1.500000000m,
+        999999999999.999998m,
+        999999999999.999999m,
+    };
+
+    public static TheoryData<decimal> FactorsBeyondSixDecimalPlaces => new()
+    {
+        0.0000001m,
+        0.0000005m,
+        0.1234567m,
+    };
+
+    public static TheoryData<decimal> FactorsTooPreciseAndAboveMaximum => new()
+    {
+        1000000000000.0000001m,
+        999999999999.9999994m,
+    };
+
     [Fact]
     public void Create_BaseUnit_WithValidInputs_ShouldSucceed()
     {
@@ -190,5 +212,81 @@ public class UnitOfMeasureTests
 
         result.IsSuccess.ShouldBeTrue();
         result.Value.Name.ShouldBe(name);
+    }
+
+    [Theory]
+    [MemberData(nameof(RepresentableFactorsWithinMaximum))]
+    public void Create_DerivedUnit_WithRepresentableFactorWithinMaximum_ShouldSucceed(decimal factor)
+    {
+        var baseUnitId = Guid.CreateVersion7();
+
+        var result = UnitOfMeasure.Create("GR", "Gram", baseUnitId, factor);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ConversionFactor.ShouldBe(factor);
+    }
+
+    [Theory]
+    [MemberData(nameof(FactorsBeyondSixDecimalPlaces))]
+    public void Create_DerivedUnit_WithFactorBeyondSixDecimalPlaces_ShouldFailWithTooPrecise(decimal factor)
+    {
+        var baseUnitId = Guid.CreateVersion7();
+
+        var result = UnitOfMeasure.Create("GR", "Gram", baseUnitId, factor);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.ConversionFactorTooPrecise);
+    }
+
+    [Fact]
+    public void Create_DerivedUnit_WithFactorAboveMaximum_ShouldFailWithTooLarge()
+    {
+        var baseUnitId = Guid.CreateVersion7();
+
+        var result = UnitOfMeasure.Create("GR", "Gram", baseUnitId, 1000000000000.000000m);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.ConversionFactorTooLarge);
+    }
+
+    [Theory]
+    [MemberData(nameof(FactorsTooPreciseAndAboveMaximum))]
+    public void Create_DerivedUnit_WithFactorTooPreciseAndAboveMaximum_ShouldFailWithTooPrecise(decimal factor)
+    {
+        var baseUnitId = Guid.CreateVersion7();
+
+        var result = UnitOfMeasure.Create("GR", "Gram", baseUnitId, factor);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.ConversionFactorTooPrecise);
+    }
+
+    [Fact]
+    public void Create_DerivedUnit_WithNegativeFactorBeyondSixDecimalPlaces_ShouldFailWithMustBePositive()
+    {
+        var baseUnitId = Guid.CreateVersion7();
+
+        var result = UnitOfMeasure.Create("GR", "Gram", baseUnitId, -0.0000001m);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.ConversionFactorMustBePositive);
+    }
+
+    [Fact]
+    public void Create_BaseUnit_WithOneAndTrailingZeros_ShouldSucceed()
+    {
+        var result = UnitOfMeasure.Create("KG", "Kilogram", null, 1.000000000m);
+
+        result.IsSuccess.ShouldBeTrue();
+        result.Value.ConversionFactor.ShouldBe(1m);
+    }
+
+    [Fact]
+    public void Create_BaseUnit_WithFactorBeyondSixDecimalPlaces_ShouldFailWithBaseUnitFactorMustBeOne()
+    {
+        var result = UnitOfMeasure.Create("KG", "Kilogram", null, 1.0000001m);
+
+        result.IsFailure.ShouldBeTrue();
+        result.Error.ShouldBe(UnitOfMeasureErrors.BaseUnitFactorMustBeOne);
     }
 }

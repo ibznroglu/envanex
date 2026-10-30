@@ -8,6 +8,8 @@ public static class UnitOfMeasureErrors
     public static readonly Error NameRequired = new("UnitOfMeasure.NameRequired", "Unit of measure name is required.");
     public static readonly Error BaseUnitFactorMustBeOne = new("UnitOfMeasure.BaseUnitFactorMustBeOne", "A base unit must have a conversion factor of 1.");
     public static readonly Error ConversionFactorMustBePositive = new("UnitOfMeasure.ConversionFactorMustBePositive", "A derived unit must have a positive conversion factor.");
+    public static readonly Error ConversionFactorTooPrecise = new("UnitOfMeasure.ConversionFactorTooPrecise", "A derived unit's conversion factor must have at most 6 decimal places, not counting trailing zeros.");
+    public static readonly Error ConversionFactorTooLarge = new("UnitOfMeasure.ConversionFactorTooLarge", "A derived unit's conversion factor must not exceed 999999999999.999999.");
     public static readonly Error InvalidBaseUnitId = new("UnitOfMeasure.InvalidBaseUnitId", "Base unit identifier must not be an empty GUID.");
     public static readonly Error CodeTooLong = new("UnitOfMeasure.CodeTooLong", "Unit of measure code must not exceed 20 characters.");
     public static readonly Error NameTooLong = new("UnitOfMeasure.NameTooLong", "Unit of measure name must not exceed 200 characters.");
